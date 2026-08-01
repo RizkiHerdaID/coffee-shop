@@ -3,8 +3,52 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="description" content="Coffee Shop — specialty coffee, slow-brewed with care. Visit us for espresso, pour over, and fresh bakes.">
+    <meta name="description" content="@yield('description', 'Coffee Shop — specialty coffee, slow-brewed with care. Visit us for espresso, pour over, and fresh bakes.')">
     <title>@yield('title', 'Coffee Shop')</title>
+
+    <meta property="og:title" content="@yield('title', 'Coffee Shop')">
+    <meta property="og:description" content="@yield('description', 'Coffee Shop — specialty coffee, slow-brewed with care. Visit us for espresso, pour over, and fresh bakes.')">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="{{ url()->current() }}">
+    <meta property="og:image" content="{{ url('/favicon.ico') }}">
+    <meta property="og:site_name" content="{{ config('shop.name') }}">
+    <meta name="twitter:card" content="summary">
+
+    @php
+        $days = [
+            'Monday — Friday' => ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'],
+            'Saturday' => ['Saturday'],
+            'Sunday' => ['Sunday'],
+        ];
+
+        $openingHours = collect(config('shop.hours'))->flatMap(function ($hours, $label) use ($days) {
+            [$opens, $closes] = array_map('trim', explode('—', $hours));
+
+            return array_map(fn ($day) => [
+                '@type' => 'OpeningHoursSpecification',
+                'dayOfWeek' => $day,
+                'opens' => $opens,
+                'closes' => $closes,
+            ], $days[$label] ?? []);
+        })->values();
+
+        $localBusiness = [
+            '@context' => 'https://schema.org',
+            '@type' => 'Cafe',
+            'name' => config('shop.name'),
+            'telephone' => config('shop.phone'),
+            'email' => config('shop.email'),
+            'url' => url('/'),
+            'hasMap' => config('shop.maps_url'),
+            'address' => [
+                '@type' => 'PostalAddress',
+                'streetAddress' => config('shop.address'),
+            ],
+            'openingHoursSpecification' => $openingHours,
+        ];
+    @endphp
+    <script type="application/ld+json">{!! json_encode($localBusiness, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) !!}</script>
+
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
 <body class="bg-stone-950 text-stone-200 antialiased font-sans">
