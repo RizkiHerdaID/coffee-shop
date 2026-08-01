@@ -18,6 +18,10 @@ class OrdersTable
             ->columns([
                 TextColumn::make('order_number')
                     ->searchable(),
+                TextColumn::make('customer_phone')
+                    ->label(__('orders.customer_phone'))
+                    ->searchable()
+                    ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('status')
                     ->badge()
                     ->color(fn (OrderStatus $state): string => match ($state) {
@@ -26,10 +30,11 @@ class OrdersTable
                         OrderStatus::Served => 'info',
                     }),
                 TextColumn::make('total')
+                    ->label(__('orders.total'))
                     ->money('IDR')
                     ->sortable(),
                 TextColumn::make('admin.name')
-                    ->label('Created by')
+                    ->label(__('orders.created_by'))
                     ->searchable()
                     ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('created_at')

@@ -3,14 +3,24 @@
 namespace App\Models;
 
 use App\Enums\OrderStatus;
+use App\Jobs\SendOrderConfirmation;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-#[Fillable(['order_number', 'status', 'total', 'shift_id', 'created_by'])]
+#[Fillable(['order_number', 'customer_phone', 'status', 'total', 'shift_id', 'created_by'])]
 class Order extends Model
 {
+    protected static function booted(): void
+    {
+        static::created(function (Order $order) {
+            if (config('whatsapp.enabled') && filled($order->customer_phone)) {
+                SendOrderConfirmation::dispatch($order);
+            }
+        });
+    }
+
     /**
      * Get the attributes that should be cast.
      *
