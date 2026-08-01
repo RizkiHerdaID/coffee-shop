@@ -23,8 +23,12 @@ Pitfalls learned in prior sessions:
 
 - **Prompt quoting**: single-quoted prompts containing apostrophes break the shell command (`ops` agent's prompt failed to submit this way). Avoid apostrophes or escape them.
 - **`herdr pane run ... --wait` returns early** — it matches the first state change, not task completion. After dispatching, `sleep` then `herdr pane read <pane>`.
-- **Check the pane, don't trust acknowledgement** — fast models may acknowledge a task without doing it; read the pane output to confirm work happened.
+- **Check the pane, don't trust acknowledgement** — fast models may acknowledge a task without doing it; read the pane output to confirm work happened. Agents may also silently ignore instructions (a "don't commit" instruction was violated) — verify the pane, and if a violation matters, dispatch a corrective prompt.
 - **Permission prompts block agents** — if a pane is stuck, read its output; the agent may be waiting on a permission prompt that needs approval or needs its task simplified to avoid it.
+- **`herdr agent read` only exposes the ~30 visible terminal lines** — an agent's full report scrolls out of reach. To collect a long result: prompt the agent to reprint it in a compact block that fits one screen (≤22 lines), or have it write the result to a file. Split long outputs into "print section X only" follow-ups.
+- **Agents and panes disappear when the session ends** — research agents' panes closed after their sessions, losing direct access. Capture lessons/post-mortems WHILE agents are alive, and have deliverables written to files (e.g. `docs/`) rather than only spoken into the pane.
+- **Branch worktrees from the current `main` HEAD** — branches created from an older base show unrelated infra commits as deletions in `git diff main <branch>`; the 3-way merge still resolves cleanly (main keeps its versions), but the diff noise is confusing. Re-create stale-base branches or accept the artifact.
+- **Post-mortems** — before closing agent panes, ask each agent (and yourself) for `LESSONS LEARNED` bullets; fold them into AGENTS.md quirks and these skills. This session's lessons are captured in `.opencode/skills/sail-filament-workflow/SKILL.md`.
 
 ## Starting opencode agents in panes
 
