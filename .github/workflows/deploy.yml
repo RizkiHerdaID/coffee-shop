@@ -1,0 +1,25 @@
+name: Deploy coffee-shop
+
+on:
+  push:
+    branches: [main]
+    paths-ignore: ["README.md"]
+  workflow_dispatch:
+    inputs:
+      commit:
+        description: "Commit SHA to deploy (default: latest main)"
+        required: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger deploy on rizkilab VPS
+        env:
+          KEY: ${{ secrets.COFFEE_DEPLOY_KEY }}
+          COMMIT: ${{ github.event.inputs.commit || '' }}
+        run: |
+          printf '%s\n' "$KEY" > "$HOME/deploy_key"
+          chmod 600 "$HOME/deploy_key"
+          ssh -i "$HOME/deploy_key" -o StrictHostKeyChecking=accept-new \
+            ubuntu@43.163.6.163 "sudo bash /opt/rizkilab/deploy-coffee-shop.sh '$COMMIT'"
