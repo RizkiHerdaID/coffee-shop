@@ -70,9 +70,10 @@ curl -s -o /dev/null -w "%{http_code}\n" https://coffee.rizkilab.my.id/
 5. **Redis RDB version crash-loop**: a stale `sail-redis` volume written by a newer Redis makes Redis 7.4 crash-loop. Fix: `sg docker -c "./vendor/bin/sail down"` then `sg docker -c "docker volume rm coffee-shop_sail-redis"` then `sail up -d`.
 6. **Worktree Sail containers run side-by-side with per-worktree ports.** Feature branches run in herdr worktrees (`~/.herdr/worktrees/coffee-shop/<branch>`); each worktree gets its own `.env` port mapping via `scripts/worktree-env.sh <worktree-dir> <slot 1-4>` (slots map to APP_PORT 8081-8084, FORWARD_DB_PORT 5433-5436, etc. — see the herdr-parallel skill for the table). All worktrees can be up simultaneously. Only `APP_PORT`/`VITE_PORT`/`FORWARD_*` and `APP_URL` are overridden — `DB_PORT`/`REDIS_PORT`/`MAIL_PORT`/`AWS_ENDPOINT_URL` stay internal (in-container hostnames `pgsql`, `redis`, `mailpit`, `minio`). One-time cleanup: worktrees created BEFORE this scheme still hold default ports; `sail down` them once.
 7. **`laravel.test` unhealthy / can't resolve `pgsql`** after interrupted starts → leftover containers have no network attached. Fix: `sail down` + `sail up -d` (full recreate).
-8. **Seeded admin**: `admin@example.com` / `password` (fallbacks; `.env` may not set `ADMIN_*`). Change before anything facing real traffic.
-9. **Never access `/mnt/c`** (outside WSL) — user explicitly banned it.
-10. **Don't commit or push unless explicitly asked.** When asked, use the existing style (e.g. `Add Filament admin panel, replace custom admin auth, add menu resource`).
+8. **After `sail up`, the entrypoint's `optimize` re-caches config/views/routes, which breaks the test suite** (phpunit.xml env overrides like `SESSION_DRIVER=array`/`DB_CONNECTION=sqlite` are ignored → CSRF 419s and `data.email is required` failures in AdminAuthTest). Fix after every `sail down`/`up` in a dev env: `sg docker -c "php artisan config:clear && php artisan view:clear && php artisan route:clear"`. `sail artisan migrate` right after a recreate may also report a bogus `pgsql` DNS error — retry (or use `docker exec -u sail coffee-shop-laravel.test-1 php artisan ...`) before assuming a real network fault.
+9. **Seeded admin**: `admin@example.com` / `password` (fallbacks; `.env` may not set `ADMIN_*`). Change before anything facing real traffic.
+10. **Never access `/mnt/c`** (outside WSL) — user explicitly banned it.
+11. **Don't commit or push unless explicitly asked.** When asked, use the existing style (e.g. `Add Filament admin panel, replace custom admin auth, add menu resource`).
 
 ## Conventions
 
