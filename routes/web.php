@@ -11,7 +11,7 @@ Route::get('/contact', [PageController::class, 'contact'])->name('contact');
 
 Route::prefix('admin')->name('admin.')->group(function () {
     Route::get('login', [AdminAuthController::class, 'showLoginForm'])->name('login');
-    Route::post('login', [AdminAuthController::class, 'login'])->name('login.attempt');
+    Route::post('login', [AdminAuthController::class, 'login'])->middleware('throttle:admin.login')->name('login.attempt');
 
     Route::middleware('auth:admin')->group(function () {
         Route::get('/', [AdminDashboardController::class, 'index'])->name('dashboard');

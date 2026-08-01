@@ -1,58 +1,89 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# Coffee Shop
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+A Laravel 12 application for a coffee shop, combining a public marketing site with an admin back office. It ships with a Docker-based development environment built on [Laravel Sail](https://laravel.com/docs/sail), extended with a database-driven menu, admin authentication, an object-storage-backed filesystem (MinIO), and a mail preview server (Mailpit).
 
-## About Laravel
+## Features
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+- **Landing pages** — hero, menu, and contact pages styled with Tailwind CSS 4.
+- **Database-driven menu** — menu items are stored in PostgreSQL and rendered from the database via a `MenuItem` model.
+- **Admin authentication** — a password-protected admin area with its own login flow.
+- **Local services** — PostgreSQL, Redis, MinIO (S3-compatible storage), and Mailpit run as Docker services via Sail.
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+## Prerequisites
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+- **Docker** with the Compose plugin (required — the whole stack runs in containers).
+- **PHP 8.3+ and Composer** (optional — only needed if you want to run Sail without the `./vendor/bin/sail` wrapper or work with Composer tooling on the host).
 
-## Learning Laravel
-
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
-
-In addition, [Laracasts](https://laracasts.com) contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
-
-You can also watch bite-sized lessons with real-world projects on [Laravel Learn](https://laravel.com/learn), where you will be guided through building a Laravel application from scratch while learning PHP fundamentals.
-
-## Agentic Development
-
-Laravel's predictable structure and conventions make it ideal for AI coding agents like Claude Code, Cursor, and GitHub Copilot. Install [Laravel Boost](https://laravel.com/docs/ai) to supercharge your AI workflow:
+## Quick Start
 
 ```bash
-composer require laravel/boost --dev
+# 1. Configure the environment
+cp .env.example .env
 
-php artisan boost:install
+# 2. Build the app image (first time only)
+./vendor/bin/sail build
+
+# 3. Start the stack
+./vendor/bin/sail up -d
 ```
 
-Boost provides your agent 15+ tools and skills that help agents build Laravel applications while following best practices.
+The first boot is fully automated by `docker-entrypoint.sh`, which runs inside the `laravel.test` container:
 
-## Contributing
+- generates `APP_KEY` in `.env` if it is empty,
+- waits for PostgreSQL and runs `php artisan migrate --force` (retries for up to 60 attempts),
+- caches the app config and compiled views,
+- then hands off to Sail's `start-container`, which remaps the `sail` user to your host UID and launches `php artisan serve` via supervisord.
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+After the stack is up, the site is available at `http://localhost` (or `APP_PORT` if you changed it), and the Vite dev server runs on port 5173.
 
-## Code of Conduct
+### Seed the database
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+```bash
+./vendor/bin/sail artisan db:seed
+```
 
-## Security Vulnerabilities
+This seeds the database and creates the admin account from the `ADMIN_NAME`, `ADMIN_EMAIL`, and `ADMIN_PASSWORD` environment variables. If they are not set, the fallbacks are used:
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+| Variable | Fallback |
+| --- | --- |
+| `ADMIN_NAME` | `Admin` |
+| `ADMIN_EMAIL` | `admin@example.com` |
+| `ADMIN_PASSWORD` | `password` |
 
-## License
+> **WARNING:** change `ADMIN_*` in `.env` before seeding anything that will face real traffic. The fallback password is for local development only.
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+### Run the tests
+
+```bash
+./vendor/bin/sail artisan test
+```
+
+## Local Services
+
+| Service | Purpose | Host port |
+| --- | --- | --- |
+| `laravel.test` | Laravel app (`php artisan serve` via supervisord) | `APP_PORT` (default `80`) |
+| `queue` | `php artisan queue:work --sleep=3 --tries=3` | — |
+| `pgsql` | PostgreSQL 18 database | `FORWARD_DB_PORT` (default `5432`) |
+| `redis` | Redis 7.4 cache/session store | `FORWARD_REDIS_PORT` (default `6379`) |
+| `minio` | S3-compatible object storage | `9000` / console `8900` |
+| `mailpit` | SMTP mail catcher + web UI | `1025` / UI `8025` |
+
+### Mail
+
+Outgoing mail uses SMTP and is delivered to **Mailpit** (see `MAIL_*` in `.env`). Open `http://localhost:8025` (`FORWARD_MAILPIT_UI_PORT`) to inspect captured messages.
+
+### Queues
+
+A dedicated `queue` container runs `php artisan queue:work` continuously, so jobs are processed automatically once you switch `QUEUE_CONNECTION` from `sync` to `redis` in `.env` and restart the stack:
+
+```bash
+./vendor/bin/sail restart
+```
+
+## Production Notes
+
+- **Secrets** — generate a real `APP_KEY`, use a strong `DB_PASSWORD`, and set real `ADMIN_*` credentials. Never reuse the defaults from `.env.example`.
+- **Storage** — `FILESYSTEM_DISK=s3` points at MinIO. In production, replace `AWS_ENDPOINT_URL` with your S3 provider endpoint (or switch to `FILESYSTEM_DISK=local`) and use real `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` values instead of the `MINIO_ROOT_*` references.
+- **Mail** — point `MAIL_HOST` / `MAIL_PORT` at a real SMTP provider and configure `MAIL_USERNAME`, `MAIL_PASSWORD`, and `MAIL_ENCRYPTION` accordingly.
+- The template defaults to `APP_ENV=production` with `APP_DEBUG=false`. For local development, set `APP_ENV=local` and `APP_DEBUG=true` (see the comment in `.env.example`).

@@ -61,10 +61,10 @@
             @foreach ($highlights as $item)
             <div class="flex items-start justify-between gap-4 rounded-2xl border border-stone-800 bg-stone-950 p-6">
                 <div>
-                    <h3 class="font-semibold text-white">{{ $item['name'] }}</h3>
-                    <p class="mt-1 text-sm text-stone-400">{{ $item['note'] }}</p>
+                    <h3 class="font-semibold text-white">{{ $item->name }}</h3>
+                    <p class="mt-1 text-sm text-stone-400">{{ $item->note }}</p>
                 </div>
-                <p class="shrink-0 font-semibold text-amber-500">{{ number_format($item['price']) }}</p>
+                <p class="shrink-0 font-semibold text-amber-500">Rp {{ number_format($item->price, 0, ",", ".") }}</p>
             </div>
             @endforeach
         </div>

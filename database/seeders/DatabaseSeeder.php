@@ -24,9 +24,11 @@ class DatabaseSeeder extends Seeder
         ]);
 
         Admin::factory()->create([
-            'name' => 'Admin',
-            'email' => 'admin@example.com',
-            'password' => 'password',
+            'name' => env('ADMIN_NAME', 'Admin'),
+            'email' => env('ADMIN_EMAIL', 'admin@example.com'),
+            'password' => env('ADMIN_PASSWORD', 'password'),
         ]);
+
+        $this->call(MenuSeeder::class);
     }
 }

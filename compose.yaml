@@ -4,15 +4,18 @@ services:
             context: ./vendor/laravel/sail/runtimes/8.4
             dockerfile: Dockerfile
             args:
-                WWWGROUP: '${WWWGROUP}'
+                WWWGROUP: '${WWWGROUP:-1000}'
         image: sail-8.4/app
+        entrypoint:
+            - './docker-entrypoint.sh'
+            - '/usr/local/bin/start-container'
         extra_hosts:
             - 'host.docker.internal:host-gateway'
         ports:
             - '${APP_PORT:-80}:80'
             - '${VITE_PORT:-5173}:${VITE_PORT:-5173}'
         environment:
-            WWWUSER: '${WWWUSER}'
+            WWWUSER: '${WWWUSER:-1000}'
             LARAVEL_SAIL: 1
             XDEBUG_MODE: '${SAIL_XDEBUG_MODE:-off}'
             XDEBUG_CONFIG: '${SAIL_XDEBUG_CONFIG:-client_host=host.docker.internal}'
@@ -22,17 +25,53 @@ services:
         networks:
             - sail
         depends_on:
-            - pgsql
-            - redis
-            - minio
+            pgsql:
+                condition: service_healthy
+            redis:
+                condition: service_healthy
+            minio:
+                condition: service_healthy
+        healthcheck:
+            test:
+                - CMD
+                - curl
+                - '-fsS'
+                - 'http://localhost/up'
+            interval: 5s
+            timeout: 5s
+            retries: 20
+            start_period: 10s
+    queue:
+        image: sail-8.4/app
+        entrypoint:
+            - './docker-entrypoint.sh'
+            - '/usr/local/bin/start-container'
+        command: 'php artisan queue:work --sleep=3 --tries=3'
+        environment:
+            WWWUSER: '${WWWUSER:-1000}'
+            LARAVEL_SAIL: 1
+            XDEBUG_MODE: '${SAIL_XDEBUG_MODE:-off}'
+            XDEBUG_CONFIG: '${SAIL_XDEBUG_CONFIG:-client_host=host.docker.internal}'
+            IGNITION_LOCAL_SITES_PATH: '${PWD}'
+        volumes:
+            - '.:/var/www/html'
+        networks:
+            - sail
+        depends_on:
+            laravel.test:
+                condition: service_healthy
+            pgsql:
+                condition: service_healthy
+            redis:
+                condition: service_healthy
     pgsql:
         image: 'postgres:18-alpine'
         ports:
             - '${FORWARD_DB_PORT:-5432}:5432'
         environment:
             PGPASSWORD: '${DB_PASSWORD:-secret}'
-            POSTGRES_DB: '${DB_DATABASE}'
-            POSTGRES_USER: '${DB_USERNAME}'
+            POSTGRES_DB: '${DB_DATABASE:-coffee_shop}'
+            POSTGRES_USER: '${DB_USERNAME:-sail}'
             POSTGRES_PASSWORD: '${DB_PASSWORD:-secret}'
         volumes:
             - 'sail-pgsql:/var/lib/postgresql'
@@ -45,13 +84,13 @@ services:
                 - pg_isready
                 - '-q'
                 - '-d'
-                - '${DB_DATABASE}'
+                - '${DB_DATABASE:-coffee_shop}'
                 - '-U'
-                - '${DB_USERNAME}'
+                - '${DB_USERNAME:-sail}'
             retries: 3
             timeout: 5s
     redis:
-        image: 'redis:alpine'
+        image: 'redis:7.4-alpine'
         ports:
             - '${FORWARD_REDIS_PORT:-6379}:6379'
         volumes:
@@ -66,13 +105,13 @@ services:
             retries: 3
             timeout: 5s
     minio:
-        image: 'minio/minio:latest'
+        image: 'minio/minio:RELEASE.2025-04-22T22-12-26Z'
         ports:
             - '${FORWARD_MINIO_PORT:-9000}:9000'
             - '${FORWARD_MINIO_CONSOLE_PORT:-8900}:8900'
         environment:
-            MINIO_ROOT_USER: sail
-            MINIO_ROOT_PASSWORD: password
+            MINIO_ROOT_USER: '${MINIO_ROOT_USER:-sail}'
+            MINIO_ROOT_PASSWORD: '${MINIO_ROOT_PASSWORD:-password}'
         volumes:
             - 'sail-minio:/data'
         networks:
@@ -86,6 +125,13 @@ services:
                 - local
             retries: 3
             timeout: 5s
+    mailpit:
+        image: 'axllent/mailpit:latest'
+        ports:
+            - '${FORWARD_MAILPIT_PORT:-1025}:1025'
+            - '${FORWARD_MAILPIT_UI_PORT:-8025}:8025'
+        networks:
+            - sail
 networks:
     sail:
         driver: bridge
