@@ -23,11 +23,12 @@ Git history (all on `main`):
 | Admin model | `app/Models/Admin.php` — implements `FilamentUser` (`canAccessPanel` returns `true`), `#[Fillable]`/`#[Hidden]` attributes |
 | Menu model | `app/Models/MenuItem.php` — `menu_items` table; `name`, `price` (unsigned int IDR), `note` (nullable), `sort_order` (default 0) |
 | Filament resource | `app/Filament/Resources/MenuItems/` — `MenuItemResource.php` + `Schemas/MenuItemForm.php` + `Tables/MenuItemsTable.php` (Filament v5 layout) |
-| Shop info | `config/shop.php` — `name`, `phone`, `phone_display`, `email`, `address`, `hours` (day→time map), `maps_url` (Google Maps search URL from `rawurlencode($address)`) |
+| Shop info | `config/shop.php` — `name`, `phone`, `phone_display`, `email`, `address`, `hours` (code→time map; codes `mon_fri`/`sat`/`sun`, labels come from `lang/*/site.php` `days` keys), `maps_url` (Google Maps search URL from `rawurlencode($address)`) |
+| Localization | `lang/{id,en}/` — `site.php` (nav/footer/meta/days + `wa_message`), `home.php`, `menu.php`, `contact.php`; default locale `id` (config + `.env` `APP_LOCALE=id`), switch via `app/Http/Middleware/SetLocale.php` (session or `?lang=`), route `GET /lang/{locale}` (persists session, redirects back); switcher partial `resources/views/partials/language-switcher.blade.php` |
 | Auth config | `config/auth.php` — `admins` provider + `admin` session guard |
 | Login throttling | `app/Providers/AppServiceProvider.php::boot()` — `RateLimiter::for('admin.login', Limit::perMinute(5)->by(strtolower(email).'|'.ip))`; applied as `throttle:admin.login` middleware on POST `/admin/login` only |
-| Seeders | `database/seeders/DatabaseSeeder.php` (User factory + Admin from `ADMIN_NAME`/`ADMIN_EMAIL`/`ADMIN_PASSWORD` env with fallbacks `Admin`/`admin@example.com`/`password` + `MenuSeeder`); `MenuSeeder.php` — 8 items, idempotent via `firstOrCreate` on `name` |
-| Tests | `tests/Feature/` — `HomePageTest`, `MenuPageTest`, `ContactPageTest` (public pages, seed `MenuSeeder`, assert `Rp 25.000` format), `AdminAuthTest` + `AdminLoginThrottleTest` (Filament login via Livewire) |
+| Seeders | `database/seeders/DatabaseSeeder.php` (User factory + Admin from `ADMIN_NAME`/`ADMIN_EMAIL`/`ADMIN_PASSWORD` env with fallbacks `Admin`/`admin@example.com`/`password` + `MenuSeeder`); `MenuSeeder.php` — 8 items with Indonesian notes, idempotent via `updateOrCreate` on `name` (re-seed `--class=MenuSeeder` to refresh notes) |
+| Tests | `tests/Feature/` — `HomePageTest`, `MenuPageTest`, `ContactPageTest` (public pages, seed `MenuSeeder`, assert `Rp 25.000` format), `AdminAuthTest` + `AdminLoginThrottleTest` (Filament login via Livewire), `LocalizationTest` (default `id`, `?lang=en`, switcher redirects) |
 | Docker | `compose.yaml` (entrypoint `["./docker-entrypoint.sh", "/usr/local/bin/start-container"]`, healthchecks, `queue` + `mailpit` services), `docker-entrypoint.sh` (APP_KEY gen, wait for pgsql 60×, `migrate --force`, optimize, view:cache), `.env.example` (see README) |
 
 ## Commands
@@ -79,7 +80,7 @@ curl -s -o /dev/null -w "%{http_code}\n" https://coffee.rizkilab.my.id/
 
 - **Laravel 13 attribute style**: `#[Fillable(['...'])]`, `#[Hidden(['password', 'remember_token'])]`, casts as `#[Cast]`/property casts — mirror `app/Models/Admin.php`.
 - **Price formatting**: integer IDR, rendered as `Rp {{ number_format($item->price, 0, ",", ".") }}` (e.g. `Rp 25.000`) on BOTH home and menu pages. Tests assert this exact string.
-- **Shop info** must come from `config('shop.*')` in views — never hardcode hours/address/phone in Blade (contact page already does this).
+- **Shop info** must come from `config('shop.*')` in views — never hardcode hours/address/phone in Blade (contact page already does this). All page copy comes from `lang/{id,en}/` — never raw strings in Blade. Day labels: `__("site.days.$day")` keyed by the `config('shop.hours')` code; JSON-LD `dayOfWeek` stays English. WhatsApp prefill: `__('site.wa_message')` (no longer in config).
 - **Menu ordering**: `MenuItem::query()->orderBy('sort_order')`; home takes the first 4 as `$highlights`.
 - **Filament v5 layout**: resources live at `app/Filament/Resources/<Plural>/` with `Schemas/` + `Tables/` subdirectories; v5 form components (`TextInput`, `TextArea`) live in `Schemas/`, table columns in `Tables/`.
 - **Admin auth**: Filament handles login/logout at `/admin`; guard is `admin`, model implements `FilamentUser`. No custom admin controllers or `resources/views/admin/*` views exist anymore (deleted in `05d1826`).

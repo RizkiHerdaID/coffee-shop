@@ -1,12 +1,12 @@
 @extends('layouts.app')
 
-@section('title', 'Menu — Coffee Shop')
+@section('title', __('menu.title'))
 
 @section('content')
 <section class="mx-auto max-w-4xl px-4 pt-32 pb-20 sm:px-6 sm:pt-40">
-    <p class="text-sm font-semibold uppercase tracking-widest text-amber-500">Brewed to order</p>
-    <h1 class="mt-2 text-4xl font-extrabold tracking-tight text-white sm:text-5xl">The Menu</h1>
-    <p class="mt-4 max-w-xl text-stone-400">All prices in Indonesian Rupiah. Oat and soy milk available at no extra charge.</p>
+    <p class="text-sm font-semibold uppercase tracking-widest text-amber-500">{{ __('menu.eyebrow') }}</p>
+    <h1 class="mt-2 text-4xl font-extrabold tracking-tight text-white sm:text-5xl">{{ __('menu.heading') }}</h1>
+    <p class="mt-4 max-w-xl text-stone-400">{{ __('menu.intro') }}</p>
 
     <div class="mt-12 divide-y divide-stone-800 rounded-2xl border border-stone-800 bg-stone-950">
         @foreach ($menu as $item)

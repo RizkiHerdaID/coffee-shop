@@ -1,13 +1,13 @@
 <!DOCTYPE html>
-<html lang="en" class="scroll-smooth">
+<html lang="{{ str_replace('_', '-', app()->getLocale()) }}" class="scroll-smooth">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="description" content="@yield('description', 'Coffee Shop — specialty coffee, slow-brewed with care. Visit us for espresso, pour over, and fresh bakes.')">
-    <title>@yield('title', 'Coffee Shop')</title>
+    <meta name="description" content="@yield('description', __('site.meta.default_description', ['shop' => config('shop.name')]))">
+    <title>@yield('title', __('site.brand'))</title>
 
-    <meta property="og:title" content="@yield('title', 'Coffee Shop')">
-    <meta property="og:description" content="@yield('description', 'Coffee Shop — specialty coffee, slow-brewed with care. Visit us for espresso, pour over, and fresh bakes.')">
+    <meta property="og:title" content="@yield('title', __('site.brand'))">
+    <meta property="og:description" content="@yield('description', __('site.meta.default_description', ['shop' => config('shop.name')]))">
     <meta property="og:type" content="website">
     <meta property="og:url" content="{{ url()->current() }}">
     <meta property="og:image" content="{{ url('/favicon.ico') }}">
@@ -16,9 +16,9 @@
 
     @php
         $days = [
-            'Monday — Friday' => ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'],
-            'Saturday' => ['Saturday'],
-            'Sunday' => ['Sunday'],
+            'mon_fri' => ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'],
+            'sat' => ['Saturday'],
+            'sun' => ['Sunday'],
         ];
 
         $openingHours = collect(config('shop.hours'))->flatMap(function ($hours, $label) use ($days) {
@@ -59,24 +59,26 @@
                 Coffee Shop
             </a>
             <div class="hidden items-center gap-8 text-sm font-medium text-stone-300 sm:flex">
-                <a href="{{ route('home') }}" class="transition hover:text-amber-400">Home</a>
-                <a href="{{ route('menu') }}" class="transition hover:text-amber-400">Menu</a>
-                <a href="{{ route('contact') }}" class="transition hover:text-amber-400">Contact</a>
+                <a href="{{ route('home') }}" class="transition hover:text-amber-400">{{ __('site.nav.home') }}</a>
+                <a href="{{ route('menu') }}" class="transition hover:text-amber-400">{{ __('site.nav.menu') }}</a>
+                <a href="{{ route('contact') }}" class="transition hover:text-amber-400">{{ __('site.nav.contact') }}</a>
+                @include('partials.language-switcher')
                 <a href="{{ route('contact') }}" class="rounded-full bg-amber-500 px-5 py-2 font-semibold text-stone-950 transition hover:bg-amber-400">
-                    Reserve a Table
+                    {{ __('site.nav.reserve') }}
                 </a>
             </div>
-            <button class="text-stone-300 sm:hidden" onclick="document.getElementById('mobile-menu').classList.toggle('hidden')" aria-label="Toggle menu">
+            <button class="text-stone-300 sm:hidden" onclick="document.getElementById('mobile-menu').classList.toggle('hidden')" aria-label="{{ __('site.nav.toggle_aria') }}">
                 <svg class="h-6 w-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                     <path stroke-linecap="round" d="M4 6h16M4 12h16M4 18h16"></path>
                 </svg>
             </button>
         </nav>
         <div id="mobile-menu" class="hidden border-t border-stone-800 px-4 py-3 text-sm font-medium sm:hidden">
-            <a href="{{ route('home') }}" class="block py-2 text-stone-300">Home</a>
-            <a href="{{ route('menu') }}" class="block py-2 text-stone-300">Menu</a>
-            <a href="{{ route('contact') }}" class="block py-2 text-stone-300">Contact</a>
-            <a href="{{ route('contact') }}" class="mt-2 block rounded-full bg-amber-500 px-5 py-2 text-center font-semibold text-stone-950">Reserve a Table</a>
+            <div class="mb-3">@include('partials.language-switcher')</div>
+            <a href="{{ route('home') }}" class="block py-2 text-stone-300">{{ __('site.nav.home') }}</a>
+            <a href="{{ route('menu') }}" class="block py-2 text-stone-300">{{ __('site.nav.menu') }}</a>
+            <a href="{{ route('contact') }}" class="block py-2 text-stone-300">{{ __('site.nav.contact') }}</a>
+            <a href="{{ route('contact') }}" class="mt-2 block rounded-full bg-amber-500 px-5 py-2 text-center font-semibold text-stone-950">{{ __('site.nav.reserve') }}</a>
         </div>
     </header>
 
@@ -86,10 +88,10 @@
 
     <footer class="border-t border-stone-800 bg-stone-950 py-10">
         <div class="mx-auto flex max-w-6xl flex-col items-center justify-between gap-4 px-4 text-sm text-stone-500 sm:flex-row sm:px-6">
-            <p>&#169; {{ date('Y') }} Coffee Shop. Brewed with care.</p>
+            <p>{{ __('site.footer.tagline', ['year' => date('Y'), 'shop' => config('shop.name')]) }}</p>
             <div class="flex gap-6">
-                <a href="{{ route('menu') }}" class="transition hover:text-amber-400">Menu</a>
-                <a href="{{ route('contact') }}" class="transition hover:text-amber-400">Hours &amp; Location</a>
+                <a href="{{ route('menu') }}" class="transition hover:text-amber-400">{{ __('site.footer.menu') }}</a>
+                <a href="{{ route('contact') }}" class="transition hover:text-amber-400">{{ __('site.footer.hours_location') }}</a>
             </div>
         </div>
     </footer>

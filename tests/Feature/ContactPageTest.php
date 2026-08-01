@@ -28,7 +28,7 @@ class ContactPageTest extends TestCase
         $response = $this->get('/contact');
 
         foreach (config('shop.hours') as $day => $hours) {
-            $response->assertSee($day);
+            $response->assertSee(__("site.days.$day"));
             $response->assertSee($hours);
         }
     }
@@ -38,7 +38,7 @@ class ContactPageTest extends TestCase
         $response = $this->get('/contact');
 
         $response->assertSee('https://wa.me/'.preg_replace('/\D/', '', config('shop.phone')));
-        $response->assertSee('Chat on WhatsApp');
+        $response->assertSee('Hubungi via WhatsApp');
     }
 
     public function test_contact_page_shows_qris_badge(): void

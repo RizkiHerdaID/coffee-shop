@@ -48,7 +48,7 @@ class HomePageTest extends TestCase
         $response = $this->get('/');
 
         $response->assertSee('https://wa.me/'.preg_replace('/\D/', '', config('shop.phone')));
-        $response->assertSee('Order on WhatsApp');
+        $response->assertSee('Pesan lewat WhatsApp');
     }
 
     public function test_home_page_mentions_qris(): void

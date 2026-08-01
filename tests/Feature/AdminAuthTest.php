@@ -21,7 +21,7 @@ class AdminAuthTest extends TestCase
     {
         $this->get(route('filament.admin.auth.login'))
             ->assertOk()
-            ->assertSee('Sign in');
+            ->assertSee('Masuk');
     }
 
     public function test_admin_can_sign_in_with_valid_credentials(): void
