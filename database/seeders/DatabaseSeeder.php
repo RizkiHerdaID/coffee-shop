@@ -30,5 +30,6 @@ class DatabaseSeeder extends Seeder
         ]);
 
         $this->call(MenuSeeder::class);
+        $this->call(StockSeeder::class);
     }
 }
