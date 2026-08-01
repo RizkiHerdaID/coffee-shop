@@ -2,10 +2,8 @@
 
 namespace App\Providers\Filament;
 
-use App\Filament\Widgets\AverageOrderValue;
 use App\Filament\Widgets\RevenueChart;
-use App\Filament\Widgets\TodayOrders;
-use App\Filament\Widgets\TodayRevenue;
+use App\Filament\Widgets\TodayStats;
 use App\Filament\Widgets\TopItemsChart;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
@@ -45,9 +43,7 @@ class AdminPanelProvider extends PanelProvider
             ])
             ->widgets([
                 AccountWidget::class,
-                TodayRevenue::class,
-                TodayOrders::class,
-                AverageOrderValue::class,
+                TodayStats::class,
                 RevenueChart::class,
                 TopItemsChart::class,
                 FilamentInfoWidget::class,

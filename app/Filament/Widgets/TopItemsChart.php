@@ -8,6 +8,8 @@ use Filament\Widgets\ChartWidget;
 
 class TopItemsChart extends ChartWidget
 {
+    protected int|string|array $columnSpan = 'full';
+
     protected ?string $heading = 'Top items by revenue';
 
     protected function getType(): string

@@ -8,7 +8,7 @@ use Filament\Support\Icons\Heroicon;
 use Filament\Widgets\StatsOverviewWidget;
 use Filament\Widgets\StatsOverviewWidget\Stat;
 
-class AverageOrderValue extends StatsOverviewWidget
+class TodayStats extends StatsOverviewWidget
 {
     protected function getStats(): array
     {
@@ -21,6 +21,14 @@ class AverageOrderValue extends StatsOverviewWidget
         $average = $count > 0 ? intdiv($revenue, $count) : 0;
 
         return [
+            Stat::make('Today Revenue', 'Rp '.number_format($revenue, 0, ',', '.'))
+                ->description('Paid & served orders')
+                ->icon(Heroicon::OutlinedBanknotes)
+                ->color('success'),
+            Stat::make('Today Orders', $count)
+                ->description('Paid & served orders')
+                ->icon(Heroicon::OutlinedShoppingBag)
+                ->color('primary'),
             Stat::make('Average Order Value', 'Rp '.number_format($average, 0, ',', '.'))
                 ->description('Paid & served orders')
                 ->icon(Heroicon::OutlinedChartBar)

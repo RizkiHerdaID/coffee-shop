@@ -8,6 +8,8 @@ use Filament\Widgets\ChartWidget;
 
 class RevenueChart extends ChartWidget
 {
+    protected int|string|array $columnSpan = 'full';
+
     protected ?string $heading = 'Revenue (last 14 days)';
 
     protected function getType(): string
