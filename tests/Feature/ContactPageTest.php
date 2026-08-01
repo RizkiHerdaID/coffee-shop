@@ -47,12 +47,4 @@ class ContactPageTest extends TestCase
 
         $response->assertSee('Terima QRIS');
     }
-
-    public function test_contact_page_shows_delivery_app_links(): void
-    {
-        $response = $this->get('/contact');
-
-        $response->assertSee(config('shop.gofood_url'));
-        $response->assertSee(config('shop.grab_url'));
-    }
 }

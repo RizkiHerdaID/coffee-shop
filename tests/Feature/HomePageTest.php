@@ -58,6 +58,15 @@ class HomePageTest extends TestCase
         $response->assertSee('Terima QRIS');
     }
 
+    public function test_home_page_shows_cta_feature_cards(): void
+    {
+        $response = $this->get('/');
+
+        $response->assertSee('WhatsApp');
+        $response->assertSee('Terima QRIS');
+        $response->assertSee('GoFood & GrabFood');
+    }
+
     public function test_home_page_shows_delivery_app_links(): void
     {
         $response = $this->get('/');

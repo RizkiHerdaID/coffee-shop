@@ -59,11 +59,4 @@
     </div>
 </section>
 
-<section class="border-t border-stone-800 bg-stone-950/50">
-    <div class="mx-auto flex max-w-6xl flex-wrap items-center justify-center gap-3 px-4 py-8 sm:px-6">
-        <span class="mr-2 text-sm font-semibold uppercase tracking-widest text-stone-500">Order online</span>
-        <a href="{{ config('shop.gofood_url') }}" target="_blank" rel="noopener" class="rounded-full bg-red-500 px-6 py-2.5 text-sm font-semibold text-white transition hover:bg-red-400">GoFood</a>
-        <a href="{{ config('shop.grab_url') }}" target="_blank" rel="noopener" class="rounded-full bg-green-600 px-6 py-2.5 text-sm font-semibold text-white transition hover:bg-green-500">GrabFood</a>
-    </div>
-</section>
 @endsection
