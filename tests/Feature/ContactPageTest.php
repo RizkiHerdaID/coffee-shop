@@ -32,4 +32,27 @@ class ContactPageTest extends TestCase
             $response->assertSee($hours);
         }
     }
+
+    public function test_contact_page_has_whatsapp_cta(): void
+    {
+        $response = $this->get('/contact');
+
+        $response->assertSee('https://wa.me/'.preg_replace('/\D/', '', config('shop.phone')));
+        $response->assertSee('Chat on WhatsApp');
+    }
+
+    public function test_contact_page_shows_qris_badge(): void
+    {
+        $response = $this->get('/contact');
+
+        $response->assertSee('Terima QRIS');
+    }
+
+    public function test_contact_page_shows_delivery_app_links(): void
+    {
+        $response = $this->get('/contact');
+
+        $response->assertSee(config('shop.gofood_url'));
+        $response->assertSee(config('shop.grab_url'));
+    }
 }

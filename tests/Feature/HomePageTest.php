@@ -42,4 +42,27 @@ class HomePageTest extends TestCase
         $response->assertSee('Rp 25.000');
         $response->assertSee('Rp 32.000');
     }
+
+    public function test_home_page_has_whatsapp_cta(): void
+    {
+        $response = $this->get('/');
+
+        $response->assertSee('https://wa.me/'.preg_replace('/\D/', '', config('shop.phone')));
+        $response->assertSee('Order on WhatsApp');
+    }
+
+    public function test_home_page_mentions_qris(): void
+    {
+        $response = $this->get('/');
+
+        $response->assertSee('Terima QRIS');
+    }
+
+    public function test_home_page_shows_delivery_app_links(): void
+    {
+        $response = $this->get('/');
+
+        $response->assertSee(config('shop.gofood_url'));
+        $response->assertSee(config('shop.grab_url'));
+    }
 }
