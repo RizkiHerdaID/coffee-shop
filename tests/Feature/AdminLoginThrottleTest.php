@@ -3,8 +3,10 @@
 namespace Tests\Feature;
 
 use App\Models\Admin;
+use Filament\Auth\Pages\Login;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
+use Livewire\Livewire;
 use Tests\TestCase;
 
 class AdminLoginThrottleTest extends TestCase
@@ -18,44 +20,56 @@ class AdminLoginThrottleTest extends TestCase
         Cache::flush();
     }
 
-    public function test_login_is_throttled_after_five_failed_attempts(): void
+    public function test_login_is_throttled_after_five_attempts(): void
     {
         $email = 'throttled@example.com';
         Admin::factory()->create(['email' => $email, 'password' => 'password']);
 
         for ($i = 1; $i <= 5; $i++) {
-            $this->post(route('admin.login.attempt'), [
-                'email' => $email,
-                'password' => 'wrong-password',
-            ])->assertSessionHasErrors('email');
+            Livewire::test(Login::class)
+                ->fillForm([
+                    'email' => $email,
+                    'password' => 'wrong-password',
+                ])
+                ->call('authenticate')
+                ->assertHasFormErrors(['email']);
         }
 
-        $this->post(route('admin.login.attempt'), [
-            'email' => $email,
-            'password' => 'password',
-        ])->assertStatus(429);
+        Livewire::test(Login::class)
+            ->fillForm([
+                'email' => $email,
+                'password' => 'password',
+            ])
+            ->call('authenticate')
+            ->assertNotified();
 
         $this->assertGuest('admin');
     }
 
-    public function test_throttle_is_keyed_by_email_and_ip(): void
+    public function test_throttle_is_keyed_by_ip_not_email(): void
     {
-        $throttledEmail = 'throttled-key-a@example.com';
-        $otherEmail = 'throttled-key-b@example.com';
+        $throttledEmail = 'throttled-a@example.com';
+        $otherEmail = 'throttled-b@example.com';
         Admin::factory()->create(['email' => $throttledEmail, 'password' => 'password']);
         Admin::factory()->create(['email' => $otherEmail, 'password' => 'password']);
 
         for ($i = 1; $i <= 5; $i++) {
-            $this->post(route('admin.login.attempt'), [
-                'email' => $throttledEmail,
-                'password' => 'wrong-password',
-            ])->assertSessionHasErrors('email');
+            Livewire::test(Login::class)
+                ->fillForm([
+                    'email' => $throttledEmail,
+                    'password' => 'wrong-password',
+                ])
+                ->call('authenticate')
+                ->assertHasFormErrors(['email']);
         }
 
-        $this->post(route('admin.login.attempt'), [
-            'email' => $otherEmail,
-            'password' => 'wrong-password',
-        ])->assertSessionHasErrors('email');
+        Livewire::test(Login::class)
+            ->fillForm([
+                'email' => $otherEmail,
+                'password' => 'password',
+            ])
+            ->call('authenticate')
+            ->assertNotified();
 
         $this->assertGuest('admin');
     }
