@@ -44,13 +44,13 @@
             <h3 class="mt-4 text-lg font-semibold text-white">Terima QRIS</h3>
             <p class="mt-2 text-sm leading-relaxed text-stone-400">Pay with any QRIS wallet — scan, pay, done. No cash? No problem.</p>
         </a>
-        <div class="rounded-2xl border border-stone-800 bg-stone-900/60 p-8">
-            <div class="text-3xl">&#127857;</div>
+        <div class="rounded-2xl border border-stone-800 bg-stone-900/60 p-8 transition hover:border-red-500/60">
+            <svg class="h-8 w-8 text-[#ee4d2d]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
             <h3 class="mt-4 text-lg font-semibold text-white">GoFood &amp; GrabFood</h3>
             <p class="mt-2 text-sm leading-relaxed text-stone-400">Order your favourites for delivery, straight from the apps you already use.</p>
-            <div class="mt-4 flex flex-wrap gap-3">
-                <a href="{{ config('shop.gofood_url') }}" target="_blank" rel="noopener" class="rounded-full bg-red-500 px-5 py-2 text-sm font-semibold text-white transition hover:bg-red-400">GoFood</a>
-                <a href="{{ config('shop.grab_url') }}" target="_blank" rel="noopener" class="rounded-full bg-green-600 px-5 py-2 text-sm font-semibold text-white transition hover:bg-green-500">GrabFood</a>
+            <div class="mt-6 flex flex-col gap-3 sm:flex-row">
+                <a href="{{ config('shop.gofood_url') }}" target="_blank" rel="noopener" class="flex-1 rounded-full bg-[#ee4d2d] px-5 py-2.5 text-center text-sm font-semibold text-white transition hover:brightness-110">GoFood</a>
+                <a href="{{ config('shop.grab_url') }}" target="_blank" rel="noopener" class="flex-1 rounded-full bg-[#00b14f] px-5 py-2.5 text-center text-sm font-semibold text-white transition hover:brightness-110">GrabFood</a>
             </div>
         </div>
     </div>
