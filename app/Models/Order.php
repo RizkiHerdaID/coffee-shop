@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Facades\DB;
 
 #[Fillable(['order_number', 'customer_phone', 'notes', 'status', 'total', 'discount_type', 'discount_amount', 'shift_id', 'created_by'])]
 class Order extends Model
@@ -19,8 +20,17 @@ class Order extends Model
     {
         static::created(function (Order $order) {
             if (config('whatsapp.enabled') && filled($order->customer_phone)) {
-                SendOrderConfirmation::dispatch($order);
+                // Dispatch after commit so a sync queue never sends a
+                // confirmation before the order row is visible.
+                DB::afterCommit(fn () => SendOrderConfirmation::dispatch($order));
             }
+        });
+
+        // Orders are immutable audit records: a hard delete would cascade
+        // order_items/payments, destroy the history that Z-reports are
+        // built from, and leave stock movements orphaned.
+        static::deleting(function (Order $order) {
+            throw new \RuntimeException('Orders cannot be deleted: they are immutable audit records.');
         });
     }
 
@@ -34,6 +44,7 @@ class Order extends Model
         return [
             'status' => OrderStatus::class,
             'total' => 'integer',
+            'loyalty_credited_at' => 'datetime',
         ];
     }
 
@@ -97,6 +108,13 @@ class Order extends Model
     /**
      * Transition pending → paid once payments cover the net total. Dispatches
      * the receipt/kitchen print jobs exactly once, on the transition itself.
+     * The dispatches are deferred until after the surrounding transaction
+     * commits so sync-queue mode never prints against uncommitted data.
+     *
+     * The transition is claimed atomically: the row is locked before the
+     * status flip, so concurrent callers (cashier payment flow and the
+     * admin Orders table action) serialize and only one can capture the
+     * pending → paid transition and dispatch prints.
      */
     public function markPaidIfCovered(): bool
     {
@@ -104,10 +122,26 @@ class Order extends Model
             return false;
         }
 
-        $this->update(['status' => OrderStatus::Paid]);
+        DB::transaction(function (): void {
+            $locked = static::query()->whereKey($this->getKey())->lockForUpdate()->first();
 
-        PrintReceipt::dispatch($this);
-        PrintKitchenTicket::dispatch($this);
+            if ($locked === null || $locked->status !== OrderStatus::Pending || $locked->paid_total < $locked->net_total) {
+                return;
+            }
+
+            $locked->update(['status' => OrderStatus::Paid]);
+
+            $this->setRawAttributes($locked->getAttributes(), true);
+        });
+
+        if ($this->status !== OrderStatus::Paid) {
+            return false;
+        }
+
+        DB::afterCommit(function (): void {
+            PrintReceipt::dispatch($this);
+            PrintKitchenTicket::dispatch($this);
+        });
 
         return true;
     }
@@ -129,12 +163,17 @@ class Order extends Model
      * Record a refund as a negative payment row. Full refunds (net paid
      * drops to zero) flip the status to Refunded; partial refunds keep the
      * current status. Returns false when the order is not refundable or the
-     * amount is invalid (zero, negative, or above the net paid).
+     * amount is invalid (zero, negative, or above the net paid). Invalid
+     * method strings are rejected instead of throwing a ValueError.
      */
     public function refund(int $amount, PaymentMethod|string $method = PaymentMethod::Cash, ?string $reason = null): bool
     {
         if (! $method instanceof PaymentMethod) {
-            $method = PaymentMethod::from($method);
+            $method = PaymentMethod::tryFrom($method);
+        }
+
+        if (! $method instanceof PaymentMethod) {
+            return false;
         }
 
         if (! $this->canBeRefunded() || $amount <= 0 || $amount > $this->paid_total) {

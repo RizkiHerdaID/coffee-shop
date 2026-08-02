@@ -62,6 +62,7 @@ return [
         'mark_paid' => 'Mark as Paid',
         'mark_served' => 'Mark as Served',
         'marked_paid' => ':order_number marked as paid',
+        'marked_paid_pending' => ':order_number is still pending — payments don\'t cover the total yet.',
         'marked_served' => ':order_number marked as served',
         'view_receipt' => 'Receipt',
         'refund' => 'Refund',
