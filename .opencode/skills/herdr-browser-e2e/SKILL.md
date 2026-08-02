@@ -97,6 +97,51 @@ the view lives) — `console` on a fresh daemon hits about:blank.
 navigation/timeout, then return a JSON summary. Used successfully for the public
 site (click switcher → read result), since each br.sh call kills the daemon.
 
+## Batch 2 additions (2026-08-03, 5-agent run — all PASS, 71/71)
+
+- **Heartbeat REQUIRES the `x-herdr-browser-view: <view_id>` header** (410s without it); `/views`
+  returns `"view_id"` (snake_case, space after colon — grep `'"view_id": *"'`). A self-healing
+  heartbeat loop (poll `/views` → POST `/views/heartbeat` w/ header, every ≤4s, re-read
+  daemon.json each iteration so restarts self-heal) keeps ONE Chrome + login session alive across
+  CLI calls indefinitely. Also export `HERDR_BROWSER_VIEW_ID` on every CLI call so the CLI reuses
+  the pinned view instead of creating one per call.
+- **Chrome profile dir is REUSED across daemon restarts** → Filament session cookie survives
+  daemon crashes (restart w/o re-login, treated as luck not a pattern; full profile reset needs
+  re-login).
+- **`$wire` never works in evals** (not a page global; zsh also eats `$`): use native-setter +
+  `form.requestSubmit()` everywhere; in Bash double-quotes escape `\$wire` (only valid inside
+  Livewire's own context, e.g. `el.__livewire.$wire`).
+- **zsh never word-splits `$VAR`**: `$CLI open ...` fails — use a `br()` shell function or
+  `${=CLI}`.
+- **Never fallback-search submit buttons** (matched sidebar logout once — lost auth mid-flow):
+  enumerate buttons, pick `.fi-ac-btn-action` only.
+- **Native setter crashes on TEXTAREA** (`HTMLInputElement.prototype` → "Illegal invocation"):
+  use `HTMLTextAreaElement.prototype` for textareas.
+- **Bulk-delete checkbox trap**: `tr input[type=checkbox]` matches the header select-all too;
+  scope to `tbody tr` or clicks cancel out and deletes silently.
+- **Toggle switches are async**: read `aria-checked` only after the Livewire roundtrip (~1-2s).
+- **Money-mask fields swallow `wire:model`**: typing formats the input but Livewire state stays
+  empty — always follow typing with `$wire.set()` on masked fields (opening cash, discount,
+  payment/refund/movement amounts). Blur-only fields (line notes) need a blur to sync.
+- **Filament `->tel()` regex rejects letters**: `E2E-`-prefixed PHONES are impossible on
+  reservation forms (both admin + public) — put the E2E marker in name/notes instead.
+- **Livewire dev error dialog** (`#livewire-error` iframe) intercepts all clicks after a 500 —
+  reload the page before continuing.
+- **Console is a cross-view buffer**: CSP report-only entries (maps iframe, Pulse fonts/gravatar)
+  accumulate across views — timestamp-correlate, don't treat as page errors.
+- **Searchable combobox options render only after typing** in the search input, then real-click
+  the `li[data-value]` option.
+- **Pulse + strict CSP**: fonts.bunny.net / gravatar.com will never load on a strict policy
+  (report-only today). Contact-page maps iframe works only because CSP is report-only —
+  enforcing CSP needs `frame-src https://maps.google.com https://www.google.com`.
+- **First /pulse load** logged one transient 500 (not reproducible, no app-log trace).
+- **Product inconsistency found**: cashier `customerPhone` is `max:20` but `loyalty_cards.phone`
+  is unlimited — a phone legitimately registered can never be entered at the cashier.
+- **Cross-agent data race on banners**: concurrently-created promos with lower `sort_order`
+  become the visible banner — assert dismiss per-promo-id, not by content.
+- **Empty DB on arrival** (migrate:fresh without re-seed) is a recurring dev-DB state: run
+  `db:seed` before E2E fleets (MenuSeeder + PromoSeeder + admin).
+
 ## Known plugin/Filament quirks (verified)
 
 - `type` command breaks on `email`/`password` inputs (focus calls
