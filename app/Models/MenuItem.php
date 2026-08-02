@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 #[Fillable(['name', 'price', 'note', 'sort_order', 'photo', 'category', 'available'])]
 class MenuItem extends Model
@@ -21,5 +22,17 @@ class MenuItem extends Model
             'category' => 'string',
             'available' => 'boolean',
         ];
+    }
+
+    public function ingredients(): BelongsToMany
+    {
+        return $this->belongsToMany(StockItem::class)->withPivot('quantity');
+    }
+
+    public function cogs(): int
+    {
+        return $this->ingredients()
+            ->get()
+            ->sum(fn (StockItem $item): int => (int) $item->cost * (int) $item->pivot->quantity);
     }
 }

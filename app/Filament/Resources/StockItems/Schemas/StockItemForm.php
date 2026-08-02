@@ -33,6 +33,14 @@ class StockItemForm
                     ->formatStateUsing(fn ($state) => self::formatQuantity($state))
                     ->dehydrateStateUsing(fn ($state) => self::rawQuantity($state))
                     ->default(0),
+                TextInput::make('cost')
+                    ->label(__('stock.fields.cost'))
+                    ->prefix('Rp')
+                    ->mask(RawJs::make('$money($input, \',\', \'.\', 0)'))
+                    ->rule('regex:/^(\d{1,3}(\.\d{3})*|\d+)$/')
+                    ->formatStateUsing(fn ($state) => self::formatQuantity($state))
+                    ->dehydrateStateUsing(fn ($state) => self::rawQuantity($state))
+                    ->default(0),
                 TextInput::make('note')
                     ->label(__('stock.fields.note')),
             ]);

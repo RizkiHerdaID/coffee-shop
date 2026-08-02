@@ -8,6 +8,7 @@ use Filament\Actions\EditAction;
 use Filament\Tables\Columns\ImageColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Model;
 
 class MenuItemsTable
 {
@@ -31,6 +32,17 @@ class MenuItemsTable
                 TextColumn::make('price')
                     ->money('IDR')
                     ->sortable(),
+                TextColumn::make('cogs')
+                    ->label(__('recipes.cogs.label'))
+                    ->state(fn (Model $record): int => $record->cogs())
+                    ->money('IDR')
+                    ->tooltip(__('recipes.cogs.tooltip')),
+                TextColumn::make('margin')
+                    ->label(__('recipes.margin.label'))
+                    ->state(fn (Model $record): int => $record->price - $record->cogs())
+                    ->money('IDR')
+                    ->tooltip(__('recipes.margin.tooltip'))
+                    ->color(fn (Model $record): string => $record->price - $record->cogs() >= 0 ? 'success' : 'danger'),
                 TextColumn::make('note')
                     ->searchable(),
                 TextColumn::make('sort_order')

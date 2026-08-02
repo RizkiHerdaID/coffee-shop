@@ -36,6 +36,10 @@ class StockItemsTable
                     ->label(__('stock.fields.min_threshold'))
                     ->sortable()
                     ->formatStateUsing(fn ($state): string => number_format((int) $state, 0, ',', '.')),
+                TextColumn::make('cost')
+                    ->label(__('stock.fields.cost'))
+                    ->money('IDR')
+                    ->sortable(),
                 TextColumn::make('note')
                     ->label(__('stock.fields.note'))
                     ->searchable(),

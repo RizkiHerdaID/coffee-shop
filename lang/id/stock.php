@@ -10,6 +10,7 @@ return [
         'unit_placeholder' => 'gram / liter / pcs',
         'quantity' => 'Jumlah',
         'min_threshold' => 'Batas Minimum',
+        'cost' => 'Biaya per Satuan',
         'note' => 'Catatan',
         'type' => 'Tipe',
         'created_at' => 'Dibuat',

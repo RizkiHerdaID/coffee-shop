@@ -10,6 +10,7 @@ return [
         'unit_placeholder' => 'grams / liters / pcs',
         'quantity' => 'Quantity',
         'min_threshold' => 'Min Threshold',
+        'cost' => 'Unit Cost',
         'note' => 'Note',
         'type' => 'Type',
         'created_at' => 'Created At',

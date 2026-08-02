@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Facades\DB;
 
-#[Fillable(['name', 'unit', 'quantity', 'min_threshold', 'note'])]
+#[Fillable(['name', 'unit', 'cost', 'quantity', 'min_threshold', 'note'])]
 class StockItem extends Model
 {
     /**
@@ -19,6 +19,7 @@ class StockItem extends Model
     protected function casts(): array
     {
         return [
+            'cost' => 'integer',
             'quantity' => 'integer',
             'min_threshold' => 'integer',
         ];
