@@ -96,6 +96,17 @@ PO fields: `supplier_id`, `ordered_at`, `expected_at`, `status`, `total` (intege
 - Revenue = `SUM(orders.total)` for paid orders (status NOT IN pending/refunded/cancelled — mirrors `Shift::paidOrders()`); COGS = Σ `order_items.qty × MenuItem::cogs()` (lines with a deleted `menu_item_id` contribute 0); expenses grouped by `ExpenseCategory` (all 8 cases 0-filled).
 - Statement shows revenue − COGS = gross margin − expenses = net margin, plus gross/net margin percentages and a period-independent inventory valuation (Σ `stock_items.cost × quantity`).
 
+### Demand forecasting widget (day-of-week + seasonal)
+
+| Piece | Location |
+| --- | --- |
+| Service | `app/Services/DemandForecastService.php` — `paidOrders(?int $months)` (paid/served orders in the last N months, current month inclusive), `weekdayAggregate()` (`['count' => mon..sun ints, 'revenue' => ...]`, zero-filled), `monthAggregate()` (`['Y-m' => ['count'=>int,'revenue'=>int]]`, oldest→newest, zero-filled); `DEFAULT_MONTHS = 3`, no migration |
+| Widget | `app/Filament/Widgets/DemandForecastWidget.php` — bar `ChartWidget`, heading + 4 filters (`weekday_revenue` default, `weekday_count`, `month_revenue`, `month_count`); month labels via `Carbon::translatedFormat('M Y')` in the app locale |
+| Wiring | Registered in `AdminPanelProvider::widgets()`; localized labels in `lang/{id,en}/dashboard.php` (`demand_forecast_heading`, `filter.weekday`, `filter.month`) |
+| Tests | `tests/Feature/DemandForecastTest.php` (service aggregates/windows/status exclusion, widget `getData()` via reflection) |
+
+- Status window mirrors the other revenue widgets: excludes `Pending`/`Refunded`/`Cancelled`. Aggregations are computed in PHP from a single light `paidOrders()` query (id/created_at/total only) — fine at single-shop volume, keeps the widget free of raw SQL and the trend lines stackable (weekday bars answer "which day sells most", month bars answer seasonality).
+
 ### AI copy generation (DeepSeek)
 
 | Piece | Location |
@@ -151,14 +162,13 @@ Cash register: expected_amount = opening_float + SUM(orders.total in [opened_at,
 
 ## Roadmap (what remains, from the research)
 
-Implemented since the research was written: orders/order_items + payments + shifts (POS — see `docs/pos.md`), dashboard widgets (RevenueChart, TopItemsChart, BestSellersChart, PeakHoursChart, PaymentSplitChart), daily summary email, stock items + movements + thresholds + low-stock alerts, WhatsApp order confirmations (Fonnte), recipes/COGS, expense tracking + cash register, suppliers + purchase orders, wastage logging (`app/Filament/Resources/Wastages/`).
+Implemented since the research was written: orders/order_items + payments + shifts (POS — see `docs/pos.md`), dashboard widgets (RevenueChart, TopItemsChart, BestSellersChart, PeakHoursChart, PaymentSplitChart), demand forecasting widget (see below), daily summary email, stock items + movements + thresholds + low-stock alerts, WhatsApp order confirmations (Fonnte), recipes/COGS, expense tracking + cash register, suppliers + purchase orders, wastage logging (`app/Filament/Resources/Wastages/`).
 
 Still **planned** (not implemented — mark as future work):
 
 | Feature | Impact | Effort | Notes |
 | --- | --- | --- | --- |
 | M4: dynamic QRIS auto-confirmation (Tripay/Xendit/Midtrans) | High | M | Currently QRIS is captured manually as a static payment method; aggregator API auto-confirmation is NOT wired |
-| Demand forecasting (day-of-week + trend) | Med | M | Pure-PHP moving average is enough; `rubixml/rubix-ml` optional; no GPU |
 | Loyalty points / stamp cards + QR membership | Med | M | `bacon/bacon-qr-code` IS installed (used for QR table codes at `/qr/{table}` via `app/Filament/Pages/QrCodes.php`) but not wired to loyalty; QR on receipt + `wa.me` link still open |
 | WhatsApp chatbot (menu recs, hours, order status) | Med | M | Needs webhook tier: Wablas Large Rp119K or Fonnte Master Rp175K; currently text-only outbound |
 | Google review auto-response drafts | Med | M | Google Places API ~Rp100-200K/mo usage + AI call costs |

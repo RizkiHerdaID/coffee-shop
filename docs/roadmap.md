@@ -55,3 +55,4 @@ Priority legend: **P1** = Urgent & Important · **P2** = Important / Not Urgent 
 | POS refunds + voids (audit-safe corrections) | `55e1217` / `d84d21b` — negative payment rows, `refunded`/`cancelled` statuses, shift-safe totals (see `docs/pos.md`) |
 | Recipe-based stock consumption on sales | `c943ead` — `consumeRecipeStock()` on POS orders, lenient fallback, `stock_movements.order_item_id` (see `docs/owner-tools.md`) |
 | Monthly P&L report page | pnl-report branch — `PnlReport` page at `admin/pnl-report`, period picker, revenue − COGS − expenses by category, gross/net margin + inventory valuation (see `docs/owner-tools.md`) |
+| Demand forecasting (day-of-week + seasonal) | demand-forecast branch — `DemandForecastService` (paid orders by weekday + month over last 3 months) + `DemandForecastWidget` bar chart with weekday/month + revenue/count filters (see `docs/owner-tools.md`) |

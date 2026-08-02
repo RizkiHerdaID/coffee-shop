@@ -8,6 +8,7 @@ use App\Filament\Pages\ManageShift;
 use App\Filament\Pages\PnlReport;
 use App\Filament\Pages\ShiftReport;
 use App\Filament\Widgets\BestSellersChart;
+use App\Filament\Widgets\DemandForecastWidget;
 use App\Filament\Widgets\LowStockWidget;
 use App\Filament\Widgets\PaymentSplitChart;
 use App\Filament\Widgets\PeakHoursChart;
@@ -62,6 +63,7 @@ class AdminPanelProvider extends PanelProvider
                 TopItemsChart::class,
                 BestSellersChart::class,
                 PeakHoursChart::class,
+                DemandForecastWidget::class,
                 PaymentSplitChart::class,
                 FilamentInfoWidget::class,
             ])

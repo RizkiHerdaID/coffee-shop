@@ -4,6 +4,7 @@ return [
     'peak_hours_heading' => 'Jam Sibuk (30 Hari Terakhir)',
     'best_sellers_heading' => 'Produk Terlaris (Pendapatan)',
     'payment_split_heading' => 'Rincian Pembayaran Hari Ini',
+    'demand_forecast_heading' => 'Perkiraan Permintaan (3 Bulan Terakhir)',
     'revenue' => 'Pendapatan',
     'count' => 'Jumlah Pesanan',
 
@@ -39,6 +40,8 @@ return [
     'filter' => [
         'revenue' => 'Pendapatan',
         'count' => 'Jumlah Pesanan',
+        'weekday' => 'Hari',
+        'month' => 'Bulan',
     ],
 
     'day_labels' => [

@@ -4,6 +4,7 @@ return [
     'peak_hours_heading' => 'Peak Hours (Last 30 Days)',
     'best_sellers_heading' => 'Best Sellers (Revenue)',
     'payment_split_heading' => 'Today\'s Payment Split',
+    'demand_forecast_heading' => 'Demand Forecast (Last 3 Months)',
     'revenue' => 'Revenue',
     'count' => 'Order Count',
 
@@ -39,6 +40,8 @@ return [
     'filter' => [
         'revenue' => 'Revenue',
         'count' => 'Order Count',
+        'weekday' => 'Weekday',
+        'month' => 'Month',
     ],
 
     'day_labels' => [
