@@ -172,6 +172,33 @@ class PurchaseOrdersTest extends TestCase
         ]);
     }
 
+    public function test_recalculate_total_sums_line_items(): void
+    {
+        $supplier = $this->makeSupplier();
+        $po = PurchaseOrder::create([
+            'supplier_id' => $supplier->id,
+            'status' => PurchaseOrderStatus::Pending,
+            'total' => 0,
+        ]);
+
+        PurchaseOrderItem::create([
+            'purchase_order_id' => $po->id,
+            'description' => 'Biji kopi arabika',
+            'quantity' => 10,
+            'unit_price' => 50000,
+        ]);
+        PurchaseOrderItem::create([
+            'purchase_order_id' => $po->id,
+            'description' => 'Gula aren',
+            'quantity' => 5,
+            'unit_price' => 25000,
+        ]);
+
+        $po->recalculateTotal();
+
+        $this->assertSame(625000, $po->fresh()->total);
+    }
+
     private function makeStockItem(string $name, int $quantity, int $minThreshold): StockItem
     {
         return StockItem::create([
