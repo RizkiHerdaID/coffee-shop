@@ -13,10 +13,6 @@
 
 Coffee Shop is a complete platform for a single-store coffee shop. Instead of a website, a third-party POS subscription, a spreadsheet for stock, and a separate accounting tool, everything lives in one Laravel application and one PostgreSQL database: customers order from a QR table menu, the cashier rings up sales with shift-safe totals, and the owner closes the day to a Z-report that already knows the expected cash. Built for the Indonesian market first — Indonesian-first copy with full English support, QRIS and e-wallet payments, `Rp 25.000` formatting, and WhatsApp as the ordering and alerting channel — but every concept transfers to any single-store cafe.
 
-![Coffee Shop — branded share image](public/images/og-image.png)
-
-> Screenshots of the cashier, Z-report, and dashboard are coming soon. The repository ships a branded 1200×630 share image at `public/images/og-image.png`.
-
 ## Table of Contents
 
 - [Why Coffee Shop?](#why-coffee-shop)
