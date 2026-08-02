@@ -38,6 +38,7 @@ jobs:
           PAO_DISABLE: '1'
         run: |
           set -o pipefail
+          mkdir -p public/build && echo '{}' > public/build/manifest.json
           vendor/bin/phpunit --no-coverage 2>&1 | tee phpunit-output.log | tail -40
 
       - name: Report failure details
