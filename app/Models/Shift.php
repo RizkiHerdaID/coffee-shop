@@ -48,11 +48,16 @@ class Shift extends Model
     }
 
     /**
-     * Orders that count towards the report: paid or served (not pending).
+     * Orders that count towards the report: paid or served. Pending,
+     * cancelled and fully refunded orders are excluded.
      */
     public function paidOrders(): HasMany
     {
-        return $this->orders()->where('status', '!=', OrderStatus::Pending);
+        return $this->orders()->whereNotIn('status', [
+            OrderStatus::Pending,
+            OrderStatus::Refunded,
+            OrderStatus::Cancelled,
+        ]);
     }
 
     public function admin(): BelongsTo

@@ -14,7 +14,7 @@ class TodayStats extends StatsOverviewWidget
     {
         $query = Order::query()
             ->whereDate('created_at', today())
-            ->where('status', '!=', OrderStatus::Pending);
+            ->whereNotIn('status', [OrderStatus::Pending, OrderStatus::Refunded, OrderStatus::Cancelled]);
 
         $count = (clone $query)->count();
         $revenue = (clone $query)->sum('total');

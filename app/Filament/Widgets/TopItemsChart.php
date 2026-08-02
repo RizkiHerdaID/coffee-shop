@@ -26,7 +26,7 @@ class TopItemsChart extends ChartWidget
             ->select('order_items.name')
             ->selectRaw('SUM(order_items.subtotal) as revenue')
             ->join('orders', 'orders.id', '=', 'order_items.order_id')
-            ->where('orders.status', '!=', OrderStatus::Pending)
+            ->whereNotIn('orders.status', [OrderStatus::Pending, OrderStatus::Refunded, OrderStatus::Cancelled])
             ->groupBy('order_items.name')
             ->orderByDesc('revenue')
             ->limit(5)

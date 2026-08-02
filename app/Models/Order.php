@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\OrderStatus;
+use App\Enums\PaymentMethod;
 use App\Jobs\PrintKitchenTicket;
 use App\Jobs\PrintReceipt;
 use App\Jobs\SendOrderConfirmation;
@@ -76,6 +77,78 @@ class Order extends Model
 
         PrintReceipt::dispatch($this);
         PrintKitchenTicket::dispatch($this);
+
+        return true;
+    }
+
+    /**
+     * Whether the order can be refunded: paid or served, and its shift is
+     * still open (or unattached). Closed shifts keep the Z-report stable.
+     */
+    public function canBeRefunded(): bool
+    {
+        if (! in_array($this->status, [OrderStatus::Paid, OrderStatus::Served], true)) {
+            return false;
+        }
+
+        return $this->shift_id === null || $this->shift?->closed_at === null;
+    }
+
+    /**
+     * Record a refund as a negative payment row. Full refunds (net paid
+     * drops to zero) flip the status to Refunded; partial refunds keep the
+     * current status. Returns false when the order is not refundable or the
+     * amount is invalid (zero, negative, or above the net paid).
+     */
+    public function refund(int $amount, PaymentMethod|string $method = PaymentMethod::Cash, ?string $reason = null): bool
+    {
+        if (! $method instanceof PaymentMethod) {
+            $method = PaymentMethod::from($method);
+        }
+
+        if (! $this->canBeRefunded() || $amount <= 0 || $amount > $this->paid_total) {
+            return false;
+        }
+
+        $this->payments()->create([
+            'method' => $method,
+            'amount' => -$amount,
+            'reference' => $reason,
+            'paid_at' => now(),
+            'admin_id' => auth('admin')->id(),
+        ]);
+
+        if ($this->paid_total <= 0) {
+            $this->update(['status' => OrderStatus::Refunded]);
+        }
+
+        return true;
+    }
+
+    /**
+     * Whether the order can be voided: still pending, and its shift is open
+     * (or unattached).
+     */
+    public function canBeVoided(): bool
+    {
+        if ($this->status !== OrderStatus::Pending) {
+            return false;
+        }
+
+        return $this->shift_id === null || $this->shift?->closed_at === null;
+    }
+
+    /**
+     * Cancel a pending order that was never paid. Returns false when the
+     * order is not voidable.
+     */
+    public function void(): bool
+    {
+        if (! $this->canBeVoided()) {
+            return false;
+        }
+
+        $this->update(['status' => OrderStatus::Cancelled]);
 
         return true;
     }

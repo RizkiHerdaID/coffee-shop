@@ -76,7 +76,7 @@ class ManageShift extends Page
         $orderRows = Order::query()
             ->selectRaw('shift_id, COUNT(*) as orders_count, SUM(total) as sales_total')
             ->whereIn('shift_id', $ids)
-            ->where('status', '!=', OrderStatus::Pending)
+            ->whereNotIn('status', [OrderStatus::Pending, OrderStatus::Refunded, OrderStatus::Cancelled])
             ->groupBy('shift_id')
             ->get()
             ->keyBy('shift_id');
@@ -89,7 +89,7 @@ class ManageShift extends Page
             ->selectRaw("SUM(CASE WHEN payments.method = 'qris' THEN payments.amount ELSE 0 END) as qris")
             ->selectRaw("SUM(CASE WHEN payments.method = 'ewallet' THEN payments.amount ELSE 0 END) as ewallet")
             ->whereIn('orders.shift_id', $ids)
-            ->where('orders.status', '!=', OrderStatus::Pending)
+            ->whereNotIn('orders.status', [OrderStatus::Pending, OrderStatus::Refunded, OrderStatus::Cancelled])
             ->groupBy('orders.shift_id')
             ->get()
             ->keyBy('shift_id');
