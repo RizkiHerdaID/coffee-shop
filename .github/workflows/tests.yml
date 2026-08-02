@@ -43,7 +43,14 @@ jobs:
       - name: Report failure details
         if: failure()
         run: |
-          sed 's/^/::error::/' phpunit-output.log | tail -80
+          python3 - <<'EOF'
+          import re
+          t = open('phpunit-output.log', encoding='utf-8', errors='replace').read()
+          i = t.find('1) ')
+          j = t.find('2) ')
+          block = t[i:j if j > 0 else i+1200]
+          print('::error::' + block.replace('\n', '%0A')[:2000])
+          EOF
 
       - name: Check code style
         run: vendor/bin/pint --test
