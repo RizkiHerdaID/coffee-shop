@@ -36,7 +36,16 @@ jobs:
       - name: Run test suite
         env:
           PAO_DISABLE: '1'
-        run: vendor/bin/phpunit --no-coverage
+        run: |
+          set -o pipefail
+          vendor/bin/phpunit --no-coverage 2>&1 | tee phpunit-output.log | tail -40
+
+      - name: Upload phpunit output
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: phpunit-output
+          path: phpunit-output.log
 
       - name: Check code style
         run: vendor/bin/pint --test
