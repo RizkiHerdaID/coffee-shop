@@ -5,7 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 
-#[Fillable(['name', 'price', 'note', 'sort_order'])]
+#[Fillable(['name', 'price', 'note', 'sort_order', 'photo', 'category', 'available'])]
 class MenuItem extends Model
 {
     /**
@@ -17,6 +17,9 @@ class MenuItem extends Model
     {
         return [
             'price' => 'integer',
+            'photo' => 'string',
+            'category' => 'string',
+            'available' => 'boolean',
         ];
     }
 }

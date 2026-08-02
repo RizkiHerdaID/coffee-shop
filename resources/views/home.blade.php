@@ -71,7 +71,12 @@
                     <h3 class="font-semibold text-white">{{ $item->name }}</h3>
                     <p class="mt-1 text-sm text-stone-400">{{ $item->note }}</p>
                 </div>
-                <p class="shrink-0 font-semibold text-amber-500">Rp {{ number_format($item->price, 0, ",", ".") }}</p>
+                <div class="flex shrink-0 items-center gap-4">
+                    <p class="shrink-0 font-semibold text-amber-500">Rp {{ number_format($item->price, 0, ",", ".") }}</p>
+                    @if ($item->photo)
+                    <img src="{{ Storage::disk('public')->url($item->photo) }}" alt="{{ $item->name }}" class="h-20 w-20 rounded-xl object-cover">
+                    @endif
+                </div>
             </div>
             @endforeach
         </div>

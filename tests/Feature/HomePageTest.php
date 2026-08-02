@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\MenuItem;
 use Database\Seeders\MenuSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -41,6 +42,18 @@ class HomePageTest extends TestCase
 
         $response->assertSee('Rp 25.000');
         $response->assertSee('Rp 32.000');
+    }
+
+    public function test_home_page_hides_unavailable_items(): void
+    {
+        $this->seed(MenuSeeder::class);
+
+        MenuItem::where('name', 'Espresso')->update(['available' => false]);
+
+        $response = $this->get('/');
+
+        $response->assertDontSee('Espresso');
+        $response->assertSee('Cappuccino');
     }
 
     public function test_home_page_has_whatsapp_cta(): void

@@ -5,7 +5,10 @@ namespace App\Filament\Resources\MenuItems\Schemas;
 use App\Exceptions\MissingAiKeyException;
 use App\Services\AiCopyService;
 use Filament\Actions\Action;
+use Filament\Forms\Components\FileUpload;
+use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Toggle;
 use Filament\Notifications\Notification;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
@@ -96,6 +99,21 @@ class MenuItemForm
                                 }
                             })
                     ),
+                FileUpload::make('photo')
+                    ->label(__('menu-items.fields.photo'))
+                    ->disk('public')
+                    ->image(),
+                Select::make('category')
+                    ->label(__('menu-items.fields.category'))
+                    ->options([
+                        'coffee' => __('menu.categories.coffee'),
+                        'non-coffee' => __('menu.categories.non-coffee'),
+                        'snack' => __('menu.categories.snack'),
+                        'food' => __('menu.categories.food'),
+                    ]),
+                Toggle::make('available')
+                    ->label(__('menu-items.fields.available'))
+                    ->default(true),
                 TextInput::make('sort_order')
                     ->label(__('menu-items.fields.sort_order'))
                     ->numeric()
