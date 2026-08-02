@@ -37,7 +37,36 @@ Pitfalls learned in prior sessions:
 herdr agent start --kind opencode
 ```
 
-then submit each agent's task prompt. Use the project conventions in `AGENTS.md` (e.g. `sg docker` for every container command, `PAO_DISABLE=1` for tests). Split tasks along file boundaries so agents don't edit the same files concurrently. In a worktree workspace the "agents" tab already runs 3 opencode agents (auto-layout) — the lead agent is the FIRST pane; sub-agents are the OTHER pre-provisioned panes in the same tab. Use `herdr agent prompt <pane> "..."` / `herdr agent read` / `herdr agent wait` on them. Do NOT run `herdr pane split`/`agent start` from inside a lead — it opens new terminals instead of staying in the shared layout.
+then submit each agent's task prompt. Use the project conventions in `AGENTS.md` (e.g. `sg docker` for every container command, `PAO_DISABLE=1` for tests). Split tasks along file boundaries so agents don't edit the same files concurrently. In a worktree workspace the "agents" tab already runs 3 opencode agents (auto-layout) — the lead agent is the FIRST pane; sub-agents are the OTHER pre-provisioned panes in the same tab. Use `herdr agent prompt <pane> "..."` / `herdr agent read` / `herdr agent wait` on them. Do NOT run `herdr pane split`/`agent start` from inside a lead — it opens new terminals instead of staying in the shared layout. Idle pre-provisioned panes hold ~700MB each — close panes the lead doesn't need (`herdr pane close <pane>`) or keep fleet sizes matched to task size.
+
+**Fleet sizing (v2 rule):** match sub-agents to task complexity, NOT "always 3".
+- S-effort tasks → lead only (close the other 2 panes immediately after provisioning)
+- M-effort tasks → lead + 2 sub-agents max
+- Only large independent-scope tasks get the full 3.
+Coordination overhead (prompting, verifying, folding) eats the parallel gain below ~M effort.
+
+## V2 orchestration flow (main session, per batch)
+
+Order of operations for a parallel batch — designed to remove polling, duplicated research, and message storms:
+
+1. **Write a shared contract file FIRST** — before prompting any lead, the main session writes `/tmp/opencode/<branch>-contract.md` containing: feature spec, existing code to MIRROR (paths), conventions to follow (money mask idiom, localization, enum-cast handling), the worktree path, app URL/port, and a "do not touch" list of files owned by other branches. Kills redundant research — every agent starts from the same context (the expenses lead wrote one spontaneously mid-session; make it standard).
+2. **Dispatch leads in parallel** — one `herdr agent prompt <lead-pane>` per worktree, each ending with the DONE-notification instruction (see Panes pitfalls). Keep file boundaries disjoint across branches.
+3. **Sub-agents write reports to files** — each sub-agent writes its deliverable summary to `/tmp/opencode/<branch>-report.md` (their on-pane reports scroll out of reach). The lead verifies on disk, never from pane output.
+4. **Only the LEAD notifies** — on completion the lead runs `herdr agent prompt wE:p1 "DONE <branch>: ..."`. Sub-agents never message the main session — prevents message storms when several finish at once.
+5. **Main reacts on notification, never on a timer** — merge, run the suite once, cleanup (see Worktree lifecycle below), and free RAM.
+
+Worktree lifecycle (proven sequence, order matters):
+```bash
+herdr worktree create --cwd /home/rizki/projects/coffee-shop --branch feature-x --no-focus --json
+scripts/worktree-env.sh $WT <slot> --dev --force && cp -al <main>/vendor <main>/node_modules $WT/
+sg docker -c "cd $WT && ./vendor/bin/sail up -d" && sg docker -c "cd $WT && ./vendor/bin/sail artisan key:generate && php artisan config:clear && php artisan view:clear && php artisan route:clear"
+herdr pane rename <pane> "research|implement|test"   # readable agent fleet (3 identical "OpenCode" titles otherwise)
+# ... work happens, lead notifies DONE ...
+rtk git merge feature-x -m "Merge feature-x: <summary>"
+herdr workspace close <workspace-id>                 # removes herdr state AND deletes the git branch
+sg docker -c "docker run --rm -v ~/.herdr/worktrees/coffee-shop:/wt alpine rm -rf /wt/feature-x"   # root-owned bootstrap/cache/filament files block plain rm
+rtk git worktree prune && rtk git branch -d feature-x || true   # branch usually already gone with the workspace
+```
 
 ## herdr-plus extras (user has the plugin installed)
 
