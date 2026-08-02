@@ -21,6 +21,7 @@ Symptoms of a stale cache:
 - New Filament resource 500s with "Route not defined" (panel routes cached).
 - Deleted widget/resource class fatals with "Class not found" (optimized view/components cache).
 - Test suite shows CSRF 419s / `data.email is required` in AdminAuthTest (cached config ignores phpunit.xml env overrides like `SESSION_DRIVER=array`).
+- **WORST CASE (happened 2026-08-02): running `sail artisan test` with cached config made `RefreshDatabase` run `migrate:fresh` against the DEV pgsql DB — wiped all tables (772 dev orders etc.), tests still PASSED because they ran against the dev DB.** Always `config:clear` BEFORE the first test run after any `sail up`/recreate; verify the suite is on sqlite by checking `DB_CONNECTION` via a quick `tinker --execute="echo config('database.default')"` if in doubt.
 
 After clearing, the suite should pass fully; the 4 AdminAuth failures are a cache artifact, NOT pre-existing. `optimize` also runs on every `sail up` — after a recreate, clear caches before trusting anything.
 
