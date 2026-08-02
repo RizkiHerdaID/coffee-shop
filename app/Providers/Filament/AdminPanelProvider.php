@@ -5,6 +5,7 @@ namespace App\Providers\Filament;
 use App\Filament\Auth\Login;
 use App\Filament\Pages\Cashier;
 use App\Filament\Pages\ManageShift;
+use App\Filament\Pages\PnlReport;
 use App\Filament\Pages\ShiftReport;
 use App\Filament\Widgets\BestSellersChart;
 use App\Filament\Widgets\LowStockWidget;
@@ -50,6 +51,7 @@ class AdminPanelProvider extends PanelProvider
                 Dashboard::class,
                 Cashier::class,
                 ManageShift::class,
+                PnlReport::class,
                 ShiftReport::class,
             ])
             ->widgets([
