@@ -13,7 +13,7 @@ jobs:
   tests:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
@@ -23,7 +23,7 @@ jobs:
           extensions: pdo_sqlite, sqlite3
 
       - name: Cache Composer dependencies
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: vendor
           key: composer-${{ runner.os }}-${{ hashFiles('composer.lock') }}
@@ -38,7 +38,7 @@ jobs:
           PAO_DISABLE: '1'
         run: |
           set -o pipefail
-          mkdir -p public/build && printf '{"resources/css/app.css":{"file":"app.css","src":"resources/css/app.css","isEntry":true},"resources/js/app.js":{"file":"app.js","src":"resources/js/app.js","isEntry":true}}' > public/build/manifest.json && printf '{"version":"1","families":{}}' > public/build/fonts-manifest.json
+          mkdir -p public/build && printf '{"resources/css/app.css":{"file":"app.css","src":"resources/css/app.css","isEntry":true},"resources/js/app.js":{"file":"app.js","src":"resources/js/app.js","isEntry":true}}' > public/build/manifest.json && printf '{"version":1,"families":{"instrument-sans":{}},"preloads":[]}' > public/build/fonts-manifest.json
           vendor/bin/phpunit --no-coverage 2>&1 | tee phpunit-output.log | tail -40
 
       - name: Report failure details
