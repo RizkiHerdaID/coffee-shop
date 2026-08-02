@@ -11,6 +11,7 @@ conventions and environment quirks.
 | [`website.md`](website.md) | Public site: landing pages, SEO/structured data, QR table menu, WhatsApp pickup ordering, conversion features |
 | [`pos.md`](pos.md) | POS: order capture, payments, shifts/Z-report, receipts, refunds & voids, planned gateway integration |
 | [`owner-tools.md`](owner-tools.md) | Owner tooling: dashboard widgets, inventory/stock, suppliers, purchase orders, expenses, cash register, recipes/COGS, low-stock alerts, AI copy, summary email |
+| [`ops.md`](ops.md) | Operations: local services, mail/queues, production notes, uptime monitoring + scheduler heartbeat, backups & restore drill |
 | [`i18n/README.md`](i18n/README.md) | Localization system (ID/EN switcher) + copy decisions |
 | [`i18n/home.md`](i18n/home.md) | Home page final Indonesian copy |
 | [`i18n/menu-contact.md`](i18n/menu-contact.md) | Menu & contact page final Indonesian copy |
