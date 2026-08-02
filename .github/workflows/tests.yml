@@ -40,12 +40,10 @@ jobs:
           set -o pipefail
           vendor/bin/phpunit --no-coverage 2>&1 | tee phpunit-output.log | tail -40
 
-      - name: Upload phpunit output
+      - name: Report failure details
         if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: phpunit-output
-          path: phpunit-output.log
+        run: |
+          sed 's/^/::error::/' phpunit-output.log | head -80
 
       - name: Check code style
         run: vendor/bin/pint --test
