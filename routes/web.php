@@ -34,12 +34,18 @@ Route::get('/pos/z-report/{shift}', [PosZReportController::class, 'show'])
     ->name('pos.zreport');
 
 Route::get('/sitemap.xml', function () {
-    $urls = [route('home'), route('menu'), route('contact'), route('reservation')];
+    $urls = [route('home'), route('menu'), route('contact'), route('reservation'), route('points')];
+
+    for ($table = 1; $table <= config('shop.tables'); $table++) {
+        $urls[] = route('qr.menu', ['table' => $table]);
+    }
+
+    $lastmod = date('Y-m-d');
 
     $xml = '<?xml version="1.0" encoding="UTF-8"?>'."\n".'<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">';
 
     foreach ($urls as $url) {
-        $xml .= "\n  <url>\n    <loc>".e($url)."</loc>\n    <changefreq>weekly</changefreq>\n  </url>";
+        $xml .= "\n  <url>\n    <loc>".e($url)."</loc>\n    <lastmod>".$lastmod."</lastmod>\n    <changefreq>weekly</changefreq>\n  </url>";
     }
 
     $xml .= "\n</urlset>\n";
