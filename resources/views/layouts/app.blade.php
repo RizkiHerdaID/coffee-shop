@@ -10,9 +10,12 @@
     <meta property="og:description" content="@yield('description', __('site.meta.default_description', ['shop' => config('shop.name')]))">
     <meta property="og:type" content="website">
     <meta property="og:url" content="{{ url()->current() }}">
-    <meta property="og:image" content="{{ url('/favicon.ico') }}">
+    <meta property="og:image" content="{{ url('/images/og-image.png') }}">
     <meta property="og:site_name" content="{{ config('shop.name') }}">
-    <meta name="twitter:card" content="summary">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="@yield('title', __('site.brand'))">
+    <meta name="twitter:description" content="@yield('description', __('site.meta.default_description', ['shop' => config('shop.name')]))">
+    <meta name="twitter:image" content="{{ url('/images/og-image.png') }}">
 
     @php
         $days = [

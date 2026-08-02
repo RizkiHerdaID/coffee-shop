@@ -43,4 +43,54 @@ class SeoTest extends TestCase
         $response->assertHeader('Content-Type', 'text/plain; charset=UTF-8');
         $response->assertSee('Sitemap: '.url('/sitemap.xml'), false);
     }
+
+    public function test_home_page_renders_og_image_and_twitter_image_meta_tags(): void
+    {
+        $response = $this->get('/');
+
+        $response->assertOk();
+        $response->assertSee('property="og:image" content="'.url('/images/og-image.png').'"', false);
+        $response->assertSee('name="twitter:card" content="summary_large_image"', false);
+        $response->assertSee('name="twitter:image" content="'.url('/images/og-image.png').'"', false);
+    }
+
+    public function test_all_public_pages_render_og_share_meta_tags(): void
+    {
+        foreach (['/', '/menu', '/contact', '/cek-poin', '/reservasi', '/qr/1'] as $path) {
+            $response = $this->get($path);
+
+            $response->assertOk();
+            $response->assertSee('property="og:image" content="'.url('/images/og-image.png').'"', false);
+            $response->assertSee('name="twitter:image" content="'.url('/images/og-image.png').'"', false);
+        }
+    }
+
+    public function test_og_image_file_exists_and_is_a_non_zero_png(): void
+    {
+        $path = public_path('images/og-image.png');
+
+        $this->assertFileExists($path);
+        $this->assertGreaterThan(0, filesize($path));
+        $this->assertNotFalse(getimagesize($path));
+    }
+
+    public function test_sitemap_includes_lastmod_for_each_url(): void
+    {
+        $response = $this->get('/sitemap.xml');
+
+        $response->assertOk();
+        $response->assertSee('<lastmod>'.date('Y-m-d').'</lastmod>', false);
+    }
+
+    public function test_sitemap_includes_points_and_qr_table_urls(): void
+    {
+        $response = $this->get('/sitemap.xml');
+
+        $response->assertOk();
+        $response->assertSee(url('/cek-poin'), false);
+
+        for ($table = 1; $table <= config('shop.tables'); $table++) {
+            $response->assertSee(url('/qr/'.$table), false);
+        }
+    }
 }
