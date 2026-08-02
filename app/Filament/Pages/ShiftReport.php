@@ -24,7 +24,7 @@ class ShiftReport extends Page
     public function mount(int|string $record): void
     {
         $this->shift = Shift::query()
-            ->with('admin')
+            ->with(['admin', 'cashMovements.admin'])
             ->findOrFail($record);
     }
 

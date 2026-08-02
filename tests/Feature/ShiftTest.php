@@ -12,6 +12,7 @@ use App\Models\MenuItem;
 use App\Models\Order;
 use App\Models\Payment;
 use App\Models\Shift;
+use App\Models\ShiftCashMovement;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
@@ -595,5 +596,328 @@ class ShiftTest extends TestCase
             ->assertSee('DISCREPANCY')
             ->assertSee('MATCH')
             ->assertDontSee('LAPORAN PENUTUPAN SHIFT');
+    }
+
+    private function deposit(Shift $shift, Admin $admin, int $amount, ?string $note = null): ShiftCashMovement
+    {
+        return ShiftCashMovement::create([
+            'shift_id' => $shift->id,
+            'type' => 'in',
+            'amount' => $amount,
+            'note' => $note,
+            'admin_id' => $admin->id,
+        ]);
+    }
+
+    private function pettyOut(Shift $shift, Admin $admin, int $amount, ?string $note = null): ShiftCashMovement
+    {
+        return ShiftCashMovement::create([
+            'shift_id' => $shift->id,
+            'type' => 'out',
+            'amount' => $amount,
+            'note' => $note,
+            'admin_id' => $admin->id,
+        ]);
+    }
+
+    public function test_deposit_increases_expected_cash(): void
+    {
+        $admin = $this->admin();
+        $shift = $this->openShift($admin, 250000);
+
+        $this->deposit($shift, $admin, 200000);
+
+        $this->assertSame(200000, $shift->deposits());
+        $this->assertSame(0, $shift->pettyOut());
+        $this->assertSame(450000, $shift->expectedCash());
+    }
+
+    public function test_petty_out_decreases_expected_cash(): void
+    {
+        $admin = $this->admin();
+        $shift = $this->openShift($admin, 250000);
+
+        $this->pettyOut($shift, $admin, 50000);
+
+        $this->assertSame(0, $shift->deposits());
+        $this->assertSame(50000, $shift->pettyOut());
+        $this->assertSame(200000, $shift->expectedCash());
+    }
+
+    public function test_expected_cash_combines_movements_with_payments_and_refunds(): void
+    {
+        $admin = $this->admin();
+        $shift = $this->openShift($admin, 250000);
+
+        $order = $this->paidOrder($shift, $admin, 100000);
+        $this->cashPayment($order, $admin, 100000);
+        $this->cashPayment($order, $admin, -10000);
+
+        $this->deposit($shift, $admin, 200000);
+        $this->pettyOut($shift, $admin, 50000);
+
+        // 250.000 + 100.000 − 10.000 + 200.000 − 50.000 = 490.000
+        $this->assertSame(490000, $shift->expectedCash());
+    }
+
+    public function test_expected_cash_accumulates_multiple_movements_of_the_same_type(): void
+    {
+        $admin = $this->admin();
+        $shift = $this->openShift($admin, 100000);
+
+        $this->deposit($shift, $admin, 50000);
+        $this->deposit($shift, $admin, 75000);
+        $this->pettyOut($shift, $admin, 30000);
+        $this->pettyOut($shift, $admin, 20000);
+
+        $this->assertSame(125000, $shift->deposits());
+        $this->assertSame(50000, $shift->pettyOut());
+        $this->assertSame(175000, $shift->expectedCash());
+    }
+
+    public function test_movements_are_scoped_to_their_shift(): void
+    {
+        $admin = $this->admin();
+        $shift = $this->openShift($admin, 100000);
+        $other = $this->openShift($admin, 100000);
+
+        $this->deposit($other, $admin, 50000);
+        $this->pettyOut($other, $admin, 20000);
+
+        $this->assertSame(0, $shift->deposits());
+        $this->assertSame(0, $shift->pettyOut());
+        $this->assertSame(100000, $shift->expectedCash());
+        $this->assertSame(130000, $other->expectedCash());
+    }
+
+    public function test_cash_movement_records_admin_id_type_amount_and_note(): void
+    {
+        $admin = $this->admin();
+        $shift = $this->openShift($admin, 100000);
+
+        $this->deposit($shift, $admin, 200000, 'Setoran siang');
+        $this->pettyOut($shift, $admin, 30000, 'Beli gula');
+
+        $this->assertDatabaseHas('shift_cash_movements', [
+            'shift_id' => $shift->id,
+            'type' => 'in',
+            'amount' => 200000,
+            'note' => 'Setoran siang',
+            'admin_id' => $admin->id,
+        ]);
+        $this->assertDatabaseHas('shift_cash_movements', [
+            'shift_id' => $shift->id,
+            'type' => 'out',
+            'amount' => 30000,
+            'note' => 'Beli gula',
+            'admin_id' => $admin->id,
+        ]);
+    }
+
+    public function test_cash_movement_note_is_optional_and_nullable(): void
+    {
+        $admin = $this->admin();
+        $shift = $this->openShift($admin, 100000);
+
+        $this->deposit($shift, $admin, 50000);
+
+        $this->assertDatabaseHas('shift_cash_movements', [
+            'shift_id' => $shift->id,
+            'type' => 'in',
+            'amount' => 50000,
+            'note' => null,
+        ]);
+    }
+
+    public function test_cash_movement_is_deposit_and_is_petty_out_helpers(): void
+    {
+        $admin = $this->admin();
+        $shift = $this->openShift($admin, 100000);
+
+        $deposit = $this->deposit($shift, $admin, 50000);
+        $out = $this->pettyOut($shift, $admin, 10000);
+
+        $this->assertTrue($deposit->isDeposit());
+        $this->assertFalse($deposit->isPettyOut());
+        $this->assertTrue($out->isPettyOut());
+        $this->assertFalse($out->isDeposit());
+    }
+
+    public function test_recording_a_deposit_via_page_stores_movement_and_updates_expected_cash(): void
+    {
+        $admin = $this->admin();
+        $shift = $this->openShift($admin, 250000);
+
+        Livewire::actingAs($admin, 'admin')
+            ->test(ManageShift::class)
+            ->set('movementAmount', '200.000')
+            ->call('recordDeposit')
+            ->assertHasNoErrors();
+
+        $this->assertDatabaseHas('shift_cash_movements', [
+            'shift_id' => $shift->id,
+            'type' => 'in',
+            'amount' => 200000,
+            'note' => null,
+            'admin_id' => $admin->id,
+        ]);
+
+        $this->assertSame(450000, $shift->refresh()->expectedCash());
+    }
+
+    public function test_recording_a_petty_out_via_page_stores_movement_with_note(): void
+    {
+        $admin = $this->admin();
+        $shift = $this->openShift($admin, 250000);
+
+        Livewire::actingAs($admin, 'admin')
+            ->test(ManageShift::class)
+            ->set('movementAmount', '50.000')
+            ->set('movementNote', 'Beli gula')
+            ->call('recordPettyOut')
+            ->assertHasNoErrors();
+
+        $this->assertDatabaseHas('shift_cash_movements', [
+            'shift_id' => $shift->id,
+            'type' => 'out',
+            'amount' => 50000,
+            'note' => 'Beli gula',
+            'admin_id' => $admin->id,
+        ]);
+
+        $this->assertSame(200000, $shift->refresh()->expectedCash());
+    }
+
+    public function test_recording_a_movement_requires_a_positive_integer_amount(): void
+    {
+        $admin = $this->admin();
+        $this->openShift($admin, 100000);
+
+        $invalid = ['', 'abc', '0', '-5.000', '1.5'];
+
+        foreach ($invalid as $value) {
+            Livewire::actingAs($admin, 'admin')
+                ->test(ManageShift::class)
+                ->set('movementAmount', $value)
+                ->call('recordDeposit')
+                ->assertHasErrors(['movementAmount']);
+
+            Livewire::actingAs($admin, 'admin')
+                ->test(ManageShift::class)
+                ->set('movementAmount', $value)
+                ->call('recordPettyOut')
+                ->assertHasErrors(['movementAmount']);
+        }
+
+        $this->assertDatabaseCount('shift_cash_movements', 0);
+    }
+
+    public function test_recording_a_movement_requires_an_open_shift(): void
+    {
+        $admin = $this->admin();
+
+        Livewire::actingAs($admin, 'admin')
+            ->test(ManageShift::class)
+            ->set('movementAmount', '100.000')
+            ->call('recordDeposit')
+            ->assertHasErrors(['movementAmount']);
+
+        $this->assertDatabaseCount('shift_cash_movements', 0);
+    }
+
+    public function test_recording_a_movement_rejects_overlong_notes(): void
+    {
+        $admin = $this->admin();
+        $this->openShift($admin, 100000);
+
+        Livewire::actingAs($admin, 'admin')
+            ->test(ManageShift::class)
+            ->set('movementAmount', '100.000')
+            ->set('movementNote', Str::repeat('x', 300))
+            ->call('recordDeposit')
+            ->assertHasErrors(['movementNote']);
+
+        $this->assertDatabaseCount('shift_cash_movements', 0);
+    }
+
+    public function test_today_movements_property_lists_movements_latest_first(): void
+    {
+        $admin = $this->admin();
+        $shift = $this->openShift($admin, 100000);
+
+        $first = $this->deposit($shift, $admin, 50000, 'Setor pagi');
+        ShiftCashMovement::whereKey($first->id)->update(['created_at' => now()->subMinutes(5)]);
+        $second = $this->pettyOut($shift, $admin, 10000, 'Belanja');
+
+        $component = Livewire::actingAs($admin, 'admin')->test(ManageShift::class);
+        $movements = collect($component->get('todayMovements'));
+
+        $this->assertSame([$second->id, $first->id], $movements->pluck('id')->all());
+    }
+
+    public function test_z_report_expected_cash_reflects_movements(): void
+    {
+        $admin = $this->admin();
+        $shift = $this->openShift($admin, 250000);
+        $this->deposit($shift, $admin, 200000, 'Setor siang');
+        $this->pettyOut($shift, $admin, 50000, 'Beli gula');
+        $shift->update([
+            'closed_at' => now(),
+            'closing_cash' => 400000,
+            'expected_total' => 0,
+        ]);
+
+        $this->actingAs($admin, 'admin')
+            ->get(route('pos.zreport', $shift))
+            ->assertOk()
+            ->assertSee('Rp 250.000')
+            ->assertSee('Rp 200.000')
+            ->assertSee('Rp 50.000')
+            ->assertSee('Rp 400.000')
+            ->assertSee('COCOK');
+    }
+
+    public function test_shift_report_page_shows_expected_cash_with_movements(): void
+    {
+        $admin = $this->admin();
+        $shift = $this->openShift($admin, 250000);
+        $this->deposit($shift, $admin, 200000);
+        $this->pettyOut($shift, $admin, 50000);
+        $shift->update([
+            'closed_at' => now(),
+            'closing_cash' => 400000,
+            'expected_total' => 0,
+        ]);
+
+        Livewire::actingAs($admin, 'admin')
+            ->test(ShiftReport::class, ['record' => $shift->id])
+            ->assertOk()
+            ->assertSee('Rp 400.000')
+            ->assertSee('Rp 200.000')
+            ->assertSee('Rp 50.000');
+    }
+
+    public function test_recent_shifts_expected_cash_includes_movements(): void
+    {
+        $admin = $this->admin();
+        $shift = $this->openShift($admin, 250000);
+        $order = $this->paidOrder($shift, $admin, 50000);
+        $this->cashPayment($order, $admin, 50000);
+        $this->deposit($shift, $admin, 200000);
+        $this->pettyOut($shift, $admin, 50000);
+        $shift->update([
+            'closed_at' => now(),
+            'closing_cash' => 450000,
+            'expected_total' => 50000,
+        ]);
+
+        $component = Livewire::actingAs($admin, 'admin')->test(ManageShift::class);
+
+        $recent = collect($component->get('recentShifts'))->firstWhere(
+            fn (array $row) => $row['shift']->is($shift)
+        );
+
+        $this->assertNotNull($recent);
+        $this->assertSame(450000, $recent['expected_cash']);
     }
 }

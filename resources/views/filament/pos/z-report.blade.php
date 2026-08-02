@@ -169,6 +169,14 @@
                 <span>{{ __('pos.zreport.cash_refunds') }}</span>
                 <span>Rp {{ number_format($shift->cashRefunds(), 0, ',', '.') }}</span>
             </div>
+            <div class="line">
+                <span>{{ __('dashboard.cash_movements.deposits_total') }}</span>
+                <span>Rp {{ number_format($shift->deposits(), 0, ',', '.') }}</span>
+            </div>
+            <div class="line">
+                <span>{{ __('dashboard.cash_movements.petty_out_total') }}</span>
+                <span>Rp {{ number_format($shift->pettyOut(), 0, ',', '.') }}</span>
+            </div>
 
             <hr>
 
