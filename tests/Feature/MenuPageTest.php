@@ -54,16 +54,20 @@ class MenuPageTest extends TestCase
         $response->assertSee('Espresso');
     }
 
-    public function test_menu_page_hides_unavailable_items(): void
+    public function test_menu_page_marks_unavailable_items_as_sold_out_and_not_selectable(): void
     {
         $this->seed(MenuSeeder::class);
 
-        MenuItem::where('name', 'Espresso')->update(['available' => false]);
+        $espresso = MenuItem::where('name', 'Espresso')->firstOrFail();
+        $espresso->update(['available' => false]);
 
         $response = $this->get('/menu');
 
         $response->assertOk();
-        $response->assertDontSee('Espresso');
+        $response->assertSee('Espresso');
+        $response->assertSee(__('menu.sold_out'));
+        $response->assertSee('data-available="0"', false);
+        $response->assertDontSee('data-add="'.$espresso->id.'"', false);
     }
 
     public function test_seeded_items_have_categories(): void
