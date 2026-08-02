@@ -9,6 +9,9 @@ Route::get('/', [PageController::class, 'home'])->name('home');
 Route::get('/menu', [PageController::class, 'menu'])->name('menu');
 Route::get('/contact', [PageController::class, 'contact'])->name('contact');
 
+Route::match(['get', 'post'], '/reservasi', [PageController::class, 'reservation'])
+    ->name('reservation');
+
 Route::get('/qr/{table}', [PageController::class, 'qr'])->where('table', '\d+')->name('qr.menu');
 
 Route::get('/lang/{locale}', function (string $locale) {
@@ -30,7 +33,7 @@ Route::get('/pos/z-report/{shift}', [PosZReportController::class, 'show'])
     ->name('pos.zreport');
 
 Route::get('/sitemap.xml', function () {
-    $urls = [route('home'), route('menu'), route('contact')];
+    $urls = [route('home'), route('menu'), route('contact'), route('reservation')];
 
     $xml = '<?xml version="1.0" encoding="UTF-8"?>'."\n".'<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">';
 

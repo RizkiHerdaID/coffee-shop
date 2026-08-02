@@ -10,6 +10,7 @@ return [
     'nav' => [
         'home' => 'Beranda',
         'menu' => 'Menu',
+        'reservation' => 'Reservasi',
         'contact' => 'Kontak',
         'reserve' => 'Pesan Meja',
         'toggle_aria' => 'Buka menu',
