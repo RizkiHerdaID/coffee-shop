@@ -1,0 +1,277 @@
+<?php
+
+namespace Tests\Feature;
+
+use App\Enums\PaymentMethod;
+use App\Models\Admin;
+use App\Models\LoyaltyCard;
+use App\Models\Order;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Http;
+use Tests\TestCase;
+
+/**
+ * Loyalty/stamps program (Vikunja 65).
+ *
+ * Paid orders keyed by customer_phone credit a stamp via the Order
+ * observer (App\Observers\OrderObserver — fires on the pending → paid
+ * transition, so pending orders, refunds and re-saves never re-credit).
+ * Stamps accumulate per phone; every full block of 10 stamps can be
+ * redeemed for one free drink (LoyaltyCard::redeem() subtracts 10 stamps
+ * and increments `redeemed`). The public "Cek Poin" page
+ * (PageController::points(), GET /cek-poin) shows the stamps and free
+ * drinks available for a queried phone. Orders without a customer_phone
+ * never credit a stamp.
+ */
+class LoyaltyTest extends TestCase
+{
+    use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        Http::fake();
+    }
+
+    /**
+     * Create a fully paid order (pending → paid via markPaidIfCovered,
+     * the same transition the cashier performs).
+     */
+    private function createPaidOrder(?string $phone = '081234567890', int $total = 20000, ?Admin $admin = null): Order
+    {
+        $admin ??= Admin::factory()->create();
+
+        $order = Order::create([
+            'order_number' => 'ORD-'.fake()->unique()->numberBetween(100000, 999999),
+            'customer_phone' => $phone,
+            'total' => $total,
+            'created_by' => $admin->id,
+        ])->refresh();
+
+        $order->payments()->create([
+            'method' => PaymentMethod::Cash,
+            'amount' => $total,
+            'paid_at' => now(),
+            'admin_id' => $admin->id,
+        ]);
+
+        $order->markPaidIfCovered();
+
+        return $order->refresh();
+    }
+
+    public function test_paid_order_credits_a_stamp_keyed_by_customer_phone(): void
+    {
+        $this->createPaidOrder('081234567890');
+
+        $card = LoyaltyCard::where('phone', '081234567890')->first();
+
+        $this->assertNotNull($card);
+        $this->assertSame(1, $card->stamps);
+        $this->assertSame(0, $card->redeemed);
+        $this->assertSame(0, $card->freeDrinksAvailable());
+    }
+
+    public function test_stamps_are_keyed_per_phone_not_shared(): void
+    {
+        $this->createPaidOrder('081234567890');
+        $this->createPaidOrder('081298765432');
+
+        $this->assertSame(1, LoyaltyCard::where('phone', '081234567890')->firstOrFail()->stamps);
+        $this->assertSame(1, LoyaltyCard::where('phone', '081298765432')->firstOrFail()->stamps);
+        $this->assertSame(2, LoyaltyCard::count());
+    }
+
+    public function test_multiple_paid_orders_accumulate_stamps(): void
+    {
+        foreach (range(1, 3) as $i) {
+            $this->createPaidOrder('081234567890');
+        }
+
+        $card = LoyaltyCard::where('phone', '081234567890')->firstOrFail();
+
+        $this->assertSame(3, $card->stamps);
+        $this->assertSame(0, $card->redeemed);
+        $this->assertSame(0, $card->freeDrinksAvailable());
+    }
+
+    public function test_ninth_order_holds_eight_stamps_and_no_free_drink_yet(): void
+    {
+        foreach (range(1, 9) as $i) {
+            $this->createPaidOrder('081234567890');
+        }
+
+        $card = LoyaltyCard::where('phone', '081234567890')->firstOrFail();
+
+        $this->assertSame(9, $card->stamps);
+        $this->assertSame(0, $card->freeDrinksAvailable());
+        $this->assertSame(1, $card->remainingToNextFreeDrink());
+    }
+
+    public function test_tenth_paid_order_makes_a_free_drink_available(): void
+    {
+        foreach (range(1, 10) as $i) {
+            $this->createPaidOrder('081234567890');
+        }
+
+        $card = LoyaltyCard::where('phone', '081234567890')->firstOrFail();
+
+        $this->assertSame(10, $card->stamps);
+        $this->assertSame(0, $card->redeemed);
+        $this->assertSame(1, $card->freeDrinksAvailable());
+        $this->assertSame(10, $card->remainingToNextFreeDrink());
+    }
+
+    public function test_orders_beyond_the_tenth_accumulate_into_the_next_block(): void
+    {
+        foreach (range(1, 12) as $i) {
+            $this->createPaidOrder('081234567890');
+        }
+
+        $card = LoyaltyCard::where('phone', '081234567890')->firstOrFail();
+
+        $this->assertSame(12, $card->stamps);
+        $this->assertSame(1, $card->freeDrinksAvailable());
+        $this->assertSame(8, $card->remainingToNextFreeDrink());
+    }
+
+    public function test_redeem_returns_false_when_balance_is_below_ten_stamps(): void
+    {
+        LoyaltyCard::credit('081234567890', 9);
+
+        $this->assertFalse(LoyaltyCard::redeem('081234567890'));
+
+        $card = LoyaltyCard::where('phone', '081234567890')->firstOrFail();
+        $this->assertSame(9, $card->stamps);
+        $this->assertSame(0, $card->redeemed);
+    }
+
+    public function test_redeem_consumes_ten_stamps_and_increments_redeemed(): void
+    {
+        LoyaltyCard::credit('081234567890', 10);
+
+        $this->assertTrue(LoyaltyCard::redeem('081234567890'));
+
+        $card = LoyaltyCard::where('phone', '081234567890')->firstOrFail();
+        $this->assertSame(0, $card->stamps);
+        $this->assertSame(1, $card->redeemed);
+        $this->assertSame(0, $card->freeDrinksAvailable());
+        $this->assertSame(10, $card->remainingToNextFreeDrink());
+    }
+
+    public function test_redeem_returns_false_when_none_left(): void
+    {
+        LoyaltyCard::credit('081234567890', 20);
+
+        $this->assertTrue(LoyaltyCard::redeem('081234567890'));
+        $this->assertTrue(LoyaltyCard::redeem('081234567890'));
+        $this->assertFalse(LoyaltyCard::redeem('081234567890'));
+
+        $card = LoyaltyCard::where('phone', '081234567890')->firstOrFail();
+        $this->assertSame(0, $card->stamps);
+        $this->assertSame(2, $card->redeemed);
+        $this->assertSame(0, $card->freeDrinksAvailable());
+    }
+
+    public function test_credit_upserts_a_single_row_per_phone(): void
+    {
+        LoyaltyCard::credit('081234567890');
+        LoyaltyCard::credit('081234567890');
+        LoyaltyCard::credit('081298765432');
+
+        $this->assertSame(2, LoyaltyCard::count());
+        $this->assertSame(2, LoyaltyCard::where('phone', '081234567890')->firstOrFail()->stamps);
+        $this->assertSame(1, LoyaltyCard::where('phone', '081298765432')->firstOrFail()->stamps);
+    }
+
+    public function test_adjust_stamps_applies_delta_and_clamps_at_zero(): void
+    {
+        LoyaltyCard::credit('081234567890', 4);
+
+        LoyaltyCard::adjustStamps('081234567890', 2);
+        $this->assertSame(6, LoyaltyCard::where('phone', '081234567890')->firstOrFail()->stamps);
+
+        LoyaltyCard::adjustStamps('081234567890', -6);
+        $this->assertSame(0, LoyaltyCard::where('phone', '081234567890')->firstOrFail()->stamps);
+
+        LoyaltyCard::adjustStamps('081298765432', 3);
+        $this->assertSame(3, LoyaltyCard::where('phone', '081298765432')->firstOrFail()->stamps);
+    }
+
+    public function test_order_without_customer_phone_gets_no_stamp(): void
+    {
+        $this->createPaidOrder(null);
+
+        $this->assertDatabaseCount('loyalty_cards', 0);
+    }
+
+    public function test_pending_order_does_not_credit_a_stamp_until_paid(): void
+    {
+        $admin = Admin::factory()->create();
+
+        Order::create([
+            'order_number' => 'ORD-777777',
+            'customer_phone' => '081234567890',
+            'total' => 20000,
+            'created_by' => $admin->id,
+        ]);
+
+        $this->assertDatabaseCount('loyalty_cards', 0);
+    }
+
+    public function test_editing_a_paid_order_does_not_recredit_a_stamp(): void
+    {
+        $this->createPaidOrder('081234567890');
+
+        $order = Order::where('customer_phone', '081234567890')->firstOrFail();
+        $order->update(['notes' => 'edit after payment']);
+
+        $card = LoyaltyCard::where('phone', '081234567890')->firstOrFail();
+        $this->assertSame(1, $card->stamps);
+    }
+
+    public function test_points_page_renders_successfully(): void
+    {
+        $this->get(url('/cek-poin'))
+            ->assertOk();
+    }
+
+    public function test_points_page_has_phone_form_field(): void
+    {
+        $this->get(url('/cek-poin'))
+            ->assertOk()
+            ->assertSee('name="phone"', false);
+    }
+
+    public function test_points_page_shows_stamps_and_free_drinks_for_known_phone(): void
+    {
+        LoyaltyCard::credit('081234567890', 4);
+
+        $card = LoyaltyCard::where('phone', '081234567890')->firstOrFail();
+        $this->assertSame(4, $card->stamps);
+        $this->assertSame(0, $card->freeDrinksAvailable());
+
+        $this->get(url('/cek-poin').'?phone=081234567890')
+            ->assertOk()
+            ->assertSee(__('points.stamps_label'))
+            ->assertSee(__('points.available_free'))
+            ->assertSee('4', false);
+    }
+
+    public function test_points_page_keeps_the_queried_phone_in_the_input(): void
+    {
+        LoyaltyCard::credit('081234567890', 2);
+
+        $this->get(url('/cek-poin').'?phone=081234567890')
+            ->assertOk()
+            ->assertSee('value="081234567890"', false);
+    }
+
+    public function test_points_page_unknown_phone_shows_not_found_state(): void
+    {
+        $this->get(url('/cek-poin').'?phone=081200000000')
+            ->assertOk()
+            ->assertSee(__('points.not_found'));
+    }
+}

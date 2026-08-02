@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Jobs\SendReservationConfirmation;
+use App\Models\LoyaltyCard;
 use App\Models\MenuItem;
 use App\Models\Reservation;
 use Illuminate\Contracts\View\View;
@@ -35,6 +36,16 @@ final class PageController extends Controller
     public function contact(): View
     {
         return view('contact');
+    }
+
+    public function points(Request $request): View
+    {
+        $phone = filled($request->query('phone')) ? trim((string) $request->query('phone')) : null;
+
+        return view('points', [
+            'card' => $phone ? LoyaltyCard::where('phone', $phone)->first() : null,
+            'phone' => $phone,
+        ]);
     }
 
     public function reservation(Request $request): View|RedirectResponse
