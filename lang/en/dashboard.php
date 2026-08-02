@@ -3,6 +3,7 @@
 return [
     'peak_hours_heading' => 'Peak Hours (Last 30 Days)',
     'best_sellers_heading' => 'Best Sellers (Revenue)',
+    'payment_split_heading' => 'Today\'s Payment Split',
     'revenue' => 'Revenue',
     'count' => 'Order Count',
 

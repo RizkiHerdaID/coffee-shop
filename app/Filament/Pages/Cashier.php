@@ -6,6 +6,7 @@ use App\Enums\OrderStatus;
 use App\Enums\PaymentMethod;
 use App\Models\MenuItem;
 use App\Models\Order;
+use App\Models\Shift;
 use BackedEnum;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
@@ -124,6 +125,7 @@ class Cashier extends Page
                 'status' => OrderStatus::Pending,
                 'total' => $lines->sum('subtotal'),
                 'customer_phone' => filled($this->customerPhone) ? $this->customerPhone : null,
+                'shift_id' => Shift::active()?->id,
                 'created_by' => auth('admin')->id(),
             ]);
 

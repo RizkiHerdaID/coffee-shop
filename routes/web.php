@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\PageController;
 use App\Http\Controllers\PosReceiptController;
+use App\Http\Controllers\PosZReportController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', [PageController::class, 'home'])->name('home');
@@ -23,6 +24,10 @@ Route::get('/lang/{locale}', function (string $locale) {
 Route::get('/pos/receipt/{order}', [PosReceiptController::class, 'show'])
     ->middleware('auth:admin')
     ->name('pos.receipt');
+
+Route::get('/pos/z-report/{shift}', [PosZReportController::class, 'show'])
+    ->middleware('auth:admin')
+    ->name('pos.zreport');
 
 Route::get('/sitemap.xml', function () {
     $urls = [route('home'), route('menu'), route('contact')];

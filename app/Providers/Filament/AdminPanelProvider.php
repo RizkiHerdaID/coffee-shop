@@ -4,7 +4,10 @@ namespace App\Providers\Filament;
 
 use App\Filament\Auth\Login;
 use App\Filament\Pages\Cashier;
+use App\Filament\Pages\ManageShift;
+use App\Filament\Pages\ShiftReport;
 use App\Filament\Widgets\BestSellersChart;
+use App\Filament\Widgets\PaymentSplitChart;
 use App\Filament\Widgets\PeakHoursChart;
 use App\Filament\Widgets\RevenueChart;
 use App\Filament\Widgets\TodayStats;
@@ -45,6 +48,8 @@ class AdminPanelProvider extends PanelProvider
             ->pages([
                 Dashboard::class,
                 Cashier::class,
+                ManageShift::class,
+                ShiftReport::class,
             ])
             ->widgets([
                 AccountWidget::class,
@@ -53,6 +58,7 @@ class AdminPanelProvider extends PanelProvider
                 TopItemsChart::class,
                 BestSellersChart::class,
                 PeakHoursChart::class,
+                PaymentSplitChart::class,
                 FilamentInfoWidget::class,
             ])
             ->middleware([
