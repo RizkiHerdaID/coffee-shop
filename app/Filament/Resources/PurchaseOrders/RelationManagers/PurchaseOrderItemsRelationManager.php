@@ -2,8 +2,12 @@
 
 namespace App\Filament\Resources\PurchaseOrders\RelationManagers;
 
+use App\Models\StockItem;
 use Filament\Actions\CreateAction;
+use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
+use Filament\Forms\Get;
+use Filament\Forms\Set;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Schemas\Schema;
 use Filament\Support\RawJs;
@@ -24,6 +28,19 @@ class PurchaseOrderItemsRelationManager extends RelationManager
     {
         return $schema
             ->components([
+                Select::make('stock_item_id')
+                    ->label(__('purchase-orders.fields.stock_item'))
+                    ->relationship('stockItem', 'name')
+                    ->searchable()
+                    ->preload()
+                    ->live()
+                    ->afterStateUpdated(function (Set $set, Get $get, ?string $state): void {
+                        if (blank($state) || filled($get('description'))) {
+                            return;
+                        }
+
+                        $set('description', StockItem::find($state)?->name);
+                    }),
                 TextInput::make('description')
                     ->label(__('purchase-orders.fields.description'))
                     ->required(),
@@ -61,6 +78,8 @@ class PurchaseOrderItemsRelationManager extends RelationManager
         return $table
             ->emptyStateHeading(__('purchase-orders.relation.items.empty_heading'))
             ->columns([
+                TextColumn::make('stockItem.name')
+                    ->label(__('purchase-orders.fields.stock_item')),
                 TextColumn::make('description')
                     ->label(__('purchase-orders.fields.description')),
                 TextColumn::make('quantity')

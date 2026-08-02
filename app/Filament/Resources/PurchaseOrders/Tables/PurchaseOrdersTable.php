@@ -4,10 +4,13 @@ namespace App\Filament\Resources\PurchaseOrders\Tables;
 
 use App\Enums\PurchaseOrderStatus;
 use App\Filament\Exports\PurchaseOrderExporter;
+use App\Models\PurchaseOrder;
+use Filament\Actions\Action;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
 use Filament\Actions\ExportAction;
+use Filament\Notifications\Notification;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
@@ -64,6 +67,27 @@ class PurchaseOrdersTable
                         ->all()),
             ])
             ->recordActions([
+                Action::make('receive')
+                    ->label(__('purchase-orders.actions.receive'))
+                    ->icon('heroicon-o-arrow-down-tray')
+                    ->modalHeading(__('purchase-orders.actions.receive'))
+                    ->modalDescription(__('purchase-orders.actions.receive_confirm'))
+                    ->modalSubmitActionLabel(__('purchase-orders.actions.receive_submit'))
+                    ->requiresConfirmation()
+                    ->visible(fn (PurchaseOrder $record): bool => $record->status === PurchaseOrderStatus::Pending)
+                    ->action(function (PurchaseOrder $record): void {
+                        $record->recalculateTotal();
+
+                        $stocked = $record->receiveStock(__('purchase-orders.notifications.receive_note', ['id' => $record->id]));
+
+                        $record->status = PurchaseOrderStatus::Received;
+                        $record->save();
+
+                        Notification::make()
+                            ->title(__('purchase-orders.notifications.received_success', ['count' => $stocked]))
+                            ->success()
+                            ->send();
+                    }),
                 EditAction::make(),
             ])
             ->toolbarActions([

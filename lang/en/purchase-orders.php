@@ -15,6 +15,7 @@ return [
         'quantity' => 'Quantity',
         'unit_price' => 'Unit price',
         'description' => 'Description',
+        'stock_item' => 'Stock Item',
         'created_at' => 'Created',
         'updated_at' => 'Updated',
     ],
@@ -34,6 +35,24 @@ return [
 
     'actions' => [
         'export' => 'Export CSV/XLSX',
+        'receive' => 'Receive Order',
+        'receive_confirm' => 'Stock will increase for linked items and the status will change to Received.',
+        'receive_submit' => 'Receive',
+    ],
+
+    'notifications' => [
+        'received_success' => 'Purchase order received — :count item(s) added to stock.',
+        'receive_note' => 'PO #:id received',
+    ],
+
+    'restock' => [
+        'navigation' => 'Restock Suggestions',
+        'heading' => 'Restock Suggestions',
+        'description' => 'Stock items at or below their minimum threshold. Use the suggested quantity to create a new purchase order.',
+        'create_po' => 'Create Purchase Order',
+        'manage_stock' => 'Manage Stock',
+        'empty_heading' => 'No items need restocking',
+        'empty_description' => 'All stock items are above their minimum threshold.',
     ],
 
     'exports' => [

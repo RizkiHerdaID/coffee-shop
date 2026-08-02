@@ -21,6 +21,10 @@ return [
         'low' => 'Low',
     ],
 
+    'restock' => [
+        'suggested_quantity' => 'Suggested Quantity',
+    ],
+
     'movements' => [
         'label' => 'Stock Movements',
         'in' => 'In',
