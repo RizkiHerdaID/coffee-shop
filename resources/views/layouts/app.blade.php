@@ -49,6 +49,18 @@
             ],
             'openingHoursSpecification' => $openingHours,
         ];
+
+        $visibleTestimonials = \Illuminate\Support\Facades\Schema::hasTable('testimonials')
+            ? \App\Models\Testimonial::query()->visible()->get(['rating'])
+            : collect();
+
+        if ($visibleTestimonials->count() >= 3) {
+            $localBusiness['aggregateRating'] = [
+                '@type' => 'AggregateRating',
+                'ratingValue' => (float) $visibleTestimonials->avg('rating'),
+                'reviewCount' => $visibleTestimonials->count(),
+            ];
+        }
     @endphp
     <script type="application/ld+json">{!! json_encode($localBusiness, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) !!}</script>
 
