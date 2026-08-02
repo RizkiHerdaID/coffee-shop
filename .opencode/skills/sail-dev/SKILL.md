@@ -25,12 +25,16 @@ sg docker -c "PAO_DISABLE=1 ./vendor/bin/sail artisan test --no-coverage"
 
 # Single file / filter
 sg docker -c "PAO_DISABLE=1 ./vendor/bin/sail artisan test --filter=AdminAuthTest --no-coverage"
+
+# Fast parallel loop (~4.5x faster; brianium/paratest, dev dep)
+sg docker -c "PAO_DISABLE=1 ./vendor/bin/paratest --no-coverage --processes 8"
 ```
 
 - `PAO_DISABLE=1` is required: the `laravel/pao` package swallows PHPUnit output in agent environments.
 - `--no-coverage` is required: `failOnWarning=true` in `phpunit.xml` makes the "no code coverage driver" warning abort the whole run.
 - phpunit.xml pins `DB_CONNECTION=sqlite`, `DB_DATABASE=:memory:`, `FILESYSTEM_DISK=local` — tests don't touch the dev DB.
 - `.phpunit.result.cache` permission warnings inside the container are harmless.
+- **Parallel tests are safe**: each worker gets its own `sqlite :memory:` DB + `array` cache/session (`CACHE_STORE=array` in phpunit.xml) — no shared state. `artisan test` stays serial (nicer reporting); use `paratest` for the fast loop. CI runs `paratest --processes 4` (GitHub runners have ~2 cores).
 
 ## Artisan, seeders, DB
 

@@ -50,7 +50,7 @@ jobs:
           PAO_DISABLE: '1'
         run: |
           set -o pipefail
-          vendor/bin/phpunit --no-coverage 2>&1 | tee phpunit-output.log | tail -40
+          vendor/bin/paratest --no-coverage --processes 4 2>&1 | tee phpunit-output.log | tail -40
 
       - name: Report failure details
         if: failure()

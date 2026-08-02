@@ -39,6 +39,8 @@ Git history (all on `main`):
 # Tests (MUST run inside the Sail container — see quirks)
 sg docker -c "./vendor/bin/sail artisan test"
 sg docker -c "./vendor/bin/sail artisan test --filter=AdminAuthTest"
+# Fast parallel loop (~4.5x faster on 8 procs; per-process sqlite:memory/array-cache = safe)
+sg docker -c "cd /home/rizki/projects/coffee-shop && PAO_DISABLE=1 ./vendor/bin/paratest --no-coverage --processes 8"
 
 # Code style (Pint)
 vendor/bin/pint                    # or: vendor/bin/pint --test

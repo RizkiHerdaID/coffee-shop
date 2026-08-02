@@ -1,2 +1,2 @@
-name = "Sail: run test suite"
-command = "PAO_DISABLE=1 sg docker -c './vendor/bin/sail artisan test --no-coverage'"
+name = "Sail: run test suite (parallel)"
+command = "PAO_DISABLE=1 sg docker -c './vendor/bin/paratest --no-coverage --processes 8'"
