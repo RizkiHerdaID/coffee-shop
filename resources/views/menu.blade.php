@@ -8,11 +8,16 @@
     <h1 class="mt-2 text-4xl font-extrabold tracking-tight text-white sm:text-5xl">{{ __('menu.heading') }}</h1>
     <p class="mt-4 max-w-xl text-stone-400">{{ __('menu.intro') }}</p>
 
+    @php
+        $categories = collect(['coffee', 'non-coffee', 'snack', 'food'])
+            ->filter(fn (string $category) => $menu->contains(fn ($item) => $item->category === $category));
+    @endphp
+
     <div class="mt-12 flex flex-wrap gap-3" id="category-filter" role="group" aria-label="{{ __('menu.categories.all') }}">
         <button type="button" data-filter="all" class="category-filter-btn rounded-full border border-amber-500/60 px-5 py-2 text-sm font-semibold text-amber-400 transition hover:bg-amber-500/10">
             {{ __('menu.categories.all') }}
         </button>
-        @foreach (['coffee', 'non-coffee', 'snack', 'food'] as $category)
+        @foreach ($categories as $category)
         <button type="button" data-filter="{{ $category }}" class="category-filter-btn rounded-full border border-stone-700 px-5 py-2 text-sm font-semibold text-stone-300 transition hover:border-amber-500 hover:text-amber-400">
             {{ __("menu.categories.$category") }}
         </button>
@@ -51,8 +56,8 @@
         var buttons = document.querySelectorAll('.category-filter-btn');
         var cards = document.querySelectorAll('.menu-card');
         var empty = document.getElementById('menu-empty');
-        var activeClass = 'border-amber-500/60 bg-amber-500/10 text-amber-400';
-        var baseClass = 'border-stone-700 text-stone-300';
+        var activeClass = ['border-amber-500/60', 'bg-amber-500/10', 'text-amber-400'];
+        var baseClass = ['border-stone-700', 'text-stone-300'];
 
         function apply(filter) {
             var visible = 0;
@@ -68,14 +73,17 @@
             }
         }
 
+        function setActive(button) {
+            buttons.forEach(function (b) {
+                var tokens = b === button ? activeClass : baseClass;
+                b.classList.remove.apply(b.classList, b === button ? baseClass : activeClass);
+                b.classList.add.apply(b.classList, tokens);
+            });
+        }
+
         buttons.forEach(function (button) {
             button.addEventListener('click', function () {
-                buttons.forEach(function (b) {
-                    b.classList.remove(activeClass);
-                    b.classList.add(baseClass);
-                });
-                button.classList.remove(baseClass);
-                button.classList.add(activeClass);
+                setActive(button);
                 apply(button.dataset.filter);
             });
         });
