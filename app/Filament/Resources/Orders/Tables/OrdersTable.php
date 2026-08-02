@@ -40,6 +40,9 @@ class OrdersTable
                     ->label(__('pos.paid'))
                     ->money('IDR')
                     ->toggleable(isToggledHiddenByDefault: true),
+                TextColumn::make('shift_id')
+                    ->label(__('pos.shift.nav_label'))
+                    ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('admin.name')
                     ->label(__('orders.created_by'))
                     ->searchable()

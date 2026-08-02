@@ -1,4 +1,10 @@
 <x-filament-panels::page>
+    @if (\App\Models\Shift::active() === null)
+        <div class="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-900">
+            {{ __('pos.shift.no_active_notice') }}
+        </div>
+    @endif
+
     <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <div class="lg:col-span-2">
             <div class="mb-4 flex flex-wrap items-center gap-2">

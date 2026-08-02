@@ -3,6 +3,7 @@
 return [
     'peak_hours_heading' => 'Jam Sibuk (30 Hari Terakhir)',
     'best_sellers_heading' => 'Produk Terlaris (Pendapatan)',
+    'payment_split_heading' => 'Rincian Pembayaran Hari Ini',
     'revenue' => 'Pendapatan',
     'count' => 'Jumlah Pesanan',
 
