@@ -7,6 +7,8 @@ Route::get('/', [PageController::class, 'home'])->name('home');
 Route::get('/menu', [PageController::class, 'menu'])->name('menu');
 Route::get('/contact', [PageController::class, 'contact'])->name('contact');
 
+Route::get('/qr/{table}', [PageController::class, 'qr'])->where('table', '\d+')->name('qr.menu');
+
 Route::get('/lang/{locale}', function (string $locale) {
     if (! in_array($locale, ['id', 'en'], true)) {
         abort(404);
