@@ -87,3 +87,38 @@ A dedicated `queue` container runs `php artisan queue:work` continuously, so job
 - **Storage** — `FILESYSTEM_DISK=s3` points at MinIO. In production, replace `AWS_ENDPOINT_URL` with your S3 provider endpoint (or switch to `FILESYSTEM_DISK=local`) and use real `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` values instead of the `MINIO_ROOT_*` references.
 - **Mail** — point `MAIL_HOST` / `MAIL_PORT` at a real SMTP provider and configure `MAIL_USERNAME`, `MAIL_PASSWORD`, and `MAIL_ENCRYPTION` accordingly.
 - The template defaults to `APP_ENV=production` with `APP_DEBUG=false`. For local development, set `APP_ENV=local` and `APP_DEBUG=true` (see the comment in `.env.example`).
+
+## Backups
+
+`scripts/db-backup.sh` dumps the PostgreSQL database (`pg_dump -Fc`, gzipped) into `storage/app/backups/` and keeps a rolling retention: **14 daily** dumps plus **8 weekly** snapshots (one per ISO week, created on the first day of a new week). It runs inside the pgsql container, so no host PostgreSQL client is needed — only `docker` access.
+
+```bash
+./scripts/db-backup.sh
+```
+
+On the VPS, install it in the crontab (every day at 02:00 server time):
+
+```
+0 2 * * *  /opt/rizkilab/coffee-shop/scripts/db-backup.sh >> /var/log/coffee-shop-backup.log 2>&1
+```
+
+Useful environment overrides (defaults work in both dev and prod):
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `PG_CONTAINER` | auto | Container name for `docker exec`. Auto-detects `docker compose exec pgsql` first; falls back to `coffee-shop-pgsql-1` (prod). Dev worktrees use `<branch>-pgsql-1`. |
+| `DB_USER` / `DB_NAME` | from `.env` (`sail` / `coffee_shop`) | Database credentials. |
+| `BACKUP_DIR` | `storage/app/backups` | Where dumps are written. |
+| `RETENTION_DAILY` / `RETENTION_WEEKLY` | `14` / `8` | How many dumps to keep. |
+| `S3_BACKUP=1` + `S3_BUCKET` (+ optional `S3_PREFIX`) | off | Also copy the newest dump to S3 via the `aws` CLI (creds from `.env` or the environment). Expire old S3 objects with a bucket lifecycle rule. |
+
+### Restore drill
+
+`scripts/restore-drill.sh` verifies the latest backup is restorable without touching the live database: it restores the newest dump into a throwaway `*_restore_drill_*` database, runs sanity queries, prints `PASSED`, and drops the throwaway database. Run it manually or on a schedule (e.g. weekly):
+
+```bash
+./scripts/restore-drill.sh                      # newest daily dump
+./scripts/restore-drill.sh backups/foo.dump.gz  # a specific dump
+```
+
+Both scripts accept the same `PG_CONTAINER` / `DB_USER` / `DB_NAME` / `BACKUP_DIR` overrides, and neither needs the app itself to be running — only the pgsql container.
