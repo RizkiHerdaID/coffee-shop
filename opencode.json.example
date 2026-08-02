@@ -95,5 +95,12 @@
         "paths": [
             ".agents/skills"
         ]
+    },
+    "permission": {
+        "external_directory": {
+            "~/projects/coffee-shop/**": "allow",
+            "/tmp/opencode/**": "allow",
+            "*": "ask"
+        }
     }
 }
