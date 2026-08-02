@@ -1,6 +1,6 @@
 # Website — Coffee Shop
 
-Documentation for the public-facing website of the coffee-shop codebase (Laravel 13 + Filament 5 + Tailwind 4, live at https://coffee.rizkilab.my.id). Replaces the pre-implementation research in `docs/research-website.md`; research decisions and references are preserved under [Decisions & rationale](#decisions--rationale) and [References](#references).
+Documentation for the public-facing website of the coffee-shop codebase (Laravel 13 + Filament 5 + Tailwind 4, live at https://coffee-shop.example). Replaces the pre-implementation research in `docs/research-website.md`; research decisions and references are preserved under [Decisions & rationale](#decisions--rationale) and [References](#references).
 
 Focus areas: conversion and the Indonesian market — mobile-first UX and page speed, QR table menus, WhatsApp ordering, QRIS, local SEO, photography, retention, and common mistakes.
 
@@ -27,7 +27,7 @@ All routes are in `routes/web.php`. All user-facing copy comes from `lang/{id,en
 - **OG/meta tags**: `og:title`, `og:description`, `og:type`, `og:url`, `og:image` (favicon), `og:site_name`, `twitter:card` (`layouts/app.blade.php:9-15`); meta description localized via `site.meta.default_description`.
 - **Webfont loading**: `@fonts('instrument-sans')` (Laravel 13 Fonts via the Bunny CDN `fonts` plugin in `vite.config.js`) plus a hero woff2 `<link rel="preload">` resolved from the Vite-generated `public/build/fonts-manifest.json` (`layouts/app.blade.php:54-62`). Added in commit `03759ad` (Web Vitals pass).
 
-Routes for SEO: `/sitemap.xml` (home/menu/contact, `changefreq=weekly`) and `/robots.txt` (`Sitemap:` pointing at the sitemap) are closures in `routes/web.php:32-49`. Note: a **static `public/robots.txt` also exists** and shadows the route in production (static files take precedence over routes) — it hardcodes `https://coffee.rizkilab.my.id/sitemap.xml`, so keep the two in sync when the domain changes.
+Routes for SEO: `/sitemap.xml` (home/menu/contact, `changefreq=weekly`) and `/robots.txt` (`Sitemap:` pointing at the sitemap) are closures in `routes/web.php:32-49`. Note: a **static `public/robots.txt` also exists** and shadows the route in production (static files take precedence over routes) — it points at the relative `/sitemap.xml`, so it works under any domain; switch it to an absolute URL only if a crawler requires one.
 
 ### Menu model & admin — `app/Models/MenuItem.php`
 

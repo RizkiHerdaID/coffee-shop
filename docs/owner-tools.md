@@ -1,6 +1,6 @@
 # Owner Tools — Coffee Shop
 
-Documentation for the owner-facing tooling of a single-owner Indonesian coffee shop (Laravel 13 + Filament 5, IDR pricing, production at coffee.rizkilab.my.id). Covers inventory, low-stock alerts, WhatsApp integrations, suppliers & purchase orders, expenses & cash register, recipes/COGS, AI copy generation, and the daily summary email. Derived from `docs/research-owner-ai.md` (pre-implementation research) and verified against the current codebase; all costs below are IDR/month unless noted.
+Documentation for the owner-facing tooling of a single-owner Indonesian coffee shop (Laravel 13 + Filament 5, IDR pricing, production at coffee-shop.example). Covers inventory, low-stock alerts, WhatsApp integrations, suppliers & purchase orders, expenses & cash register, recipes/COGS, AI copy generation, and the daily summary email. Derived from `docs/research-owner-ai.md` (pre-implementation research) and verified against the current codebase; all costs below are IDR/month unless noted.
 
 ## Overview
 

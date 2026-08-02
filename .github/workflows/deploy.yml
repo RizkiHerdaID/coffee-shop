@@ -18,12 +18,14 @@ jobs:
     needs: tests
     runs-on: ubuntu-latest
     steps:
-      - name: Trigger deploy on rizkilab VPS
+      - name: Trigger deploy on production VPS
         env:
           KEY: ${{ secrets.COFFEE_DEPLOY_KEY }}
+          HOST: ${{ secrets.COFFEE_DEPLOY_HOST }}
+          DEPLOY_PATH: ${{ secrets.COFFEE_DEPLOY_PATH }}
           COMMIT: ${{ github.event.inputs.commit || '' }}
         run: |
           printf '%s\n' "$KEY" > "$HOME/deploy_key"
           chmod 600 "$HOME/deploy_key"
           ssh -i "$HOME/deploy_key" -o StrictHostKeyChecking=accept-new \
-            ubuntu@43.163.6.163 "sudo bash /opt/rizkilab/deploy-coffee-shop.sh '$COMMIT'"
+            "ubuntu@${HOST}" "sudo bash ${DEPLOY_PATH} '$COMMIT'"

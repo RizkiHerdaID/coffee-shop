@@ -21,7 +21,7 @@
 #   S3_PREFIX        S3 key prefix            (default: backups/coffee-shop)
 #
 # Suggested VPS crontab (runs every day at 02:00 server time):
-#   0 2 * * *  /opt/rizkilab/coffee-shop/scripts/db-backup.sh >> /var/log/coffee-shop-backup.log 2>&1
+#   0 2 * * *  /opt/coffee-shop/scripts/db-backup.sh >> /var/log/coffee-shop-backup.log 2>&1
 
 set -euo pipefail
 

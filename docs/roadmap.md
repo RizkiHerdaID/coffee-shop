@@ -2,7 +2,7 @@
 
 The full backlog captured 2026-08-02 has been **completed in one marathon auto-mode run**
 (9 parallel waves, 2 worktrees max at a time, herdr opencode fleets). Main HEAD: `0bbd92a`,
-suite **428/428 green** (1900 assertions). Live board: https://vikunja.rizkilab.my.id,
+suite **428/428 green** (1900 assertions). Live board: https://vikunja.example,
 project "Coffee Shop" (id 6) — all cards in Done (bucket 19).
 
 ## What shipped this session (2026-08-02, all on `main`)

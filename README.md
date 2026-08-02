@@ -95,13 +95,13 @@ The app exposes a built-in Laravel health endpoint at `/up` (returns HTTP 200 wi
 ### External check via healthchecks.io
 
 1. Sign in at https://healthchecks.io, go to **Checks** → **Add check**.
-2. Choose **HTTP(s)** with URL `https://coffee.rizkilab.my.id/up`, period **5 minutes**, grace **~10 minutes** (2 missed checks).
+2. Choose **HTTP(s)** with URL `https://coffee-shop.example/up`, period **5 minutes**, grace **~10 minutes** (2 missed checks).
 3. Save — you'll get a Slack/email notification when the site is down.
 
 ### External check via Uptime Kuma
 
 1. In your Uptime Kuma instance, **Add New Monitor**.
-2. Type **HTTP(s)** (or **HTTP(s) Browser** for full page loads), URL `https://coffee.rizkilab.my.id/up`.
+2. Type **HTTP(s)** (or **HTTP(s) Browser** for full page loads), URL `https://coffee-shop.example/up`.
 3. Set interval to **300 seconds** (5 min) and assign a notification group.
 
 The `/up` endpoint needs no auth and is safe to hit from outside — it performs a framework health check only.
@@ -129,7 +129,7 @@ Leave `UPTIME_HEARTBEAT_URL` empty in development — no pings are sent and the 
 On the VPS, install it in the crontab (every day at 02:00 server time):
 
 ```
-0 2 * * *  /opt/rizkilab/coffee-shop/scripts/db-backup.sh >> /var/log/coffee-shop-backup.log 2>&1
+0 2 * * *  /opt/coffee-shop/scripts/db-backup.sh >> /var/log/coffee-shop-backup.log 2>&1
 ```
 
 Useful environment overrides (defaults work in both dev and prod):

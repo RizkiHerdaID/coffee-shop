@@ -21,7 +21,7 @@ return Application::configure(basePath: dirname(__DIR__))
         // block the CSS as mixed content (site renders unstyled). Trust scopes:
         // - 127.0.0.1: direct loopback connections
         // - 172.16.0.0/12: Docker bridge range — the coffee-shop container's
-        //   REMOTE_ADDR is the rizkilab-net gateway (e.g. 172.19.0.1), NOT the
+        //   REMOTE_ADDR is the Docker bridge gateway (e.g. 172.19.0.1), NOT the
         //   client IP, because docker-proxy forwards the host-published port.
         // Do NOT widen this to '*' (review note in AGENTS.md); do NOT remove it,
         // the deploy script's asset check depends on https URLs.

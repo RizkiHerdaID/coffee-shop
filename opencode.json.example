@@ -19,7 +19,7 @@
                 "@eargollo/vikunja-mcp"
             ],
             "environment": {
-                "VIKUNJA_URL": "https://vikunja.rizkilab.my.id/api/v1",
+                "VIKUNJA_URL": "https://vikunja.example/api/v1",
                 "VIKUNJA_API_TOKEN": "REPLACE_WITH_TOKEN_FROM_~/.vikunja-agent-token",
                 "VIKUNJA_MCP_ALLOW_WRITE": "1"
             }

@@ -11,7 +11,7 @@ return [
     'gofood_url' => 'https://gofood.co.id/your-merchant',
     'grab_url' => 'https://grab.com/your-merchant',
 
-    'email' => 'hello@coffee.rizkilab.my.id',
+    'email' => 'hello@coffee-shop.example',
 
     'address' => "Jl. Contoh Raya No. 123\nJakarta Selatan, Indonesia",
 
