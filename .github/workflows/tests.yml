@@ -33,12 +33,23 @@ jobs:
       - name: Install dependencies
         run: composer install --no-interaction --prefer-dist --no-progress
 
+      - name: Setup Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Build frontend assets
+        run: npm run build
+
       - name: Run test suite
         env:
           PAO_DISABLE: '1'
         run: |
           set -o pipefail
-          mkdir -p public/build && printf '{"resources/css/app.css":{"file":"app.css","src":"resources/css/app.css","isEntry":true},"resources/js/app.js":{"file":"app.js","src":"resources/js/app.js","isEntry":true}}' > public/build/manifest.json && printf '{"version":1,"families":{"instrument-sans":{}},"preloads":[]}' > public/build/fonts-manifest.json
           vendor/bin/phpunit --no-coverage 2>&1 | tee phpunit-output.log | tail -40
 
       - name: Report failure details
