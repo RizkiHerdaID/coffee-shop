@@ -30,7 +30,7 @@ flowchart TD
     SubAgents --> LeadVerify[Lead verifies reports<br/>incorporates findings]
     Lead --> LeadVerify
 
-    LeadVerify --> DoneNotif[Only LEAD notifies<br/>herdr agent prompt w14:p1<br/>"DONE &lt;batch&gt;: ..."]
+    LeadVerify -->     DoneNotif[Only LEAD notifies<br/>herdr agent prompt w14:p1<br/>'DONE &lt;batch&gt;: ...']
     DoneNotif --> Ack[Main session ACKs<br/>so agent knows it was received]
 
     Ack --> GateCheck{Which gate?}
@@ -40,7 +40,7 @@ flowchart TD
     PM1 --> PM2[2. All &lt;batch&gt;-&lt;role&gt;-report.md exist<br/>findings incorporated]
     PM2 --> PM3[3. Review agent phase-2 re-check<br/>of committed diff, read-only]
     PM3 --> PM4[4. git status clean<br/>git log main..branch reviewed]
-    PM4 --> PM5[5. Merge → full suite on main<br/>→ teardown (sail down, workspace close,<br/>remove dir, git worktree prune)]
+    PM4 -->     PM5[5. Merge → full suite on main<br/>→ teardown: sail down, workspace close,<br/>remove dir, git worktree prune]
 
     GateCheck -->|Docs-only main checkout| MainGate[Main-checkout gate]
     MainGate --> MG1[1. All reports exist +<br/>each agent confirmed DONE]
@@ -48,7 +48,7 @@ flowchart TD
     MG2 --> MG3[3. git status shows exactly<br/>expected staged files]
     MG3 --> MG4[4. Close fleet panes<br/>commit once on main]
 
-    PM5 --> VikunjaDone[Vikunja: move card → Done<br/>PUT /buckets/19/tasks {"task_id": N}<br/>verify done:true]
+    PM5 --> VikunjaDone[Vikunja: move card → Done<br/>PUT /buckets/19/tasks task_id=N<br/>verify done:true]
     MG4 --> VikunjaDone
     VikunjaDone --> DocsUpdate[Update matching feature doc<br/>+ roadmap.md completed section]
     DocsUpdate --> Finish([Done])
