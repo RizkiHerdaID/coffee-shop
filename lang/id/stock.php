@@ -21,6 +21,10 @@ return [
         'low' => 'Menipis',
     ],
 
+    'restock' => [
+        'suggested_quantity' => 'Jumlah Saran',
+    ],
+
     'movements' => [
         'label' => 'Riwayat Stok',
         'in' => 'Masuk',

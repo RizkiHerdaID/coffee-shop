@@ -5,6 +5,7 @@ namespace App\Filament\Resources\PurchaseOrders;
 use App\Filament\Resources\PurchaseOrders\Pages\CreatePurchaseOrder;
 use App\Filament\Resources\PurchaseOrders\Pages\EditPurchaseOrder;
 use App\Filament\Resources\PurchaseOrders\Pages\ListPurchaseOrders;
+use App\Filament\Resources\PurchaseOrders\Pages\RestockSuggestions;
 use App\Filament\Resources\PurchaseOrders\RelationManagers\PurchaseOrderItemsRelationManager;
 use App\Filament\Resources\PurchaseOrders\Schemas\PurchaseOrderForm;
 use App\Filament\Resources\PurchaseOrders\Tables\PurchaseOrdersTable;
@@ -64,6 +65,7 @@ class PurchaseOrderResource extends Resource
             'index' => ListPurchaseOrders::route('/'),
             'create' => CreatePurchaseOrder::route('/create'),
             'edit' => EditPurchaseOrder::route('/{record}/edit'),
+            'restock' => RestockSuggestions::route('/restock'),
         ];
     }
 }

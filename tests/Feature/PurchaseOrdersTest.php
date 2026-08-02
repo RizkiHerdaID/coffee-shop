@@ -6,10 +6,13 @@ use App\Enums\PurchaseOrderStatus;
 use App\Filament\Resources\PurchaseOrders\Pages\CreatePurchaseOrder;
 use App\Filament\Resources\PurchaseOrders\Pages\EditPurchaseOrder;
 use App\Filament\Resources\PurchaseOrders\Pages\ListPurchaseOrders;
+use App\Filament\Resources\PurchaseOrders\PurchaseOrderResource;
 use App\Filament\Resources\PurchaseOrders\RelationManagers\PurchaseOrderItemsRelationManager;
 use App\Models\Admin;
 use App\Models\PurchaseOrder;
 use App\Models\PurchaseOrderItem;
+use App\Models\StockItem;
+use App\Models\StockMovement;
 use App\Models\Supplier;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
@@ -167,5 +170,149 @@ class PurchaseOrdersTest extends TestCase
             'quantity' => 5,
             'unit_price' => 10000,
         ]);
+    }
+
+    private function makeStockItem(string $name, int $quantity, int $minThreshold): StockItem
+    {
+        return StockItem::create([
+            'name' => $name,
+            'unit' => 'gram',
+            'quantity' => $quantity,
+            'min_threshold' => $minThreshold,
+        ]);
+    }
+
+    public function test_receive_action_stocks_in_each_linked_line_and_marks_po_received(): void
+    {
+        $admin = Admin::factory()->create();
+        $supplier = $this->makeSupplier();
+        $po = PurchaseOrder::create([
+            'supplier_id' => $supplier->id,
+            'status' => PurchaseOrderStatus::Pending,
+            'total' => 750000,
+        ]);
+
+        $coffee = $this->makeStockItem('Biji Kopi Arabika', 1000, 500);
+        $sugar = $this->makeStockItem('Gula Aren', 2000, 1000);
+
+        foreach ([[$coffee, 10, 50000], [$sugar, 5, 25000]] as [$stock, $quantity, $unitPrice]) {
+            $item = PurchaseOrderItem::create([
+                'purchase_order_id' => $po->id,
+                'description' => $stock->name,
+                'quantity' => $quantity,
+                'unit_price' => $unitPrice,
+            ]);
+            $item->forceFill(['stock_item_id' => $stock->id])->save();
+        }
+
+        Livewire::actingAs($admin, 'admin')
+            ->test(ListPurchaseOrders::class)
+            ->callTableAction('receive', $po)
+            ->assertHasNoTableActionErrors();
+
+        $this->assertDatabaseHas('purchase_orders', [
+            'id' => $po->id,
+            'status' => PurchaseOrderStatus::Received->value,
+        ]);
+        $this->assertSame(1010, $coffee->fresh()->quantity);
+        $this->assertSame(2005, $sugar->fresh()->quantity);
+        $this->assertDatabaseHas('stock_movements', [
+            'stock_item_id' => $coffee->id,
+            'type' => 'in',
+            'quantity' => 10,
+        ]);
+        $this->assertDatabaseHas('stock_movements', [
+            'stock_item_id' => $sugar->id,
+            'type' => 'in',
+            'quantity' => 5,
+        ]);
+        $this->assertSame(1, $coffee->fresh()->movements()->count());
+        $this->assertSame(2, StockMovement::count());
+    }
+
+    public function test_receive_action_keeps_description_fallback_for_unlinked_lines(): void
+    {
+        $admin = Admin::factory()->create();
+        $supplier = $this->makeSupplier();
+        $po = PurchaseOrder::create([
+            'supplier_id' => $supplier->id,
+            'status' => PurchaseOrderStatus::Pending,
+            'total' => 300000,
+        ]);
+
+        $coffee = $this->makeStockItem('Biji Kopi Arabika', 1000, 500);
+        PurchaseOrderItem::create([
+            'purchase_order_id' => $po->id,
+            'description' => 'Biji Kopi Arabika',
+            'quantity' => 10,
+            'unit_price' => 50000,
+        ])->forceFill(['stock_item_id' => $coffee->id])->save();
+
+        PurchaseOrderItem::create([
+            'purchase_order_id' => $po->id,
+            'description' => 'Kemasan pouch custom',
+            'quantity' => 100,
+            'unit_price' => 2500,
+        ]);
+
+        Livewire::actingAs($admin, 'admin')
+            ->test(ListPurchaseOrders::class)
+            ->callTableAction('receive', $po)
+            ->assertHasNoTableActionErrors();
+
+        $this->assertDatabaseHas('purchase_orders', [
+            'id' => $po->id,
+            'status' => PurchaseOrderStatus::Received->value,
+        ]);
+        $this->assertSame(1010, $coffee->fresh()->quantity);
+        $this->assertSame(1, StockMovement::count());
+    }
+
+    public function test_receive_action_cannot_be_run_twice_on_same_po(): void
+    {
+        $admin = Admin::factory()->create();
+        $supplier = $this->makeSupplier();
+        $po = PurchaseOrder::create([
+            'supplier_id' => $supplier->id,
+            'status' => PurchaseOrderStatus::Pending,
+            'total' => 500000,
+        ]);
+
+        $coffee = $this->makeStockItem('Biji Kopi Arabika', 1000, 500);
+        PurchaseOrderItem::create([
+            'purchase_order_id' => $po->id,
+            'description' => 'Biji Kopi Arabika',
+            'quantity' => 10,
+            'unit_price' => 50000,
+        ])->forceFill(['stock_item_id' => $coffee->id])->save();
+
+        Livewire::actingAs($admin, 'admin')
+            ->test(ListPurchaseOrders::class)
+            ->callTableAction('receive', $po)
+            ->assertHasNoTableActionErrors();
+
+        $this->assertSame(1010, $coffee->fresh()->quantity);
+
+        Livewire::actingAs($admin, 'admin')
+            ->test(ListPurchaseOrders::class)
+            ->assertTableActionHidden('receive', $po);
+
+        $this->assertSame(1010, $coffee->fresh()->quantity);
+        $this->assertSame(1, $coffee->fresh()->movements()->count());
+    }
+
+    public function test_restock_suggestions_page_lists_low_stock_items_only(): void
+    {
+        $admin = Admin::factory()->create();
+        $this->makeStockItem('Susu Bubuk Premium', 1, 2);
+        $this->makeStockItem('Gelas Kertas 12oz', 0, 50);
+        $healthy = $this->makeStockItem('Biji Kopi Arabika Gayo', 100, 10);
+
+        $this->actingAs($admin, 'admin')
+            ->get(PurchaseOrderResource::getUrl('restock'))
+            ->assertOk()
+            ->assertSee('Susu Bubuk Premium')
+            ->assertSee('Gelas Kertas 12oz')
+            ->assertDontSee($healthy->name);
     }
 }
