@@ -7,6 +7,11 @@ return [
     'revenue' => 'Pendapatan',
     'count' => 'Jumlah Pesanan',
 
+    'low_stock_heading' => 'Stok Menipis',
+    'low_stock_empty_heading' => 'Stok aman',
+    'low_stock_empty_description' => 'Tidak ada item stok di bawah batas minimum.',
+    'low_stock_manage' => 'Kelola Stok',
+
     'filter' => [
         'revenue' => 'Pendapatan',
         'count' => 'Jumlah Pesanan',

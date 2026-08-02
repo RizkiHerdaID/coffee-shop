@@ -41,6 +41,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $schedule->command('summary:send --period=daily')->dailyAt(config('summary.daily.time'));
         $schedule->command('summary:send --period=weekly')->weeklyOn(1, config('summary.weekly.time'));
         $schedule->command('stock:alert-low')->hourly();
+        $schedule->command('pulse:check')->everyMinute();
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(

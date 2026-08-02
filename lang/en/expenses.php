@@ -42,6 +42,12 @@ return [
 
     'actions' => [
         'create' => 'New Expense',
+        'export' => 'Export CSV/XLSX',
+    ],
+
+    'exports' => [
+        'completed' => 'Expenses export completed: :count rows.',
+        'failed' => ':failed_count rows failed.',
     ],
 
     'notifications' => [

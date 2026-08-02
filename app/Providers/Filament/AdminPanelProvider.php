@@ -7,6 +7,7 @@ use App\Filament\Pages\Cashier;
 use App\Filament\Pages\ManageShift;
 use App\Filament\Pages\ShiftReport;
 use App\Filament\Widgets\BestSellersChart;
+use App\Filament\Widgets\LowStockWidget;
 use App\Filament\Widgets\PaymentSplitChart;
 use App\Filament\Widgets\PeakHoursChart;
 use App\Filament\Widgets\RevenueChart;
@@ -54,6 +55,7 @@ class AdminPanelProvider extends PanelProvider
             ->widgets([
                 AccountWidget::class,
                 TodayStats::class,
+                LowStockWidget::class,
                 RevenueChart::class,
                 TopItemsChart::class,
                 BestSellersChart::class,

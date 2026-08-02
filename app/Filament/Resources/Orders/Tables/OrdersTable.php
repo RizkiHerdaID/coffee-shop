@@ -4,12 +4,14 @@ namespace App\Filament\Resources\Orders\Tables;
 
 use App\Enums\OrderStatus;
 use App\Enums\PaymentMethod;
+use App\Filament\Exports\OrderExporter;
 use App\Models\Order;
 use Closure;
 use Filament\Actions\Action;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
+use Filament\Actions\ExportAction;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
@@ -170,6 +172,9 @@ class OrdersTable
                 BulkActionGroup::make([
                     DeleteBulkAction::make(),
                 ]),
+                ExportAction::make()
+                    ->label(__('orders.export'))
+                    ->exporter(OrderExporter::class),
             ]);
     }
 }

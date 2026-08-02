@@ -31,4 +31,13 @@ return [
             'empty_heading' => 'Belum ada item pesanan',
         ],
     ],
+
+    'actions' => [
+        'export' => 'Ekspor CSV/XLSX',
+    ],
+
+    'exports' => [
+        'completed' => 'Ekspor pesanan pembelian selesai: :count baris.',
+        'failed' => ':failed_count baris gagal.',
+    ],
 ];
