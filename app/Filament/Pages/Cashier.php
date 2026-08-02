@@ -6,6 +6,7 @@ use App\Enums\OrderStatus;
 use App\Enums\PaymentMethod;
 use App\Models\MenuItem;
 use App\Models\Order;
+use App\Models\OrderItem;
 use App\Models\Shift;
 use BackedEnum;
 use Filament\Notifications\Notification;
@@ -14,6 +15,7 @@ use Filament\Support\Icons\Heroicon;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
@@ -55,6 +57,14 @@ class Cashier extends Page
      * Change due from the last cash payment (IDR integer; 0 when none).
      */
     public int $changeDue = 0;
+
+    /**
+     * Ingredient names skipped by consumeRecipeStock() because of
+     * insufficient stock, collected per order for the lenient warning.
+     *
+     * @var array<int, string>
+     */
+    protected array $skippedStockIngredients = [];
 
     public static function getNavigationLabel(): string
     {
@@ -129,14 +139,24 @@ class Cashier extends Page
                 'created_by' => auth('admin')->id(),
             ]);
 
+            $menuItems = config('pos.deduct_stock')
+                ? MenuItem::query()
+                    ->with('ingredients')
+                    ->whereIn('id', $lines->pluck('item')->pluck('id')->unique())
+                    ->get()
+                    ->keyBy('id')
+                : new Collection;
+
             foreach ($lines as $line) {
-                $order->items()->create([
+                $orderItem = $order->items()->create([
                     'menu_item_id' => $line['item']->id,
                     'name' => $line['item']->name,
                     'price' => $line['item']->price,
                     'qty' => $line['qty'],
                     'subtotal' => $line['subtotal'],
                 ]);
+
+                $this->consumeRecipeStock($order, $orderItem, $line['qty'], $menuItems);
             }
 
             return $order;
@@ -146,10 +166,57 @@ class Cashier extends Page
         $this->customerPhone = null;
         $this->selectOrder($order->id);
 
+        if ($this->skippedStockIngredients !== []) {
+            Log::warning("Stock deduction skipped for order {$order->order_number}: insufficient stock for ".implode(', ', $this->skippedStockIngredients));
+
+            Notification::make()
+                ->title(__('pos.stock.warning_title'))
+                ->body(__('pos.stock.skipped', ['ingredients' => implode(', ', $this->skippedStockIngredients)]))
+                ->warning()
+                ->send();
+
+            $this->skippedStockIngredients = [];
+        }
+
         Notification::make()
             ->title(__('pos.order_created', ['order_number' => $order->order_number]))
             ->success()
             ->send();
+    }
+
+    /**
+     * Deduct recipe ingredients as 'out' stock movements linked to the
+     * order item. Lenient mode: insufficient stock skips the ingredient
+     * (stockOut returns false) instead of blocking the sale; skipped
+     * ingredient names are collected for a single warning notification.
+     *
+     * @param  Collection<int, MenuItem>  $menuItems
+     */
+    protected function consumeRecipeStock(Order $order, OrderItem $orderItem, int $lineQty, Collection $menuItems): void
+    {
+        $item = $menuItems[$orderItem->menu_item_id] ?? null;
+
+        if ($item === null || $item->ingredients->isEmpty()) {
+            return;
+        }
+
+        foreach ($item->ingredients->sortBy('id') as $ingredient) {
+            $needed = (int) $ingredient->pivot->quantity * $lineQty;
+
+            if ($needed < 1) {
+                continue;
+            }
+
+            $deducted = $ingredient->stockOut(
+                $needed,
+                note: "{$order->order_number} {$orderItem->name}",
+                orderItemId: $orderItem->id,
+            );
+
+            if (! $deducted) {
+                $this->skippedStockIngredients[] = $ingredient->name;
+            }
+        }
     }
 
     /**

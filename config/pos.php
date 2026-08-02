@@ -45,4 +45,19 @@ return [
         'image' => env('POS_QRIS_IMAGE'),
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Recipe stock deduction
+    |--------------------------------------------------------------------------
+    |
+    | When enabled, creating an order in the POS cashier deducts each menu
+    | item's recipe ingredients (MenuItem::ingredients pivot, quantity per
+    | unit x line qty) as 'out' stock movements linked to the order item.
+    | Insufficient stock never blocks the sale: affected ingredients are
+    | skipped and a warning notification is shown instead (lenient mode).
+    |
+    */
+
+    'deduct_stock' => (bool) env('POS_DEDUCT_STOCK', true),
+
 ];

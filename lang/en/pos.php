@@ -137,4 +137,9 @@ return [
         'print' => 'Print',
         'back' => 'Back',
     ],
+
+    'stock' => [
+        'warning_title' => 'Insufficient Stock',
+        'skipped' => 'The following ingredients are insufficient and were not deducted: :ingredients',
+    ],
 ];

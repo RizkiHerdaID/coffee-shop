@@ -45,13 +45,13 @@ class StockItem extends Model
         return $this->quantity <= $this->min_threshold;
     }
 
-    public function stockIn(int $quantity, ?string $note = null): bool
+    public function stockIn(int $quantity, ?string $note = null, ?int $orderItemId = null): bool
     {
         if ($quantity < 1) {
             return false;
         }
 
-        return DB::transaction(function () use ($quantity, $note) {
+        return DB::transaction(function () use ($quantity, $note, $orderItemId) {
             $item = static::query()->lockForUpdate()->find($this->getKey());
 
             if ($item === null) {
@@ -62,6 +62,7 @@ class StockItem extends Model
                 'type' => 'in',
                 'quantity' => $quantity,
                 'note' => $note,
+                'order_item_id' => $orderItemId,
             ]);
 
             $item->increment('quantity', $quantity);
@@ -70,13 +71,13 @@ class StockItem extends Model
         });
     }
 
-    public function stockOut(int $quantity, ?string $note = null): bool
+    public function stockOut(int $quantity, ?string $note = null, ?int $orderItemId = null): bool
     {
         if ($quantity < 1) {
             return false;
         }
 
-        return DB::transaction(function () use ($quantity, $note) {
+        return DB::transaction(function () use ($quantity, $note, $orderItemId) {
             $item = static::query()->lockForUpdate()->find($this->getKey());
 
             if ($item === null || $item->quantity - $quantity < 0) {
@@ -87,6 +88,7 @@ class StockItem extends Model
                 'type' => 'out',
                 'quantity' => $quantity,
                 'note' => $note,
+                'order_item_id' => $orderItemId,
             ]);
 
             $item->decrement('quantity', $quantity);

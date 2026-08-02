@@ -137,4 +137,9 @@ return [
         'print' => 'Cetak',
         'back' => 'Kembali',
     ],
+
+    'stock' => [
+        'warning_title' => 'Stok Tidak Cukup',
+        'skipped' => 'Bahan berikut tidak mencukupi sehingga tidak dikurangi stoknya: :ingredients',
+    ],
 ];

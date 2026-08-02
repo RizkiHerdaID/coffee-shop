@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-#[Fillable(['stock_item_id', 'type', 'quantity', 'note'])]
+#[Fillable(['stock_item_id', 'order_item_id', 'type', 'quantity', 'note'])]
 class StockMovement extends Model
 {
     /**
@@ -24,5 +24,10 @@ class StockMovement extends Model
     public function stockItem(): BelongsTo
     {
         return $this->belongsTo(StockItem::class);
+    }
+
+    public function orderItem(): BelongsTo
+    {
+        return $this->belongsTo(OrderItem::class);
     }
 }
