@@ -822,4 +822,328 @@ class PosCashierTest extends TestCase
 
         $this->assertDatabaseCount('payments', 0);
     }
+
+    /**
+     * Discounts (wave 6).
+     *
+     * Contract pinned with the lead: `orders.total` stays GROSS (sum of line
+     * subtotals); the discount lives in `discount_type`
+     * ('fixed'|'percent'|NULL) + `discount_amount` (raw: IDR for fixed,
+     * percent integer for percent; both NULL when none). Accessors:
+     * `discountValue` (effective IDR, 0 when none; percent =
+     * round(total * amount / 100)) and `netTotal` (total - discountValue);
+     * `remaining` and `markPaidIfCovered()` use netTotal, so the NET amount
+     * covers the order. Cashier exposes `discountType` (''|'fixed'|'percent')
+     * + `discountAmount` (masked display string); invalid discounts
+     * (negative, exceeding the gross total, percent outside 1..100, bad
+     * type) are rejected by createOrder with errors on discountAmount /
+     * discountType. The printable receipt shows a discount line between the
+     * items and the TOTAL (net).
+     */
+    public function test_fixed_discount_lowers_the_net_payable_and_payment_cover(): void
+    {
+        $admin = Admin::factory()->create();
+        $espresso = MenuItem::create(['name' => 'Espresso', 'price' => 20000]);
+        $croissant = MenuItem::create(['name' => 'Croissant', 'price' => 25000]);
+
+        Livewire::actingAs($admin, 'admin')
+            ->test(Cashier::class)
+            ->call('addToCart', $espresso->id)
+            ->call('addToCart', $espresso->id)
+            ->call('addToCart', $croissant->id)
+            ->set('discountType', 'fixed')
+            ->set('discountAmount', '10.000')
+            ->call('createOrder')
+            ->assertHasNoErrors();
+
+        $this->assertDatabaseCount('orders', 1);
+        $this->assertDatabaseHas('orders', [
+            'discount_type' => 'fixed',
+            'discount_amount' => 10000,
+            'total' => 65000,
+        ]);
+
+        $order = Order::firstOrFail();
+        $this->assertSame(10000, $order->discountValue);
+        $this->assertSame(55000, $order->netTotal);
+        $this->assertSame(55000, $order->remaining);
+
+        Livewire::actingAs($admin, 'admin')
+            ->test(Cashier::class)
+            ->call('selectOrder', $order->id)
+            ->set('paymentMethod', 'qris')
+            ->call('capturePayment')
+            ->assertHasNoErrors();
+
+        $this->assertSame(OrderStatus::Paid, $order->fresh()->status);
+        $this->assertDatabaseHas('payments', [
+            'order_id' => $order->id,
+            'method' => 'qris',
+            'amount' => 55000,
+        ]);
+    }
+
+    public function test_cash_change_is_computed_from_the_net_total_after_a_fixed_discount(): void
+    {
+        $admin = Admin::factory()->create();
+        $espresso = MenuItem::create(['name' => 'Espresso', 'price' => 20000]);
+        $croissant = MenuItem::create(['name' => 'Croissant', 'price' => 25000]);
+
+        Livewire::actingAs($admin, 'admin')
+            ->test(Cashier::class)
+            ->call('addToCart', $espresso->id)
+            ->call('addToCart', $espresso->id)
+            ->call('addToCart', $croissant->id)
+            ->set('discountType', 'fixed')
+            ->set('discountAmount', '10.000')
+            ->call('createOrder')
+            ->assertHasNoErrors();
+
+        $order = Order::firstOrFail();
+
+        Livewire::actingAs($admin, 'admin')
+            ->test(Cashier::class)
+            ->call('selectOrder', $order->id)
+            ->set('paymentMethod', 'cash')
+            ->set('paymentAmount', '60.000')
+            ->call('capturePayment')
+            ->assertHasNoErrors()
+            ->assertSet('changeDue', 5000);
+
+        $this->assertSame(OrderStatus::Paid, $order->fresh()->status);
+        $this->assertDatabaseHas('payments', [
+            'order_id' => $order->id,
+            'method' => 'cash',
+            'amount' => 60000,
+        ]);
+    }
+
+    public function test_percent_discount_is_computed_as_a_percentage_of_the_gross_total(): void
+    {
+        $admin = Admin::factory()->create();
+        $item = MenuItem::create(['name' => 'Espresso', 'price' => 20000]);
+
+        Livewire::actingAs($admin, 'admin')
+            ->test(Cashier::class)
+            ->call('addToCart', $item->id)
+            ->set('discountType', 'percent')
+            ->set('discountAmount', '10')
+            ->call('createOrder')
+            ->assertHasNoErrors();
+
+        $this->assertDatabaseHas('orders', [
+            'discount_type' => 'percent',
+            'discount_amount' => 10,
+            'total' => 20000,
+        ]);
+
+        $order = Order::firstOrFail();
+        $this->assertSame(2000, $order->discountValue);
+        $this->assertSame(18000, $order->netTotal);
+        $this->assertSame(18000, $order->remaining);
+
+        Livewire::actingAs($admin, 'admin')
+            ->test(Cashier::class)
+            ->call('selectOrder', $order->id)
+            ->set('paymentMethod', 'qris')
+            ->call('capturePayment')
+            ->assertHasNoErrors();
+
+        $this->assertSame(OrderStatus::Paid, $order->fresh()->status);
+        $this->assertDatabaseHas('payments', [
+            'order_id' => $order->id,
+            'amount' => 18000,
+        ]);
+    }
+
+    public function test_percent_discount_rounds_half_up_on_odd_gross_totals(): void
+    {
+        $admin = Admin::factory()->create();
+        $espresso = MenuItem::create(['name' => 'Espresso', 'price' => 20000]);
+        $croissant = MenuItem::create(['name' => 'Croissant', 'price' => 25000]);
+
+        Livewire::actingAs($admin, 'admin')
+            ->test(Cashier::class)
+            ->call('addToCart', $espresso->id)
+            ->call('addToCart', $espresso->id)
+            ->call('addToCart', $croissant->id)
+            ->set('discountType', 'percent')
+            ->set('discountAmount', '15')
+            ->call('createOrder')
+            ->assertHasNoErrors();
+
+        $order = Order::firstOrFail();
+        $this->assertSame(9750, $order->discountValue);
+        $this->assertSame(55250, $order->netTotal);
+        $this->assertSame(55250, $order->remaining);
+    }
+
+    public function test_negative_fixed_discount_is_rejected(): void
+    {
+        $admin = Admin::factory()->create();
+        $item = MenuItem::create(['name' => 'Espresso', 'price' => 20000]);
+
+        Livewire::actingAs($admin, 'admin')
+            ->test(Cashier::class)
+            ->call('addToCart', $item->id)
+            ->set('discountType', 'fixed')
+            ->set('discountAmount', '-5.000')
+            ->call('createOrder')
+            ->assertHasErrors(['discountAmount']);
+
+        $this->assertDatabaseCount('orders', 0);
+    }
+
+    public function test_fixed_discount_exceeding_the_gross_total_is_rejected(): void
+    {
+        $admin = Admin::factory()->create();
+        $espresso = MenuItem::create(['name' => 'Espresso', 'price' => 20000]);
+        $croissant = MenuItem::create(['name' => 'Croissant', 'price' => 25000]);
+
+        Livewire::actingAs($admin, 'admin')
+            ->test(Cashier::class)
+            ->call('addToCart', $espresso->id)
+            ->call('addToCart', $espresso->id)
+            ->call('addToCart', $croissant->id)
+            ->set('discountType', 'fixed')
+            ->set('discountAmount', '70.000')
+            ->call('createOrder')
+            ->assertHasErrors(['discountAmount']);
+
+        $this->assertDatabaseCount('orders', 0);
+    }
+
+    public function test_percent_discount_outside_one_to_100_is_rejected(): void
+    {
+        $admin = Admin::factory()->create();
+        $item = MenuItem::create(['name' => 'Espresso', 'price' => 20000]);
+
+        foreach (['0', '101', 'abc'] as $value) {
+            Livewire::actingAs($admin, 'admin')
+                ->test(Cashier::class)
+                ->call('addToCart', $item->id)
+                ->set('discountType', 'percent')
+                ->set('discountAmount', $value)
+                ->call('createOrder')
+                ->assertHasErrors(['discountAmount']);
+        }
+
+        $this->assertDatabaseCount('orders', 0);
+    }
+
+    public function test_invalid_discount_type_is_rejected(): void
+    {
+        $admin = Admin::factory()->create();
+        $item = MenuItem::create(['name' => 'Espresso', 'price' => 20000]);
+
+        Livewire::actingAs($admin, 'admin')
+            ->test(Cashier::class)
+            ->call('addToCart', $item->id)
+            ->set('discountType', 'bogus')
+            ->set('discountAmount', '10.000')
+            ->call('createOrder')
+            ->assertHasErrors(['discountType']);
+
+        $this->assertDatabaseCount('orders', 0);
+    }
+
+    public function test_blank_discount_type_stores_null_discount_and_full_gross_total(): void
+    {
+        $admin = Admin::factory()->create();
+        $item = MenuItem::create(['name' => 'Espresso', 'price' => 20000]);
+
+        Livewire::actingAs($admin, 'admin')
+            ->test(Cashier::class)
+            ->call('addToCart', $item->id)
+            ->set('discountType', '')
+            ->set('discountAmount', '10.000')
+            ->call('createOrder')
+            ->assertHasNoErrors();
+
+        $this->assertDatabaseHas('orders', [
+            'discount_type' => null,
+            'discount_amount' => null,
+            'total' => 20000,
+        ]);
+
+        $order = Order::firstOrFail();
+        $this->assertSame(0, $order->discountValue);
+        $this->assertSame(20000, $order->netTotal);
+        $this->assertSame(20000, $order->remaining);
+    }
+
+    public function test_partial_payment_remaining_is_computed_from_the_net_total(): void
+    {
+        $admin = Admin::factory()->create();
+        $espresso = MenuItem::create(['name' => 'Espresso', 'price' => 20000]);
+        $croissant = MenuItem::create(['name' => 'Croissant', 'price' => 25000]);
+
+        $component = Livewire::actingAs($admin, 'admin')->test(Cashier::class);
+
+        $component
+            ->call('addToCart', $espresso->id)
+            ->call('addToCart', $espresso->id)
+            ->call('addToCart', $croissant->id)
+            ->set('discountType', 'fixed')
+            ->set('discountAmount', '10.000')
+            ->call('createOrder')
+            ->assertHasNoErrors();
+
+        $order = Order::firstOrFail();
+
+        $component
+            ->set('paymentMethod', 'qris')
+            ->set('paymentAmount', '20.000')
+            ->call('capturePayment')
+            ->assertHasNoErrors()
+            ->assertSet('paymentAmount', '35.000');
+
+        $this->assertSame(OrderStatus::Pending, $order->fresh()->status);
+        $this->assertSame(35000, $order->fresh()->remaining);
+
+        $component
+            ->set('paymentMethod', 'qris')
+            ->call('payRest')
+            ->assertSet('paymentAmount', '35.000')
+            ->call('capturePayment')
+            ->assertHasNoErrors();
+
+        $this->assertSame(OrderStatus::Paid, $order->fresh()->status);
+        $this->assertSame(55000, $order->fresh()->paid_total);
+        $this->assertSame(0, $order->fresh()->remaining);
+    }
+
+    public function test_receipt_page_shows_the_discount_line_between_items_and_the_net_total(): void
+    {
+        $admin = Admin::factory()->create();
+        $espresso = MenuItem::create(['name' => 'Espresso', 'price' => 20000]);
+        $croissant = MenuItem::create(['name' => 'Croissant', 'price' => 25000]);
+
+        Livewire::actingAs($admin, 'admin')
+            ->test(Cashier::class)
+            ->call('addToCart', $espresso->id)
+            ->call('addToCart', $espresso->id)
+            ->call('addToCart', $croissant->id)
+            ->set('discountType', 'fixed')
+            ->set('discountAmount', '10.000')
+            ->call('createOrder')
+            ->assertHasNoErrors();
+
+        $order = Order::firstOrFail();
+
+        Livewire::actingAs($admin, 'admin')
+            ->test(Cashier::class)
+            ->call('selectOrder', $order->id)
+            ->set('paymentMethod', 'qris')
+            ->call('capturePayment')
+            ->assertHasNoErrors();
+
+        $this->actingAs($admin, 'admin')
+            ->get(route('pos.receipt', $order))
+            ->assertOk()
+            ->assertSee(__('dashboard.discount'))
+            ->assertSee('-Rp 10.000')
+            ->assertSee('Rp 55.000')
+            ->assertDontSee('Rp 65.000');
+    }
 }

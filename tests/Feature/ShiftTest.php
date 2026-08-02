@@ -48,12 +48,20 @@ class ShiftTest extends TestCase
         ]);
     }
 
-    private function paidOrder(Shift $shift, Admin $admin, int $total, OrderStatus $status = OrderStatus::Paid): Order
-    {
+    private function paidOrder(
+        Shift $shift,
+        Admin $admin,
+        int $total,
+        OrderStatus $status = OrderStatus::Paid,
+        ?string $discountType = null,
+        ?int $discountAmount = null,
+    ): Order {
         return Order::create([
             'order_number' => 'SH-'.Str::upper(Str::random(8)),
             'status' => $status,
             'total' => $total,
+            'discount_type' => $discountType,
+            'discount_amount' => $discountAmount,
             'shift_id' => $shift->id,
             'created_by' => $admin->id,
         ]);
@@ -919,5 +927,54 @@ class ShiftTest extends TestCase
 
         $this->assertNotNull($recent);
         $this->assertSame(450000, $recent['expected_cash']);
+    }
+
+    /**
+     * Discounts (wave 6).
+     *
+     * Contract: `orders.total` stays GROSS; the discount lives in
+     * `discount_type` ('fixed'|'percent'|NULL) + `discount_amount` (raw IDR /
+     * percent). Shift::salesTotal() sums the NET totals
+     * (total - discountValue) of paid/served orders, so discounted orders
+     * count their net amount; the drawer math (expectedCash, cashPaid,
+     * paymentsByMethod) stays payment-derived and is unchanged.
+     */
+    public function test_sales_total_reflects_net_totals_of_discounted_orders(): void
+    {
+        $admin = $this->admin();
+        $shift = $this->openShift($admin);
+
+        $this->paidOrder($shift, $admin, 65000, OrderStatus::Paid, 'fixed', 10000); // net 55.000
+        $this->paidOrder($shift, $admin, 20000, OrderStatus::Served);               // net 20.000
+        $this->paidOrder($shift, $admin, 30000, OrderStatus::Pending, 'fixed', 5000); // excluded
+
+        $this->assertSame(75000, $shift->salesTotal());
+        $this->assertSame(2, $shift->paidOrdersCount());
+    }
+
+    public function test_sales_total_uses_percent_discount_values(): void
+    {
+        $admin = $this->admin();
+        $shift = $this->openShift($admin);
+
+        $this->paidOrder($shift, $admin, 20000, OrderStatus::Paid, 'percent', 10); // net 18.000
+        $this->paidOrder($shift, $admin, 65000, OrderStatus::Served, 'percent', 15); // net 55.250
+
+        $this->assertSame(73250, $shift->salesTotal());
+    }
+
+    public function test_drawer_math_stays_payment_derived_when_orders_have_discounts(): void
+    {
+        $admin = $this->admin();
+        $shift = $this->openShift($admin, 100000);
+
+        $order = $this->paidOrder($shift, $admin, 65000, OrderStatus::Paid, 'fixed', 10000);
+        $this->cashPayment($order, $admin, 60000); // tendered over the 55.000 net
+
+        $this->assertSame(55000, $order->netTotal);
+        $this->assertSame(55000, $shift->salesTotal());
+        $this->assertSame(60000, $shift->cashPaid());
+        $this->assertSame(160000, $shift->expectedCash());
+        $this->assertSame(['cash' => 60000, 'qris' => 0, 'ewallet' => 0], $shift->paymentsByMethod());
     }
 }

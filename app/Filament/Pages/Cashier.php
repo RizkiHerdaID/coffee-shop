@@ -49,6 +49,18 @@ class Cashier extends Page
     public ?string $customerPhone = null;
 
     /**
+     * Cart-level discount type: '' (none), 'fixed' (IDR off the gross
+     * total) or 'percent' (off the gross total).
+     */
+    public string $discountType = '';
+
+    /**
+     * Discount input value, Indonesian thousands separators for fixed
+     * ("10.000") or plain digits for percent ("10").
+     */
+    public string $discountAmount = '';
+
+    /**
      * Order awaiting/processing payment. createOrder() auto-selects the new
      * order; selectOrder() re-selects an existing pending order.
      */
@@ -129,6 +141,8 @@ class Cashier extends Page
     {
         $this->cart = [];
         $this->cartNotes = [];
+        $this->discountType = '';
+        $this->discountAmount = '';
     }
 
     /**
@@ -196,13 +210,18 @@ class Cashier extends Page
             'notes' => ['nullable', 'string', 'max:500'],
             'cartNotes' => ['nullable', 'array'],
             'cartNotes.*' => ['nullable', 'string', 'max:500'],
+            'discountType' => ['nullable', Rule::in(['', 'fixed', 'percent'])],
         ]);
 
-        $order = DB::transaction(function () use ($lines): Order {
+        [$discountType, $discountAmount] = $this->normalizeDiscount($lines->sum('subtotal'));
+
+        $order = DB::transaction(function () use ($lines, $discountType, $discountAmount): Order {
             $order = Order::create([
                 'order_number' => $this->generateOrderNumber(),
                 'status' => OrderStatus::Pending,
                 'total' => $lines->sum('subtotal'),
+                'discount_type' => $discountType,
+                'discount_amount' => $discountAmount,
                 'customer_phone' => filled($this->customerPhone) ? $this->customerPhone : null,
                 'notes' => filled($this->notes) ? trim($this->notes) : null,
                 'shift_id' => Shift::active()?->id,
@@ -237,6 +256,8 @@ class Cashier extends Page
         $this->cartNotes = [];
         $this->notes = null;
         $this->customerPhone = null;
+        $this->discountType = '';
+        $this->discountAmount = '';
         $this->selectOrder($order->id);
 
         if ($this->skippedStockIngredients !== []) {
@@ -255,6 +276,51 @@ class Cashier extends Page
             ->title(__('pos.order_created', ['order_number' => $order->order_number]))
             ->success()
             ->send();
+    }
+
+    /**
+     * Validate the cart discount and return [discount_type, discount_amount]
+     * for persistence (both null when no discount is set). Throws a
+     * ValidationException keyed on 'discountAmount' (or 'discountType' for an
+     * unknown type) when the input is invalid.
+     *
+     * @return array{0: string|null, 1: int|null}
+     */
+    protected function normalizeDiscount(int $gross): array
+    {
+        if ($this->discountType === '') {
+            return [null, null];
+        }
+
+        if ($this->discountType === 'fixed') {
+            if (! preg_match('/^(\d{1,3}(\.\d{3})*|\d+)$/', $this->discountAmount)) {
+                throw ValidationException::withMessages(['discountAmount' => __('dashboard.discount_invalid')]);
+            }
+
+            $amount = (int) str_replace('.', '', $this->discountAmount);
+
+            if ($amount < 1 || $amount > $gross) {
+                throw ValidationException::withMessages(['discountAmount' => __('dashboard.discount_exceeds_total')]);
+            }
+
+            return ['fixed', $amount];
+        }
+
+        if ($this->discountType === 'percent') {
+            if (! preg_match('/^\d+$/', $this->discountAmount)) {
+                throw ValidationException::withMessages(['discountAmount' => __('dashboard.discount_invalid')]);
+            }
+
+            $percent = (int) $this->discountAmount;
+
+            if ($percent < 1 || $percent > 100) {
+                throw ValidationException::withMessages(['discountAmount' => __('dashboard.discount_percent_range')]);
+            }
+
+            return ['percent', $percent];
+        }
+
+        throw ValidationException::withMessages(['discountType' => __('dashboard.discount_invalid')]);
     }
 
     /**
@@ -495,6 +561,37 @@ class Cashier extends Page
     public function getCartTotalProperty(): int
     {
         return $this->cartLines->sum('subtotal');
+    }
+
+    /**
+     * Effective cart discount in IDR based on the current input; 0 while no
+     * discount is set or the input is not yet a valid amount.
+     */
+    public function getCartDiscountValueProperty(): int
+    {
+        $gross = $this->cartTotal;
+
+        if ($this->discountType === 'fixed') {
+            $amount = (int) str_replace('.', '', (string) $this->discountAmount);
+
+            return $amount < 1 ? 0 : min($amount, $gross);
+        }
+
+        if ($this->discountType === 'percent') {
+            $percent = (int) $this->discountAmount;
+
+            return $percent < 1 || $percent > 100 ? 0 : (int) round($gross * $percent / 100);
+        }
+
+        return 0;
+    }
+
+    /**
+     * Gross cart total minus the effective discount.
+     */
+    public function getCartNetTotalProperty(): int
+    {
+        return max($this->cartTotal - $this->cartDiscountValue, 0);
     }
 
     public function getSelectedOrderProperty(): ?Order

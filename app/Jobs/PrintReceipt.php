@@ -44,7 +44,12 @@ class PrintReceipt implements ShouldQueue
         }
 
         $lines[] = $this->rule('-', $width);
-        $lines[] = $this->formatLine(__('pos.receipt.total'), 'Rp '.number_format($order->total, 0, ',', '.'), $width);
+
+        if ($order->discount_value > 0) {
+            $lines[] = $this->formatLine(__('dashboard.discount'), '-Rp '.number_format($order->discount_value, 0, ',', '.'), $width);
+        }
+
+        $lines[] = $this->formatLine(__('pos.receipt.total'), 'Rp '.number_format($order->net_total, 0, ',', '.'), $width);
 
         foreach ($order->payments as $payment) {
             $lines[] = $this->formatLine(
@@ -54,10 +59,10 @@ class PrintReceipt implements ShouldQueue
             );
         }
 
-        if ($order->paid_total > $order->total) {
+        if ($order->paid_total > $order->net_total) {
             $lines[] = $this->formatLine(
                 __('pos.receipt.change'),
-                'Rp '.number_format($order->paid_total - $order->total, 0, ',', '.'),
+                'Rp '.number_format($order->paid_total - $order->net_total, 0, ',', '.'),
                 $width,
             );
         }

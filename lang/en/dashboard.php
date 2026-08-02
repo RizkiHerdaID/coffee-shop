@@ -20,6 +20,17 @@ return [
     'pay_rest' => 'Pay Rest',
     'amount_exceeds_remaining' => 'Amount exceeds the remaining balance.',
 
+    'discount' => 'Discount',
+    'discount_type' => 'Discount Type',
+    'discount_fixed' => 'Fixed (Rp)',
+    'discount_percent' => 'Percent (%)',
+    'discount_fixed_placeholder' => 'e.g. 10,000',
+    'discount_percent_placeholder' => 'e.g. 10',
+    'discount_invalid' => 'Invalid discount amount.',
+    'discount_exceeds_total' => 'Discount exceeds the order total.',
+    'discount_percent_range' => 'Discount percent must be 1–100.',
+    'net_total' => 'Net Total',
+
     'low_stock_heading' => 'Low Stock',
     'low_stock_empty_heading' => 'Stock is healthy',
     'low_stock_empty_description' => 'No items are below their minimum threshold.',

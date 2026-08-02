@@ -124,6 +124,67 @@
                         <span class="text-xl font-bold text-gray-900">Rp {{ number_format($this->cartTotal, 0, ',', '.') }}</span>
                     </div>
 
+                    @if ($this->cartDiscountValue > 0)
+                        <div class="mt-1 flex items-center justify-between">
+                            <span class="text-sm font-medium text-gray-600">{{ __('dashboard.discount') }}</span>
+                            <span class="text-base font-bold text-red-600">-Rp {{ number_format($this->cartDiscountValue, 0, ',', '.') }}</span>
+                        </div>
+                        <div class="mt-1 flex items-center justify-between border-t border-gray-200 pt-1">
+                            <span class="text-sm font-semibold text-gray-700">{{ __('dashboard.net_total') }}</span>
+                            <span class="text-xl font-bold text-gray-900">Rp {{ number_format($this->cartNetTotal, 0, ',', '.') }}</span>
+                        </div>
+                    @endif
+
+                    <div class="mt-4">
+                        <label for="cashier-discount-type" class="mb-1 block text-sm font-medium text-gray-700">
+                            {{ __('dashboard.discount') }}
+                        </label>
+                        <div class="flex items-center gap-2">
+                            <button
+                                id="cashier-discount-type"
+                                type="button"
+                                wire:click="$set('discountType', '{{ $this->discountType === 'fixed' ? '' : 'fixed' }}')"
+                                class="rounded-lg border px-3 py-1.5 text-sm font-semibold transition {{ $this->discountType === 'fixed' ? 'border-amber-500 bg-amber-500/10 text-amber-600' : 'border-gray-300 text-gray-600 hover:border-amber-500 hover:text-amber-600' }}"
+                            >
+                                {{ __('dashboard.discount_fixed') }}
+                            </button>
+                            <button
+                                type="button"
+                                wire:click="$set('discountType', '{{ $this->discountType === 'percent' ? '' : 'percent' }}')"
+                                class="rounded-lg border px-3 py-1.5 text-sm font-semibold transition {{ $this->discountType === 'percent' ? 'border-amber-500 bg-amber-500/10 text-amber-600' : 'border-gray-300 text-gray-600 hover:border-amber-500 hover:text-amber-600' }}"
+                            >
+                                {{ __('dashboard.discount_percent') }}
+                            </button>
+                        </div>
+                        @if ($this->discountType === 'fixed')
+                            <input
+                                id="cashier-discount-amount"
+                                type="text"
+                                inputmode="numeric"
+                                wire:model="discountAmount"
+                                x-data="{ money: (v) => { const digits = String(v).replace(/[^\d]/g, ''); return digits === '' ? '' : Number(digits).toLocaleString('id-ID'); } }"
+                                x-mask:dynamic="money($input)"
+                                placeholder="{{ __('dashboard.discount_fixed_placeholder') }}"
+                                class="mt-2 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:border-amber-500 focus:ring-amber-500"
+                            >
+                        @elseif ($this->discountType === 'percent')
+                            <input
+                                id="cashier-discount-amount"
+                                type="text"
+                                inputmode="numeric"
+                                wire:model="discountAmount"
+                                placeholder="{{ __('dashboard.discount_percent_placeholder') }}"
+                                class="mt-2 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:border-amber-500 focus:ring-amber-500"
+                            >
+                        @endif
+                        @error('discountAmount')
+                            <p class="mt-1 text-sm text-danger-600">{{ $message }}</p>
+                        @enderror
+                        @error('discountType')
+                            <p class="mt-1 text-sm text-danger-600">{{ $message }}</p>
+                        @enderror
+                    </div>
+
                     @error('cart')
                         <p class="mt-2 text-sm text-danger-600">{{ $message }}</p>
                     @enderror
@@ -147,6 +208,12 @@
                                 <span class="text-gray-600">{{ __('pos.total') }}</span>
                                 <span class="font-semibold text-gray-900">Rp {{ number_format($this->selectedOrder->total, 0, ',', '.') }}</span>
                             </div>
+                            @if ($this->selectedOrder->discount_value > 0)
+                                <div class="flex items-center justify-between">
+                                    <span class="text-gray-600">{{ __('dashboard.discount') }}</span>
+                                    <span class="font-semibold text-red-600">-Rp {{ number_format($this->selectedOrder->discount_value, 0, ',', '.') }}</span>
+                                </div>
+                            @endif
                             <div class="flex items-center justify-between">
                                 <span class="text-gray-600">{{ __('pos.paid') }}</span>
                                 <span class="font-semibold text-green-600">Rp {{ number_format($this->selectedOrder->paid_total, 0, ',', '.') }}</span>
@@ -255,6 +322,12 @@
                                 <span class="text-gray-600">{{ __('pos.total') }}</span>
                                 <span class="font-semibold text-gray-900">Rp {{ number_format($this->selectedOrder->total, 0, ',', '.') }}</span>
                             </div>
+                            @if ($this->selectedOrder->discount_value > 0)
+                                <div class="flex items-center justify-between">
+                                    <span class="text-gray-600">{{ __('dashboard.discount') }}</span>
+                                    <span class="font-semibold text-red-600">-Rp {{ number_format($this->selectedOrder->discount_value, 0, ',', '.') }}</span>
+                                </div>
+                            @endif
                             <div class="flex items-center justify-between">
                                 <span class="text-gray-600">{{ __('pos.paid') }}</span>
                                 <span class="font-semibold text-green-600">Rp {{ number_format($this->selectedOrder->paid_total, 0, ',', '.') }}</span>

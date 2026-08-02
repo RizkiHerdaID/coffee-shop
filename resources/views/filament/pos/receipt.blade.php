@@ -132,9 +132,15 @@
             <hr>
 
             <div class="totals">
+                @if ($order->discount_value > 0)
+                    <div class="line">
+                        <span>{{ __('dashboard.discount') }}</span>
+                        <span>-Rp {{ number_format($order->discount_value, 0, ',', '.') }}</span>
+                    </div>
+                @endif
                 <div class="line grand-total">
                     <span>{{ __('pos.receipt.total') }}</span>
-                    <span>Rp {{ number_format($order->total, 0, ',', '.') }}</span>
+                    <span>Rp {{ number_format($order->net_total, 0, ',', '.') }}</span>
                 </div>
             </div>
 

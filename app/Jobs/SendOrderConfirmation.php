@@ -34,7 +34,7 @@ class SendOrderConfirmation implements ShouldQueue
             'order_number' => $this->order->order_number,
             'shop' => config('shop.name'),
             'items' => $items,
-            'total' => 'Rp '.number_format($this->order->total, 0, ',', '.'),
+            'total' => 'Rp '.number_format($this->order->net_total, 0, ',', '.'),
             'phone' => config('shop.phone'),
         ]);
     }

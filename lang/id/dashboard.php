@@ -20,6 +20,17 @@ return [
     'pay_rest' => 'Bayar Sisa',
     'amount_exceeds_remaining' => 'Nominal melebihi sisa tagihan.',
 
+    'discount' => 'Diskon',
+    'discount_type' => 'Jenis Diskon',
+    'discount_fixed' => 'Nominal (Rp)',
+    'discount_percent' => 'Persen (%)',
+    'discount_fixed_placeholder' => 'Contoh: 10.000',
+    'discount_percent_placeholder' => 'Contoh: 10',
+    'discount_invalid' => 'Nominal diskon tidak valid.',
+    'discount_exceeds_total' => 'Diskon melebihi total pesanan.',
+    'discount_percent_range' => 'Persen diskon harus 1–100.',
+    'net_total' => 'Total Bayar',
+
     'low_stock_heading' => 'Stok Menipis',
     'low_stock_empty_heading' => 'Stok aman',
     'low_stock_empty_description' => 'Tidak ada item stok di bawah batas minimum.',

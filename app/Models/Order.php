@@ -12,7 +12,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-#[Fillable(['order_number', 'customer_phone', 'notes', 'status', 'total', 'shift_id', 'created_by'])]
+#[Fillable(['order_number', 'customer_phone', 'notes', 'status', 'total', 'discount_type', 'discount_amount', 'shift_id', 'created_by'])]
 class Order extends Model
 {
     protected static function booted(): void
@@ -56,20 +56,51 @@ class Order extends Model
     }
 
     /**
-     * Amount still owed; zero once paid_total covers the total.
+     * Effective discount in IDR; 0 when the order has none. Fixed discounts
+     * are the stored amount (capped at the gross total); percent discounts
+     * are rounded from the gross total.
      */
-    public function getRemainingAttribute(): int
+    public function getDiscountValueAttribute(): int
     {
-        return max($this->total - $this->paid_total, 0);
+        if ($this->discount_type === null || $this->discount_amount === null || $this->discount_amount < 1) {
+            return 0;
+        }
+
+        if ($this->discount_type === 'fixed') {
+            return min($this->discount_amount, $this->total);
+        }
+
+        if ($this->discount_type === 'percent') {
+            return min((int) round($this->total * $this->discount_amount / 100), $this->total);
+        }
+
+        return 0;
     }
 
     /**
-     * Transition pending → paid once payments cover the total. Dispatches the
-     * receipt/kitchen print jobs exactly once, on the transition itself.
+     * Gross total minus the effective discount; what the customer actually
+     * pays and what payment coverage is measured against.
+     */
+    public function getNetTotalAttribute(): int
+    {
+        return $this->total - $this->discount_value;
+    }
+
+    /**
+     * Amount still owed; zero once paid_total covers the net total.
+     */
+    public function getRemainingAttribute(): int
+    {
+        return max($this->net_total - $this->paid_total, 0);
+    }
+
+    /**
+     * Transition pending → paid once payments cover the net total. Dispatches
+     * the receipt/kitchen print jobs exactly once, on the transition itself.
      */
     public function markPaidIfCovered(): bool
     {
-        if ($this->status !== OrderStatus::Pending || $this->paid_total < $this->total) {
+        if ($this->status !== OrderStatus::Pending || $this->paid_total < $this->net_total) {
             return false;
         }
 

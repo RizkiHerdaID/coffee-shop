@@ -87,11 +87,12 @@ class Shift extends Model
     }
 
     /**
-     * Sum of paid-order totals in the shift (IDR, integer).
+     * Sum of paid-order NET totals in the shift (gross minus discount, IDR
+     * integer) — consistent with the payment-derived expectedCash().
      */
     public function salesTotal(): int
     {
-        return (int) $this->paidOrders()->sum('total');
+        return (int) $this->paidOrders()->get()->sum(fn (Order $order) => $order->net_total);
     }
 
     /**
