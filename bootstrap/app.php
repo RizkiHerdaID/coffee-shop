@@ -28,7 +28,9 @@ return Application::configure(basePath: dirname(__DIR__))
             at: ['127.0.0.1', '172.16.0.0/12'],
             headers: Request::HEADER_X_FORWARDED_FOR | Request::HEADER_X_FORWARDED_PROTO,
         );
-        $middleware->redirectGuestsTo(fn (Request $request) => route('admin.login'));
+        // Redirect unauthenticated web guests (e.g. /pos/receipt) to the
+        // Filament admin login — the route is registered by the admin panel.
+        $middleware->redirectGuestsTo(fn (Request $request) => route('filament.admin.auth.login'));
         $middleware->web(append: [
             SetLocale::class,
         ]);

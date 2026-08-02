@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\PageController;
+use App\Http\Controllers\PosReceiptController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', [PageController::class, 'home'])->name('home');
@@ -18,6 +19,10 @@ Route::get('/lang/{locale}', function (string $locale) {
 
     return redirect()->back();
 })->name('lang.switch');
+
+Route::get('/pos/receipt/{order}', [PosReceiptController::class, 'show'])
+    ->middleware('auth:admin')
+    ->name('pos.receipt');
 
 Route::get('/sitemap.xml', function () {
     $urls = [route('home'), route('menu'), route('contact')];
