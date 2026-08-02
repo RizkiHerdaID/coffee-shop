@@ -39,10 +39,11 @@ herdr agent start --kind opencode
 
 then submit each agent's task prompt. Use the project conventions in `AGENTS.md` (e.g. `sg docker` for every container command, `PAO_DISABLE=1` for tests). Split tasks along file boundaries so agents don't edit the same files concurrently. In a worktree workspace the "agents" tab already runs 3 opencode agents (auto-layout) — the lead agent is the FIRST pane; sub-agents are the OTHER pre-provisioned panes in the same tab. Use `herdr agent prompt <pane> "..."` / `herdr agent read` / `herdr agent wait` on them. Do NOT run `herdr pane split`/`agent start` from inside a lead — it opens new terminals instead of staying in the shared layout. Idle pre-provisioned panes hold ~700MB each — close panes the lead doesn't need (`herdr pane close <pane>`) or keep fleet sizes matched to task size.
 
-**Fleet sizing (v2 rule):** match sub-agents to task complexity, NOT "always 3".
-- S-effort tasks → lead only (close the other 2 panes immediately after provisioning)
-- M-effort tasks → lead + 2 sub-agents max
-- Only large independent-scope tasks get the full 3.
+**Fleet sizing (v3 rule — role-based, layered):** match sub-agents to the feature's LAYER COUNT, NOT "always 3". A dedicated read-only "verify" pane is NOT used anymore — verification happens twice already (lead runs full suite + Pint before DONE; main session re-runs the suite on main before push). A verify pane just burns ~700MB idle (community-validated: herdr has no built-in subagent orchestration; the role-split convention is per-team — see herdr discussion #1274).
+- S-effort, single-layer (e.g. maps embed, one blade view) → lead only; close unneeded pre-provisioned panes immediately
+- M-effort, single-layer (e.g. one Filament resource) → lead + tester (tester authors the feature tests in parallel against the contract)
+- M/L-effort, multi-layer (backend + frontend + tests, e.g. POS milestones) → lead + backend + frontend + tester. Roles split by file boundary: backend = models/migrations/controllers/services/jobs/Filament PHP; frontend = blade views/css/js/vite; tester = tests/ only.
+- Never more than one agent per file set; never a pure observer pane.
 Coordination overhead (prompting, verifying, folding) eats the parallel gain below ~M effort.
 
 ## V2 orchestration flow (main session, per batch)
@@ -60,7 +61,11 @@ Worktree lifecycle (proven sequence, order matters):
 herdr worktree create --cwd /home/rizki/projects/coffee-shop --branch feature-x --no-focus --json
 scripts/worktree-env.sh $WT <slot> --dev --force && cp -al <main>/vendor <main>/node_modules $WT/
 sg docker -c "cd $WT && ./vendor/bin/sail up -d" && sg docker -c "cd $WT && ./vendor/bin/sail artisan key:generate && php artisan config:clear && php artisan view:clear && php artisan route:clear"
-herdr pane rename <pane> "research|implement|test"   # readable agent fleet (3 identical "OpenCode" titles otherwise)
+# equalize pane widths: auto-layout splits at 0.5 repeatedly → 2:1:1 (3 panes) or 4:2:1:1 (4 panes).
+# Target equal thirds/quarters: subtract (root_ratio - 1/N) from pane 1:
+#   3 panes: herdr pane resize --pane <p1> --direction left --amount 0.1667   # 0.5 -> 0.3333
+#   4 panes: herdr pane resize --pane <p1> --direction left --amount 0.25     # 0.5 -> 0.25
+herdr pane rename <pane> "<role>-<name>"   # readable agent fleet (identical "OpenCode" titles otherwise); roles: lead/backend/frontend/tester
 # ... work happens, lead notifies DONE ...
 rtk git merge feature-x -m "Merge feature-x: <summary>"
 herdr workspace close <workspace-id>                 # removes herdr state AND deletes the git branch
