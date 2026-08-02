@@ -30,6 +30,15 @@ return [
         'cancelled' => 'Cancelled',
     ],
 
+    'scorecard' => [
+        'orders_count' => 'PO count',
+        'total_spend' => 'Total spend',
+        'outstanding' => 'Outstanding POs',
+        'avg_lead_time' => 'Avg lead time',
+        'on_time_rate' => 'On-time rate',
+        'days' => 'days',
+    ],
+
     'relation' => [
         'items' => [
             'label' => 'Order Items',

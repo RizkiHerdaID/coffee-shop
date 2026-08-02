@@ -81,6 +81,7 @@ class PurchaseOrdersTable
                         $stocked = $record->receiveStock(__('purchase-orders.notifications.receive_note', ['id' => $record->id]));
 
                         $record->status = PurchaseOrderStatus::Received;
+                        $record->received_at = now();
                         $record->save();
 
                         Notification::make()
