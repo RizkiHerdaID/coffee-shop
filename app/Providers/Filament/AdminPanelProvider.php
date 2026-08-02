@@ -2,6 +2,8 @@
 
 namespace App\Providers\Filament;
 
+use App\Filament\Widgets\BestSellersChart;
+use App\Filament\Widgets\PeakHoursChart;
 use App\Filament\Widgets\RevenueChart;
 use App\Filament\Widgets\TodayStats;
 use App\Filament\Widgets\TopItemsChart;
@@ -46,6 +48,8 @@ class AdminPanelProvider extends PanelProvider
                 TodayStats::class,
                 RevenueChart::class,
                 TopItemsChart::class,
+                BestSellersChart::class,
+                PeakHoursChart::class,
                 FilamentInfoWidget::class,
             ])
             ->middleware([
