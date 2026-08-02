@@ -64,6 +64,7 @@ return [
         'mark_paid' => 'Tandai Lunas',
         'mark_served' => 'Tandai Selesai',
         'marked_paid' => ':order_number ditandai lunas',
+        'marked_paid_pending' => ':order_number masih menunggu — pembayaran belum menutupi tagihan.',
         'marked_served' => ':order_number ditandai selesai',
         'view_receipt' => 'Struk',
         'refund' => 'Refund',

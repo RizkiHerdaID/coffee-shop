@@ -8,8 +8,6 @@ use App\Filament\Exports\OrderExporter;
 use App\Models\Order;
 use Closure;
 use Filament\Actions\Action;
-use Filament\Actions\BulkActionGroup;
-use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
 use Filament\Actions\ExportAction;
 use Filament\Forms\Components\Select;
@@ -72,21 +70,35 @@ class OrdersTable
                 //
             ])
             ->recordActions([
-                EditAction::make(),
+                EditAction::make()
+                    ->disabled(fn (Order $record): bool => $record->shift?->closed_at !== null),
                 Action::make('markPaid')
                     ->label(__('pos.actions.mark_paid'))
                     ->icon(Heroicon::OutlinedBanknotes)
                     ->color('success')
-                    ->visible(fn (Order $record): bool => $record->status === OrderStatus::Pending)
-                    ->authorize(fn (Order $record): bool => auth('admin')->check() && $record->status === OrderStatus::Pending)
-                    ->action(fn (Order $record) => $record->markPaidIfCovered())
-                    ->successNotificationTitle(fn (Order $record) => __('pos.actions.marked_paid', ['order_number' => $record->order_number])),
+                    ->visible(fn (Order $record): bool => $record->status === OrderStatus::Pending && $record->shift?->closed_at === null)
+                    ->authorize(fn (Order $record): bool => auth('admin')->check() && $record->status === OrderStatus::Pending && $record->shift?->closed_at === null)
+                    ->action(function (Action $action, Order $record): void {
+                        if ($record->markPaidIfCovered()) {
+                            Notification::make()
+                                ->title(__('pos.actions.marked_paid', ['order_number' => $record->order_number]))
+                                ->success()
+                                ->send();
+
+                            return;
+                        }
+
+                        Notification::make()
+                            ->title(__('pos.actions.marked_paid_pending', ['order_number' => $record->order_number]))
+                            ->warning()
+                            ->send();
+                    }),
                 Action::make('markServed')
                     ->label(__('pos.actions.mark_served'))
                     ->icon(Heroicon::OutlinedCheckBadge)
                     ->color('info')
-                    ->visible(fn (Order $record): bool => $record->status === OrderStatus::Paid)
-                    ->authorize(fn (Order $record): bool => auth('admin')->check() && $record->status === OrderStatus::Paid)
+                    ->visible(fn (Order $record): bool => $record->status === OrderStatus::Paid && $record->shift?->closed_at === null)
+                    ->authorize(fn (Order $record): bool => auth('admin')->check() && $record->status === OrderStatus::Paid && $record->shift?->closed_at === null)
                     ->action(fn (Order $record) => $record->update(['status' => OrderStatus::Served]))
                     ->successNotificationTitle(fn (Order $record) => __('pos.actions.marked_served', ['order_number' => $record->order_number])),
                 Action::make('refund')
@@ -169,9 +181,6 @@ class OrdersTable
                     ->openUrlInNewTab(),
             ])
             ->toolbarActions([
-                BulkActionGroup::make([
-                    DeleteBulkAction::make(),
-                ]),
                 ExportAction::make()
                     ->label(__('orders.export'))
                     ->exporter(OrderExporter::class),

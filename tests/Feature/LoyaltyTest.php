@@ -2,11 +2,13 @@
 
 namespace Tests\Feature;
 
+use App\Enums\OrderStatus;
 use App\Enums\PaymentMethod;
 use App\Models\Admin;
 use App\Models\LoyaltyCard;
 use App\Models\Order;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
@@ -273,5 +275,97 @@ class LoyaltyTest extends TestCase
         $this->get(url('/cek-poin').'?phone=081200000000')
             ->assertOk()
             ->assertSee(__('points.not_found'));
+    }
+
+    // ---------------------------------------------------------------------
+    // Exactly-once credit per order lifecycle (Vikunja 117): refunded →
+    // paid edits and status round-trips must never re-credit a stamp, and
+    // the direct edit path credits like the POS payment path.
+    // ---------------------------------------------------------------------
+
+    public function test_refunded_then_repaid_order_credits_exactly_once(): void
+    {
+        $admin = Admin::factory()->create();
+        $this->actingAs($admin, 'admin');
+
+        $order = $this->createPaidOrder('081234567890', 20000, $admin);
+        $this->assertSame(1, LoyaltyCard::where('phone', '081234567890')->firstOrFail()->stamps);
+
+        $order->refund($order->paid_total);
+        $this->assertSame(OrderStatus::Refunded, $order->fresh()->status);
+
+        // Admin corrects the refund back to paid: must NOT re-credit.
+        $order->update(['status' => OrderStatus::Paid]);
+
+        $card = LoyaltyCard::where('phone', '081234567890')->firstOrFail();
+        $this->assertSame(1, $card->stamps);
+        $this->assertSame(0, $card->redeemed);
+    }
+
+    public function test_status_roundtrip_away_from_and_back_to_paid_never_recredits(): void
+    {
+        $admin = Admin::factory()->create();
+
+        $order = $this->createPaidOrder('081234567890', 20000, $admin);
+        $this->assertSame(1, LoyaltyCard::where('phone', '081234567890')->firstOrFail()->stamps);
+
+        $order->update(['status' => OrderStatus::Served]);
+        $order->update(['status' => OrderStatus::Pending]);
+        $order->update(['status' => OrderStatus::Paid]);
+
+        $this->assertSame(1, LoyaltyCard::where('phone', '081234567890')->firstOrFail()->stamps);
+    }
+
+    public function test_direct_status_edit_to_paid_credits_a_stamp_exactly_once(): void
+    {
+        $admin = Admin::factory()->create();
+
+        $order = Order::create([
+            'order_number' => 'ORD-EDIT-PAID',
+            'customer_phone' => '081234567890',
+            'status' => OrderStatus::Pending,
+            'total' => 20000,
+            'created_by' => $admin->id,
+        ]);
+
+        $this->assertDatabaseCount('loyalty_cards', 0);
+
+        $order->update(['status' => OrderStatus::Paid]);
+        $this->assertSame(1, LoyaltyCard::where('phone', '081234567890')->firstOrFail()->stamps);
+
+        $order->update(['notes' => 're-save after payment']);
+        $this->assertSame(1, LoyaltyCard::where('phone', '081234567890')->firstOrFail()->stamps);
+    }
+
+    // ---------------------------------------------------------------------
+    // Atomic balance mutations (Vikunja 115, part): read-modify-write is
+    // serialized, so sequential/nested operations never lose stamps and a
+    // redeem can never drive the balance negative.
+    // ---------------------------------------------------------------------
+
+    public function test_two_sequential_credits_inside_a_transaction_preserve_the_total(): void
+    {
+        DB::beginTransaction();
+
+        LoyaltyCard::credit('081234567890', 5);
+        LoyaltyCard::credit('081234567890', 5);
+
+        $this->assertSame(10, LoyaltyCard::where('phone', '081234567890')->firstOrFail()->stamps);
+
+        DB::commit();
+
+        $this->assertSame(10, LoyaltyCard::where('phone', '081234567890')->firstOrFail()->stamps);
+    }
+
+    public function test_double_redeem_on_exactly_ten_stamps_allows_only_one(): void
+    {
+        LoyaltyCard::credit('081234567890', 10);
+
+        $this->assertTrue(LoyaltyCard::redeem('081234567890'));
+        $this->assertFalse(LoyaltyCard::redeem('081234567890'));
+
+        $card = LoyaltyCard::where('phone', '081234567890')->firstOrFail();
+        $this->assertSame(0, $card->stamps);
+        $this->assertSame(1, $card->redeemed);
     }
 }

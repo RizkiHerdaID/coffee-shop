@@ -4,11 +4,17 @@ namespace Tests\Feature;
 
 use App\Enums\OrderStatus;
 use App\Enums\PaymentMethod;
+use App\Jobs\PrintKitchenTicket;
+use App\Jobs\PrintReceipt;
+use App\Jobs\SendOrderConfirmation;
 use App\Models\Admin;
 use App\Models\MenuItem;
 use App\Models\Order;
 use App\Models\Shift;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Queue;
+use RuntimeException;
 use Tests\TestCase;
 
 class OrderTest extends TestCase
@@ -144,5 +150,147 @@ class OrderTest extends TestCase
 
         $this->assertSame($shift->id, $order->shift->id);
         $this->assertTrue($shift->orders()->pluck('id')->contains($order->id));
+    }
+
+    // ---------------------------------------------------------------------
+    // Delete protection (Vikunja 107): the model guard must block direct
+    // deletes so the audit trail (and Z-reports) stay immutable.
+    // ---------------------------------------------------------------------
+
+    private function assertDeleteBlocked(Order $order): void
+    {
+        try {
+            $order->delete();
+            $this->fail('Order deletion must be blocked by the model guard.');
+        } catch (RuntimeException) {
+            // Expected: orders are immutable audit records.
+        }
+    }
+
+    public function test_order_with_payments_cannot_be_deleted(): void
+    {
+        $admin = Admin::factory()->create();
+        $order = Order::withoutEvents(fn () => Order::create([
+            'order_number' => 'DEL-001',
+            'status' => OrderStatus::Paid,
+            'total' => 50000,
+            'created_by' => $admin->id,
+        ]));
+        $order->payments()->create([
+            'method' => PaymentMethod::Cash,
+            'amount' => 50000,
+            'paid_at' => now(),
+            'admin_id' => $admin->id,
+        ]);
+
+        $this->assertDeleteBlocked($order);
+
+        $this->assertDatabaseHas('orders', ['id' => $order->id]);
+        $this->assertDatabaseHas('payments', ['order_id' => $order->id]);
+    }
+
+    public function test_order_without_payments_cannot_be_deleted(): void
+    {
+        $admin = Admin::factory()->create();
+        $order = Order::withoutEvents(fn () => Order::create([
+            'order_number' => 'DEL-002',
+            'total' => 10000,
+            'created_by' => $admin->id,
+        ]));
+
+        $this->assertDeleteBlocked($order);
+
+        $this->assertDatabaseHas('orders', ['id' => $order->id]);
+    }
+
+    // ---------------------------------------------------------------------
+    // Dispatch-after-commit (Vikunja 112): print/confirmation jobs must not
+    // run inside the DB transaction of the status change, or a sync queue
+    // would ship itemless confirmations against uncommitted rows.
+    //
+    // RefreshDatabase installs Illuminate\Foundation\Testing\
+    // DatabaseTransactionsManager, which fires afterCommit callbacks when
+    // the transaction level returns to 1 (the test's wrapping transaction)
+    // — so the deferral is observable inside tests: nothing is pushed while
+    // the inner transaction is open, everything is pushed once it commits,
+    // and nothing is pushed when it rolls back.
+    // ---------------------------------------------------------------------
+
+    public function test_print_jobs_are_dispatched_after_transaction_commits(): void
+    {
+        $admin = Admin::factory()->create();
+        Queue::fake();
+
+        DB::beginTransaction();
+        $order = Order::withoutEvents(fn () => Order::create([
+            'order_number' => 'ORD-DEFER-1',
+            'status' => OrderStatus::Pending,
+            'total' => 30000,
+            'created_by' => $admin->id,
+        ]))->refresh();
+        $order->payments()->create([
+            'method' => PaymentMethod::Cash,
+            'amount' => 30000,
+            'paid_at' => now(),
+            'admin_id' => $admin->id,
+        ]);
+
+        $order->markPaidIfCovered();
+
+        Queue::assertNothingPushed();
+
+        DB::commit();
+
+        Queue::assertPushed(PrintReceipt::class, fn (PrintReceipt $job) => $job->order->is($order));
+        Queue::assertPushed(PrintKitchenTicket::class, fn (PrintKitchenTicket $job) => $job->order->is($order));
+    }
+
+    public function test_print_jobs_are_not_dispatched_when_the_transaction_rolls_back(): void
+    {
+        $admin = Admin::factory()->create();
+        Queue::fake();
+
+        DB::beginTransaction();
+        $order = Order::withoutEvents(fn () => Order::create([
+            'order_number' => 'ORD-DEFER-2',
+            'status' => OrderStatus::Pending,
+            'total' => 30000,
+            'created_by' => $admin->id,
+        ]))->refresh();
+        $order->payments()->create([
+            'method' => PaymentMethod::Cash,
+            'amount' => 30000,
+            'paid_at' => now(),
+            'admin_id' => $admin->id,
+        ]);
+
+        $order->markPaidIfCovered();
+
+        DB::rollBack();
+
+        Queue::assertNothingPushed();
+    }
+
+    public function test_order_confirmation_job_is_deferred_until_transaction_commits(): void
+    {
+        config()->set('whatsapp.enabled', true);
+
+        $admin = Admin::factory()->create();
+        Queue::fake();
+
+        DB::beginTransaction();
+        Order::create([
+            'order_number' => 'ORD-DEFER-CONF',
+            'customer_phone' => '081234567890',
+            'status' => OrderStatus::Pending,
+            'total' => 20000,
+            'created_by' => $admin->id,
+        ]);
+
+        Queue::assertNothingPushed();
+
+        DB::commit();
+
+        Queue::assertPushed(SendOrderConfirmation::class);
     }
 }
