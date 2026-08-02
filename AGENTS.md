@@ -101,6 +101,7 @@ curl -s -o /dev/null -w "%{http_code}\n" https://coffee.rizkilab.my.id/
 ## Workflow (user preferences)
 
 - Parallel work is expected via **herdr panes** running **opencode agents** (`herdr agent start --kind opencode`), not just the built-in Task tool. See `.opencode/skills/herdr-parallel/SKILL.md`.
+- Real-browser E2E testing uses the **herdr Browser plugin** (`official.browser`): bun at `~/.local/bin/bun`, Chrome for Testing at `~/.local/share/cft/chrome-linux64/chrome` (needs `LD_LIBRARY_PATH=~/.local/share/cft/libs` + `HERDR_BROWSER_CHROME`). Critical: cookies never flush to disk (login dies with the daemon — keep ONE daemon per compound flow); `HERDR_BROWSER_PROFILE_ROOT` is stripped by the plugin (isolate agents via `HERDR_PLUGIN_STATE_DIR` + `HERDR_SESSION`). Full playbook + quirks: `.opencode/skills/herdr-browser-e2e/SKILL.md`. E2E run 2026-08-02: all 4 parallel agents PASS (public pages, auth+dashboard+throttle, inventory, ops).
 - Feature branches live in herdr worktrees at `~/.herdr/worktrees/coffee-shop/<branch>` and get merged into `main` when ready.
 - Verify before reporting: tests in container (`PAO_DISABLE=1`, `--no-coverage`), `vendor/bin/pint`, `php -l` on touched files, HTTP smoke test via `curl` (local `http://localhost` and prod `https://coffee.rizkilab.my.id`).
 - The composer scripts are `setup`, `dev` (concurrently: server/queue/logs/vite), `test` — there is no separate `composer test` alias.
