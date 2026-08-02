@@ -65,6 +65,27 @@ class Shift extends Model
         return $this->belongsTo(Admin::class);
     }
 
+    public function cashMovements(): HasMany
+    {
+        return $this->hasMany(ShiftCashMovement::class);
+    }
+
+    /**
+     * Total mid-shift deposits into the drawer (type "in").
+     */
+    public function deposits(): int
+    {
+        return (int) $this->cashMovements()->where('type', 'in')->sum('amount');
+    }
+
+    /**
+     * Total petty-cash withdrawals from the drawer (type "out").
+     */
+    public function pettyOut(): int
+    {
+        return (int) $this->cashMovements()->where('type', 'out')->sum('amount');
+    }
+
     /**
      * Sum of paid-order totals in the shift (IDR, integer).
      */
@@ -128,11 +149,12 @@ class Shift extends Model
     }
 
     /**
-     * Cash the drawer should hold: opening cash + cash taken in − cash refunds.
+     * Cash the drawer should hold: opening cash + cash taken in − cash
+     * refunds + mid-shift deposits − petty-cash withdrawals.
      */
     public function expectedCash(): int
     {
-        return $this->opening_cash + $this->cashPaid() + $this->cashRefunds();
+        return $this->opening_cash + $this->cashPaid() + $this->cashRefunds() + $this->deposits() - $this->pettyOut();
     }
 
     /**

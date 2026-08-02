@@ -6,6 +6,7 @@ use App\Enums\OrderStatus;
 use App\Models\Order;
 use App\Models\Payment;
 use App\Models\Shift;
+use App\Models\ShiftCashMovement;
 use BackedEnum;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
@@ -37,6 +38,17 @@ class ManageShift extends Page
      * Whether the closing confirmation panel is shown.
      */
     public bool $confirmingClose = false;
+
+    /**
+     * Mid-shift movement amount (deposit / petty-cash out), Indonesian
+     * thousands separators allowed (e.g. "500.000").
+     */
+    public string $movementAmount = '';
+
+    /**
+     * Optional note attached to a mid-shift movement.
+     */
+    public string $movementNote = '';
 
     public static function getNavigationLabel(): string
     {
@@ -94,12 +106,24 @@ class ManageShift extends Page
             ->get()
             ->keyBy('shift_id');
 
-        return $shifts->map(function (Shift $shift) use ($orderRows, $paymentRows): array {
+        $movementRows = ShiftCashMovement::query()
+            ->selectRaw('shift_id')
+            ->selectRaw("SUM(CASE WHEN type = 'in' THEN amount ELSE 0 END) as deposits")
+            ->selectRaw("SUM(CASE WHEN type = 'out' THEN amount ELSE 0 END) as petty_out")
+            ->whereIn('shift_id', $ids)
+            ->groupBy('shift_id')
+            ->get()
+            ->keyBy('shift_id');
+
+        return $shifts->map(function (Shift $shift) use ($orderRows, $paymentRows, $movementRows): array {
             $orders = $orderRows->get($shift->id);
             $payments = $paymentRows->get($shift->id);
+            $movements = $movementRows->get($shift->id);
 
             $cashPaid = (int) ($payments->cash ?? 0);
             $cashRefunds = (int) ($payments->cash_refunds ?? 0);
+            $deposits = (int) ($movements->deposits ?? 0);
+            $pettyOut = (int) ($movements->petty_out ?? 0);
 
             return [
                 'shift' => $shift,
@@ -110,10 +134,87 @@ class ManageShift extends Page
                     'qris' => (int) ($payments->qris ?? 0),
                     'ewallet' => (int) ($payments->ewallet ?? 0),
                 ],
-                'expected_cash' => $shift->opening_cash + $cashPaid + $cashRefunds,
-                'discrepancy' => $shift->closing_cash - ($shift->opening_cash + $cashPaid + $cashRefunds),
+                'deposits' => $deposits,
+                'petty_out' => $pettyOut,
+                'expected_cash' => $shift->opening_cash + $cashPaid + $cashRefunds + $deposits - $pettyOut,
+                'discrepancy' => $shift->closing_cash - ($shift->opening_cash + $cashPaid + $cashRefunds + $deposits - $pettyOut),
             ];
         });
+    }
+
+    /**
+     * Today's cash movements of the active shift, newest first.
+     *
+     * @return Collection<int, ShiftCashMovement>
+     */
+    public function getTodayMovementsProperty(): Collection
+    {
+        $shift = $this->activeShift;
+
+        if ($shift === null) {
+            return new Collection;
+        }
+
+        return $shift->cashMovements()
+            ->with('admin')
+            ->whereDate('created_at', today())
+            ->orderByDesc('created_at')
+            ->orderByDesc('id')
+            ->get();
+    }
+
+    public function recordDeposit(): void
+    {
+        $this->recordMovement('in');
+    }
+
+    public function recordPettyOut(): void
+    {
+        $this->recordMovement('out');
+    }
+
+    /**
+     * Record a mid-shift cash movement ("in" = deposit, "out" = petty cash).
+     */
+    protected function recordMovement(string $type): void
+    {
+        if ($this->activeShift === null) {
+            throw ValidationException::withMessages(['movementAmount' => __('dashboard.cash_movements.no_active_shift')]);
+        }
+
+        if (blank($this->movementAmount)) {
+            throw ValidationException::withMessages(['movementAmount' => __('dashboard.cash_movements.amount_required')]);
+        }
+
+        if (! $this->isValidAmount($this->movementAmount)) {
+            throw ValidationException::withMessages(['movementAmount' => __('dashboard.cash_movements.invalid_amount')]);
+        }
+
+        $amount = $this->parseAmount($this->movementAmount);
+
+        if ($amount <= 0) {
+            throw ValidationException::withMessages(['movementAmount' => __('dashboard.cash_movements.invalid_amount')]);
+        }
+
+        if (mb_strlen($this->movementNote) > 255) {
+            throw ValidationException::withMessages(['movementNote' => __('dashboard.cash_movements.note_max', ['max' => 255])]);
+        }
+
+        ShiftCashMovement::create([
+            'shift_id' => $this->activeShift->id,
+            'type' => $type,
+            'amount' => $amount,
+            'note' => blank($this->movementNote) ? null : $this->movementNote,
+            'admin_id' => auth('admin')->id(),
+        ]);
+
+        $this->movementAmount = '';
+        $this->movementNote = '';
+
+        Notification::make()
+            ->title(__($type === 'in' ? 'dashboard.cash_movements.deposit_success' : 'dashboard.cash_movements.petty_out_success', ['amount' => $this->formatIdr($amount)]))
+            ->success()
+            ->send();
     }
 
     public function openShift(): void

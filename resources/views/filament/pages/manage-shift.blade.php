@@ -69,6 +69,85 @@
                             </x-filament::button>
                         @endif
                     </div>
+
+                    <div class="mt-5 border-t border-gray-200 pt-4">
+                        <h3 class="text-sm font-bold text-gray-900">{{ __('dashboard.cash_movements.title') }}</h3>
+
+                        <div class="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                            <div>
+                                <label for="shift-movement-amount" class="mb-1 block text-sm font-medium text-gray-700">
+                                    {{ __('dashboard.cash_movements.amount') }}
+                                </label>
+                                <input
+                                    id="shift-movement-amount"
+                                    type="text"
+                                    inputmode="numeric"
+                                    wire:model="movementAmount"
+                                    x-data="{ money: (v) => { const digits = String(v).replace(/[^\d]/g, ''); return digits === '' ? '' : Number(digits).toLocaleString('id-ID'); } }"
+                                    x-mask:dynamic="money($input)"
+                                    placeholder="{{ __('dashboard.cash_movements.amount_placeholder') }}"
+                                    class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:border-amber-500 focus:ring-amber-500"
+                                >
+                                @error('movementAmount')
+                                    <p class="mt-1 text-sm text-danger-600">{{ $message }}</p>
+                                @enderror
+                            </div>
+                            <div>
+                                <label for="shift-movement-note" class="mb-1 block text-sm font-medium text-gray-700">
+                                    {{ __('dashboard.cash_movements.note') }}
+                                </label>
+                                <input
+                                    id="shift-movement-note"
+                                    type="text"
+                                    wire:model="movementNote"
+                                    placeholder="{{ __('dashboard.cash_movements.note_placeholder') }}"
+                                    class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:border-amber-500 focus:ring-amber-500"
+                                >
+                                @error('movementNote')
+                                    <p class="mt-1 text-sm text-danger-600">{{ $message }}</p>
+                                @enderror
+                            </div>
+                        </div>
+
+                        <div class="mt-3 flex flex-wrap gap-2">
+                            <x-filament::button color="success" icon="heroicon-m-arrow-down-tray" wire:click="recordDeposit">
+                                {{ __('dashboard.cash_movements.deposit') }}
+                            </x-filament::button>
+                            <x-filament::button color="warning" icon="heroicon-m-arrow-up-tray" wire:click="recordPettyOut">
+                                {{ __('dashboard.cash_movements.petty_out') }}
+                            </x-filament::button>
+                        </div>
+
+                        @php($inTotal = $this->todayMovements->where('type', 'in')->sum('amount'))
+                        @php($outTotal = $this->todayMovements->where('type', 'out')->sum('amount'))
+                        @if ($inTotal > 0 || $outTotal > 0)
+                            <div class="mt-4 flex items-center justify-between rounded-lg bg-gray-50 px-3 py-2 text-sm">
+                                <span class="font-semibold text-green-700">+Rp {{ number_format($inTotal, 0, ',', '.') }}</span>
+                                <span class="font-semibold text-red-600">−Rp {{ number_format($outTotal, 0, ',', '.') }}</span>
+                            </div>
+                        @endif
+
+                        @forelse ($this->todayMovements as $movement)
+                            <div class="mt-3 rounded-lg border border-gray-200 px-3 py-2">
+                                <div class="flex items-start justify-between gap-2">
+                                    <div class="min-w-0">
+                                        <p class="text-sm font-semibold {{ $movement->isDeposit() ? 'text-green-700' : 'text-red-600' }}">
+                                            {{ $movement->isDeposit() ? __('dashboard.cash_movements.deposit_short') : __('dashboard.cash_movements.petty_out_short') }}
+                                            — Rp {{ number_format($movement->amount, 0, ',', '.') }}
+                                        </p>
+                                        @if ($movement->note)
+                                            <p class="mt-0.5 truncate text-xs text-gray-500">{{ $movement->note }}</p>
+                                        @endif
+                                        <p class="mt-0.5 text-xs text-gray-400">
+                                            {{ $movement->created_at->format('H:i') }} · {{ $movement->admin?->name ?? '—' }}
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        @empty
+                            <p class="mt-3 text-sm text-gray-500">{{ __('dashboard.cash_movements.empty') }}</p>
+                        @endforelse
+                    </div>
                 </div>
             @else
                 <div class="rounded-2xl border border-gray-300 bg-white p-5 shadow-sm">
@@ -116,6 +195,12 @@
                                 <p class="mt-1 text-xs text-gray-600">
                                     {{ $row['orders_count'] }} {{ __('pos.shift.orders_count') }} · Rp {{ number_format($row['sales_total'], 0, ',', '.') }}
                                 </p>
+                                @if ($row['deposits'] !== 0 || $row['petty_out'] !== 0)
+                                    <p class="mt-0.5 text-xs text-gray-600">
+                                        {{ __('dashboard.cash_movements.deposit_short') }} +Rp {{ number_format($row['deposits'], 0, ',', '.') }} ·
+                                        {{ __('dashboard.cash_movements.petty_out_short') }} −Rp {{ number_format($row['petty_out'], 0, ',', '.') }}
+                                    </p>
+                                @endif
                                 @if ($row['discrepancy'] !== 0)
                                     <p class="mt-0.5 text-xs {{ $row['discrepancy'] > 0 ? 'text-green-600' : 'text-red-600' }}">
                                         {{ __('pos.zreport.discrepancy') }}: {{ $row['discrepancy'] > 0 ? '+' : '' }}Rp {{ number_format($row['discrepancy'], 0, ',', '.') }}

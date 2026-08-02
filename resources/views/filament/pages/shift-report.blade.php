@@ -78,6 +78,14 @@
                             <dt class="text-gray-600">{{ __('pos.zreport.cash_refunds') }}</dt>
                             <dd class="font-semibold text-gray-900">Rp {{ number_format($this->shift->cashRefunds(), 0, ',', '.') }}</dd>
                         </div>
+                        <div class="flex items-center justify-between">
+                            <dt class="text-gray-600">{{ __('dashboard.cash_movements.deposits_total') }}</dt>
+                            <dd class="font-semibold text-green-700">Rp {{ number_format($this->shift->deposits(), 0, ',', '.') }}</dd>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <dt class="text-gray-600">{{ __('dashboard.cash_movements.petty_out_total') }}</dt>
+                            <dd class="font-semibold text-red-600">Rp {{ number_format($this->shift->pettyOut(), 0, ',', '.') }}</dd>
+                        </div>
                         <div class="flex items-center justify-between border-t border-gray-200 pt-2">
                             <dt class="font-medium text-gray-700">{{ __('pos.zreport.expected') }}</dt>
                             <dd class="font-bold text-gray-900">Rp {{ number_format($this->shift->expectedCash(), 0, ',', '.') }}</dd>
@@ -99,6 +107,27 @@
                     </dl>
 
                     <p class="mt-3 text-xs text-gray-500">{{ __('pos.zreport.discrepancy_note') }}</p>
+                </div>
+
+                <div class="rounded-2xl border border-gray-300 bg-white p-5 shadow-sm">
+                    <h3 class="text-sm font-bold uppercase tracking-wide text-gray-500">{{ __('dashboard.cash_movements.title') }}</h3>
+
+                    @forelse ($this->shift->cashMovements as $movement)
+                        <div class="mt-3 rounded-lg border border-gray-200 px-3 py-2">
+                            <p class="text-sm font-semibold {{ $movement->isDeposit() ? 'text-green-700' : 'text-red-600' }}">
+                                {{ $movement->isDeposit() ? __('dashboard.cash_movements.deposit_short') : __('dashboard.cash_movements.petty_out_short') }}
+                                — Rp {{ number_format($movement->amount, 0, ',', '.') }}
+                            </p>
+                            @if ($movement->note)
+                                <p class="mt-0.5 text-xs text-gray-500">{{ $movement->note }}</p>
+                            @endif
+                            <p class="mt-0.5 text-xs text-gray-400">
+                                {{ $movement->created_at->format('d/m/Y H:i') }} · {{ $movement->admin?->name ?? '—' }}
+                            </p>
+                        </div>
+                    @empty
+                        <p class="mt-3 text-sm text-gray-500">{{ __('dashboard.cash_movements.empty') }}</p>
+                    @endforelse
                 </div>
             </div>
         </div>
