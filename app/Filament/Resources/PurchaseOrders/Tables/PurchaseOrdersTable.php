@@ -1,0 +1,73 @@
+<?php
+
+namespace App\Filament\Resources\PurchaseOrders\Tables;
+
+use App\Enums\PurchaseOrderStatus;
+use Filament\Actions\BulkActionGroup;
+use Filament\Actions\DeleteBulkAction;
+use Filament\Actions\EditAction;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\SelectFilter;
+use Filament\Tables\Table;
+
+class PurchaseOrdersTable
+{
+    public static function configure(Table $table): Table
+    {
+        return $table
+            ->defaultSort('ordered_at', 'desc')
+            ->columns([
+                TextColumn::make('supplier.name')
+                    ->label(__('suppliers.fields.supplier'))
+                    ->searchable(),
+                TextColumn::make('ordered_at')
+                    ->label(__('suppliers.fields.ordered_at'))
+                    ->date(),
+                TextColumn::make('expected_at')
+                    ->label(__('suppliers.fields.expected_at'))
+                    ->date(),
+                TextColumn::make('status')
+                    ->label(__('suppliers.fields.status'))
+                    ->badge()
+                    ->color(fn ($state) => match ($state instanceof PurchaseOrderStatus ? $state->value : $state) {
+                        'received' => 'success',
+                        'cancelled' => 'danger',
+                        default => 'warning',
+                    })
+                    ->formatStateUsing(fn ($state) => __(
+                        'suppliers.statuses.'.($state instanceof PurchaseOrderStatus ? $state->value : $state)
+                    )),
+                TextColumn::make('total')
+                    ->label(__('suppliers.fields.total'))
+                    ->money('IDR')
+                    ->sortable(),
+                TextColumn::make('note')
+                    ->label(__('suppliers.fields.note')),
+                TextColumn::make('created_at')
+                    ->label(__('suppliers.fields.created_at'))
+                    ->dateTime()
+                    ->sortable()
+                    ->toggleable(isToggledHiddenByDefault: true),
+                TextColumn::make('updated_at')
+                    ->label(__('suppliers.fields.updated_at'))
+                    ->dateTime()
+                    ->sortable()
+                    ->toggleable(isToggledHiddenByDefault: true),
+            ])
+            ->filters([
+                SelectFilter::make('status')
+                    ->label(__('suppliers.fields.status'))
+                    ->options(fn (): array => collect(PurchaseOrderStatus::cases())
+                        ->mapWithKeys(fn ($case) => [$case->value => __("suppliers.statuses.$case->value")])
+                        ->all()),
+            ])
+            ->recordActions([
+                EditAction::make(),
+            ])
+            ->toolbarActions([
+                BulkActionGroup::make([
+                    DeleteBulkAction::make(),
+                ]),
+            ]);
+    }
+}
