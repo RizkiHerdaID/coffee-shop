@@ -12,6 +12,8 @@ return [
     'phone_label' => 'Telepon:',
     'email_label' => 'Email:',
     'maps_button' => 'Buka di Google Maps',
+    'map_title' => 'Peta lokasi Coffee Shop',
+    'directions_button' => 'Petunjuk Arah ke Sini',
     'wa_button' => 'Hubungi via WhatsApp',
 
     'qris' => [

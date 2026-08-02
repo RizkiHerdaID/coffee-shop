@@ -30,6 +30,11 @@ class StockItem extends Model
         return $this->hasMany(StockMovement::class);
     }
 
+    public function wastages(): HasMany
+    {
+        return $this->hasMany(Wastage::class);
+    }
+
     public function scopeLowStock(Builder $query): Builder
     {
         return $query->whereColumn('quantity', '<=', 'min_threshold');

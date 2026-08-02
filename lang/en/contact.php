@@ -12,6 +12,8 @@ return [
     'phone_label' => 'Phone:',
     'email_label' => 'Email:',
     'maps_button' => 'Open in Google Maps',
+    'map_title' => 'Coffee Shop location map',
+    'directions_button' => 'Get Directions',
     'wa_button' => 'Chat on WhatsApp',
 
     'qris' => [

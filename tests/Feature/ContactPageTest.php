@@ -47,4 +47,20 @@ class ContactPageTest extends TestCase
 
         $response->assertSee('Terima QRIS');
     }
+
+    public function test_contact_page_has_keyless_maps_embed(): void
+    {
+        $response = $this->get('/contact');
+
+        $response->assertSee('https://maps.google.com/maps?q='.urlencode(config('shop.address')).'&output=embed');
+        $response->assertSee(__('contact.map_title'));
+    }
+
+    public function test_contact_page_has_directions_link(): void
+    {
+        $response = $this->get('/contact');
+
+        $response->assertSee('https://www.google.com/maps/dir/?api=1&destination='.urlencode(config('shop.address')));
+        $response->assertSee(__('contact.directions_button'));
+    }
 }

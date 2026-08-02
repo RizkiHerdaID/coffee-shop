@@ -33,6 +33,24 @@
         </div>
     </div>
 
+    <div class="mt-8 overflow-hidden rounded-2xl border border-stone-800 bg-stone-900/60">
+        <div class="aspect-[4/3] w-full sm:aspect-video">
+            <iframe
+                src="{{ 'https://maps.google.com/maps?q='.urlencode(config('shop.address')).'&output=embed' }}"
+                title="{{ __('contact.map_title') }}"
+                loading="lazy"
+                allowfullscreen
+                referrerpolicy="no-referrer-when-downgrade"
+                class="h-full w-full border-0"
+            ></iframe>
+        </div>
+        <div class="flex flex-wrap items-center gap-4 p-6">
+            <a href="{{ 'https://www.google.com/maps/dir/?api=1&destination='.urlencode(config('shop.address')) }}" target="_blank" rel="noopener" class="inline-block rounded-full border border-stone-700 px-6 py-2.5 text-sm font-semibold text-stone-200 transition hover:border-amber-500 hover:text-amber-400">
+                {{ __('contact.directions_button') }}
+            </a>
+        </div>
+    </div>
+
     <div class="mt-8 flex flex-col items-center gap-6 rounded-2xl border border-stone-800 bg-stone-900/60 p-8 text-center sm:flex-row sm:text-left">
         {{-- TODO: drop the real QRIS image at public/images/qris.png and replace the placeholder SVG below with:
              <img src="{{ asset('images/qris.png') }}" alt="QRIS QR code" class="h-28 w-28 shrink-0 rounded-lg bg-white p-1"> --}}

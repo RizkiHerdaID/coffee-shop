@@ -6,6 +6,7 @@ use App\Filament\Resources\StockItems\Pages\CreateStockItem;
 use App\Filament\Resources\StockItems\Pages\EditStockItem;
 use App\Filament\Resources\StockItems\Pages\ListStockItems;
 use App\Filament\Resources\StockItems\RelationManagers\StockMovementsRelationManager;
+use App\Filament\Resources\StockItems\RelationManagers\WastagesRelationManager;
 use App\Filament\Resources\StockItems\Schemas\StockItemForm;
 use App\Filament\Resources\StockItems\Tables\StockItemsTable;
 use App\Models\StockItem;
@@ -50,6 +51,7 @@ class StockItemResource extends Resource
     {
         return [
             StockMovementsRelationManager::class,
+            WastagesRelationManager::class,
         ];
     }
 
