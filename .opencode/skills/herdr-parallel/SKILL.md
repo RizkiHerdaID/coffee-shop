@@ -121,9 +121,17 @@ herdr worktree create --cwd /home/rizki/projects/coffee-shop --branch feature-x 
 scripts/worktree-env.sh $WT <slot> --dev --force && cp -al <main>/vendor <main>/node_modules $WT/
 sg docker -c "cd $WT && ./vendor/bin/sail up -d" && sg docker -c "cd $WT && ./vendor/bin/sail artisan key:generate && php artisan config:clear && php artisan view:clear && php artisan route:clear"
 # equalize pane widths: auto-layout splits at 0.5 repeatedly → 2:1:1 (3 panes) or 4:2:1:1 (4 panes).
-# Target equal thirds/quarters: subtract (root_ratio - 1/N) from pane 1:
-#   3 panes: herdr pane resize --pane <p1> --direction left --amount 0.1667   # 0.5 -> 0.3333
-#   4 panes: herdr pane resize --pane <p1> --direction left --amount 0.25     # 0.5 -> 0.25
+# RESIZE SEMANTICS (empirically verified 2026-08-02): --amount is a DELTA on the split ratio on the
+# --direction side of the target pane; the boundary on that side MOVES in that direction, so:
+#   (p1, left,  X) = shrink p1 (p1's right boundary ←), (p1, right, X) = grow p1 (boundary →)
+#   (p2, left,  X) = grow p2  (p2's left boundary ←, p1 shrinks),  (p2, right, X) = grow p2 (right boundary →)
+#   To shrink p2: (p3, left, X) — moves p3's left boundary (p2/p3 split) LEFT. Ratios clamp to [0.1, 0.9].
+# Verified recipe to equal widths (root 0.5 → 1/N of total; nested splits are ratios of their own rect):
+#   3 panes: (p1, right, 0.3333-0.5 = use deltas) — compute per call from `herdr pane resize` JSON output;
+#            e.g. root 0.5→0.3333: (p1, left, 0.1667); split_1_1 0.5→0.5 stays (2:1 → 1:1 needs (p2,right,0.0) no-op).
+#   4 panes: root 0.5→0.25: (p1, left, 0.25)  [or (p1, right, 0.25) from 0.0 clamps at 0.1 — deltas only]
+#            split_1_1 0.5→0.3333: (p3, left, 0.1667)  [p2's RIGHT boundary via p3's LEFT]
+#            split_2_11 stays 0.5 → p3/p4 already equal. Verify with the returned JSON (panes rect widths).
 herdr pane rename <pane> "<role>-<name>"   # readable agent fleet (identical "OpenCode" titles otherwise); roles: lead/backend/frontend/tester
 # ... work happens, lead notifies DONE ...
 rtk git merge feature-x -m "Merge feature-x: <summary>"
