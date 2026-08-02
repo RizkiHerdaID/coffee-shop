@@ -71,9 +71,10 @@
             <div class="hidden items-center gap-8 text-sm font-medium text-stone-300 sm:flex">
                 <a href="{{ route('home') }}" class="transition hover:text-amber-400">{{ __('site.nav.home') }}</a>
                 <a href="{{ route('menu') }}" class="transition hover:text-amber-400">{{ __('site.nav.menu') }}</a>
+                <a href="{{ route('reservation') }}" class="transition hover:text-amber-400">{{ __('site.nav.reservation') }}</a>
                 <a href="{{ route('contact') }}" class="transition hover:text-amber-400">{{ __('site.nav.contact') }}</a>
                 @include('partials.language-switcher')
-                <a href="{{ route('contact') }}" class="rounded-full bg-amber-500 px-5 py-2 font-semibold text-stone-950 transition hover:bg-amber-400">
+                <a href="{{ route('reservation') }}" class="rounded-full bg-amber-500 px-5 py-2 font-semibold text-stone-950 transition hover:bg-amber-400">
                     {{ __('site.nav.reserve') }}
                 </a>
             </div>
@@ -87,8 +88,9 @@
             <div class="mb-3">@include('partials.language-switcher')</div>
             <a href="{{ route('home') }}" class="block py-2 text-stone-300">{{ __('site.nav.home') }}</a>
             <a href="{{ route('menu') }}" class="block py-2 text-stone-300">{{ __('site.nav.menu') }}</a>
+            <a href="{{ route('reservation') }}" class="block py-2 text-stone-300">{{ __('site.nav.reservation') }}</a>
             <a href="{{ route('contact') }}" class="block py-2 text-stone-300">{{ __('site.nav.contact') }}</a>
-            <a href="{{ route('contact') }}" class="mt-2 block rounded-full bg-amber-500 px-5 py-2 text-center font-semibold text-stone-950">{{ __('site.nav.reserve') }}</a>
+            <a href="{{ route('reservation') }}" class="mt-2 block rounded-full bg-amber-500 px-5 py-2 text-center font-semibold text-stone-950">{{ __('site.nav.reserve') }}</a>
         </div>
     </header>
 

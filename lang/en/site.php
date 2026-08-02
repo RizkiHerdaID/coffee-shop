@@ -10,6 +10,7 @@ return [
     'nav' => [
         'home' => 'Home',
         'menu' => 'Menu',
+        'reservation' => 'Reservations',
         'contact' => 'Contact',
         'reserve' => 'Reserve a Table',
         'toggle_aria' => 'Toggle menu',
