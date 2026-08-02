@@ -7,6 +7,7 @@ use App\Models\LoyaltyCard;
 use App\Models\MenuItem;
 use App\Models\Promo;
 use App\Models\Reservation;
+use App\Models\Testimonial;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -20,6 +21,7 @@ final class PageController extends Controller
         return view('home', [
             'highlights' => $items->take(4),
             'promo' => Promo::query()->visible()->orderBy('sort_order')->first(),
+            'testimonials' => Testimonial::query()->visible()->orderBy('sort_order')->orderBy('id')->get(),
         ]);
     }
 
