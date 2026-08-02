@@ -43,4 +43,12 @@ return [
         'heading' => 'No stock items yet',
         'description' => 'Create your first stock item to start tracking inventory.',
     ],
+
+    'alert' => [
+        'subject' => 'Low Stock Alert',
+        'body' => 'Stock :name is running low: :quantity :unit left (min threshold :threshold). Please reorder soon.',
+        'sent' => 'Low stock alerts sent for :count item(s).',
+        'none' => 'No low-stock items to alert.',
+        'no_phone' => 'Low-stock WhatsApp number not configured (set WHATSAPP_LOW_STOCK_PHONE).',
+    ],
 ];

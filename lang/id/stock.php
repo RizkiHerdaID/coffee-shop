@@ -43,4 +43,12 @@ return [
         'heading' => 'Belum ada item stok',
         'description' => 'Tambahkan item stok pertama Anda untuk mulai mencatat persediaan.',
     ],
+
+    'alert' => [
+        'subject' => 'Peringatan Stok Menipis',
+        'body' => 'Stok :name menipis: tersisa :quantity :unit (batas minimum :threshold). Segera lakukan pemesanan ulang.',
+        'sent' => 'Peringatan stok menipis terkirim untuk :count item.',
+        'none' => 'Tidak ada item stok menipis yang perlu diberitahukan.',
+        'no_phone' => 'Nomor WhatsApp untuk peringatan stok belum dikonfigurasi (atur WHATSAPP_LOW_STOCK_PHONE).',
+    ],
 ];
