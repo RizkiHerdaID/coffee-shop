@@ -2,8 +2,8 @@
 
 namespace Tests\Feature;
 
+use App\Filament\Auth\Login;
 use App\Models\Admin;
-use Filament\Auth\Pages\Login;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Livewire\Livewire;
@@ -46,7 +46,7 @@ class AdminLoginThrottleTest extends TestCase
         $this->assertGuest('admin');
     }
 
-    public function test_throttle_is_keyed_by_ip_not_email(): void
+    public function test_throttle_is_keyed_by_email_and_ip(): void
     {
         $throttledEmail = 'throttled-a@example.com';
         $otherEmail = 'throttled-b@example.com';
@@ -63,14 +63,15 @@ class AdminLoginThrottleTest extends TestCase
                 ->assertHasFormErrors(['email']);
         }
 
+        $otherAdmin = Admin::where('email', $otherEmail)->first();
+
         Livewire::test(Login::class)
             ->fillForm([
                 'email' => $otherEmail,
                 'password' => 'password',
             ])
-            ->call('authenticate')
-            ->assertNotified();
+            ->call('authenticate');
 
-        $this->assertGuest('admin');
+        $this->assertAuthenticatedAs($otherAdmin, 'admin');
     }
 }

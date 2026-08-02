@@ -84,9 +84,9 @@ class PurchaseOrdersTest extends TestCase
 
         Livewire::actingAs($admin, 'admin')
             ->test(CreatePurchaseOrder::class)
-            ->assertSee(__('suppliers.fields.supplier'))
-            ->assertSee(__('suppliers.fields.total'))
-            ->assertSee(__('suppliers.statuses.pending'));
+            ->assertSee(__('purchase-orders.fields.supplier'))
+            ->assertSee(__('purchase-orders.fields.total'))
+            ->assertSee(__('purchase-orders.statuses.pending'));
     }
 
     public function test_status_badge_formats_localized(): void
@@ -101,7 +101,7 @@ class PurchaseOrdersTest extends TestCase
 
         Livewire::actingAs($admin, 'admin')
             ->test(ListPurchaseOrders::class)
-            ->assertSee(__('suppliers.statuses.received'));
+            ->assertSee(__('purchase-orders.statuses.received'));
     }
 
     public function test_relation_manager_lists_order_items(): void

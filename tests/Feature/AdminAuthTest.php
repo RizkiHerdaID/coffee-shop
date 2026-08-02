@@ -2,8 +2,8 @@
 
 namespace Tests\Feature;
 
+use App\Filament\Auth\Login;
 use App\Models\Admin;
-use Filament\Auth\Pages\Login;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 use Tests\TestCase;

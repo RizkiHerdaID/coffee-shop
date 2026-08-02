@@ -23,22 +23,22 @@ class PurchaseOrderResource extends Resource
 
     public static function getModelLabel(): string
     {
-        return __('suppliers.label');
+        return __('purchase-orders.label');
     }
 
     public static function getPluralModelLabel(): string
     {
-        return __('suppliers.plural_label');
+        return __('purchase-orders.plural_label');
     }
 
     public static function getNavigationLabel(): string
     {
-        return __('suppliers.plural_label');
+        return __('purchase-orders.plural_label');
     }
 
     public static function getNavigationGroup(): ?string
     {
-        return __('suppliers.navigation_group');
+        return __('purchase-orders.navigation_group');
     }
 
     public static function form(Schema $schema): Schema

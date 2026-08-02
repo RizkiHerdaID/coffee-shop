@@ -17,7 +17,7 @@ class PurchaseOrderItemsRelationManager extends RelationManager
 
     public static function getTitle(Model $ownerRecord, string $pageClass): string
     {
-        return __('suppliers.relation.items.label');
+        return __('purchase-orders.relation.items.label');
     }
 
     public function form(Schema $schema): Schema
@@ -25,15 +25,15 @@ class PurchaseOrderItemsRelationManager extends RelationManager
         return $schema
             ->components([
                 TextInput::make('description')
-                    ->label(__('suppliers.fields.description'))
+                    ->label(__('purchase-orders.fields.description'))
                     ->required(),
                 TextInput::make('quantity')
-                    ->label(__('suppliers.fields.quantity'))
+                    ->label(__('purchase-orders.fields.quantity'))
                     ->numeric()
                     ->required()
                     ->default(1),
                 TextInput::make('unit_price')
-                    ->label(__('suppliers.fields.unit_price'))
+                    ->label(__('purchase-orders.fields.unit_price'))
                     ->prefix('Rp')
                     ->mask(RawJs::make('$money($input, \',\', \'.\', 0)'))
                     ->rule('regex:/^(\d{1,3}(\.\d{3})*|\d+)$/')
@@ -59,15 +59,15 @@ class PurchaseOrderItemsRelationManager extends RelationManager
     public function table(Table $table): Table
     {
         return $table
-            ->emptyStateHeading(__('suppliers.relation.items.empty_heading'))
+            ->emptyStateHeading(__('purchase-orders.relation.items.empty_heading'))
             ->columns([
                 TextColumn::make('description')
-                    ->label(__('suppliers.fields.description')),
+                    ->label(__('purchase-orders.fields.description')),
                 TextColumn::make('quantity')
-                    ->label(__('suppliers.fields.quantity'))
+                    ->label(__('purchase-orders.fields.quantity'))
                     ->formatStateUsing(fn ($state): string => number_format((int) $state, 0, ',', '.')),
                 TextColumn::make('unit_price')
-                    ->label(__('suppliers.fields.unit_price'))
+                    ->label(__('purchase-orders.fields.unit_price'))
                     ->money('IDR'),
             ])
             ->toolbarActions([

@@ -17,23 +17,23 @@ class PurchaseOrderForm
         return $schema
             ->components([
                 Select::make('supplier_id')
-                    ->label(__('suppliers.fields.supplier'))
+                    ->label(__('purchase-orders.fields.supplier'))
                     ->relationship('supplier', 'name')
                     ->searchable()
                     ->preload()
                     ->required(),
                 DatePicker::make('ordered_at')
-                    ->label(__('suppliers.fields.ordered_at')),
+                    ->label(__('purchase-orders.fields.ordered_at')),
                 DatePicker::make('expected_at')
-                    ->label(__('suppliers.fields.expected_at')),
+                    ->label(__('purchase-orders.fields.expected_at')),
                 Select::make('status')
-                    ->label(__('suppliers.fields.status'))
+                    ->label(__('purchase-orders.fields.status'))
                     ->options(fn (): array => collect(PurchaseOrderStatus::cases())
-                        ->mapWithKeys(fn ($case) => [$case->value => __("suppliers.statuses.$case->value")])
+                        ->mapWithKeys(fn ($case) => [$case->value => __("purchase-orders.statuses.$case->value")])
                         ->all())
                     ->default(PurchaseOrderStatus::Pending->value),
                 TextInput::make('total')
-                    ->label(__('suppliers.fields.total'))
+                    ->label(__('purchase-orders.fields.total'))
                     ->prefix('Rp')
                     ->mask(RawJs::make('$money($input, \',\', \'.\', 0)'))
                     ->rule('regex:/^(\d{1,3}(\.\d{3})*|\d+)$/')
@@ -54,7 +54,7 @@ class PurchaseOrderForm
                         return $cleaned === '' ? null : (int) $cleaned;
                     }),
                 Textarea::make('note')
-                    ->label(__('suppliers.fields.note')),
+                    ->label(__('purchase-orders.fields.note')),
             ]);
     }
 }

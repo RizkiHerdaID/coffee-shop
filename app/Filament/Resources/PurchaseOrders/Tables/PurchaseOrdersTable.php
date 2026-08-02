@@ -18,16 +18,16 @@ class PurchaseOrdersTable
             ->defaultSort('ordered_at', 'desc')
             ->columns([
                 TextColumn::make('supplier.name')
-                    ->label(__('suppliers.fields.supplier'))
+                    ->label(__('purchase-orders.fields.supplier'))
                     ->searchable(),
                 TextColumn::make('ordered_at')
-                    ->label(__('suppliers.fields.ordered_at'))
+                    ->label(__('purchase-orders.fields.ordered_at'))
                     ->date(),
                 TextColumn::make('expected_at')
-                    ->label(__('suppliers.fields.expected_at'))
+                    ->label(__('purchase-orders.fields.expected_at'))
                     ->date(),
                 TextColumn::make('status')
-                    ->label(__('suppliers.fields.status'))
+                    ->label(__('purchase-orders.fields.status'))
                     ->badge()
                     ->color(fn ($state) => match ($state instanceof PurchaseOrderStatus ? $state->value : $state) {
                         'received' => 'success',
@@ -35,30 +35,30 @@ class PurchaseOrdersTable
                         default => 'warning',
                     })
                     ->formatStateUsing(fn ($state) => __(
-                        'suppliers.statuses.'.($state instanceof PurchaseOrderStatus ? $state->value : $state)
+                        'purchase-orders.statuses.'.($state instanceof PurchaseOrderStatus ? $state->value : $state)
                     )),
                 TextColumn::make('total')
-                    ->label(__('suppliers.fields.total'))
+                    ->label(__('purchase-orders.fields.total'))
                     ->money('IDR')
                     ->sortable(),
                 TextColumn::make('note')
-                    ->label(__('suppliers.fields.note')),
+                    ->label(__('purchase-orders.fields.note')),
                 TextColumn::make('created_at')
-                    ->label(__('suppliers.fields.created_at'))
+                    ->label(__('purchase-orders.fields.created_at'))
                     ->dateTime()
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('updated_at')
-                    ->label(__('suppliers.fields.updated_at'))
+                    ->label(__('purchase-orders.fields.updated_at'))
                     ->dateTime()
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
             ->filters([
                 SelectFilter::make('status')
-                    ->label(__('suppliers.fields.status'))
+                    ->label(__('purchase-orders.fields.status'))
                     ->options(fn (): array => collect(PurchaseOrderStatus::cases())
-                        ->mapWithKeys(fn ($case) => [$case->value => __("suppliers.statuses.$case->value")])
+                        ->mapWithKeys(fn ($case) => [$case->value => __("purchase-orders.statuses.$case->value")])
                         ->all()),
             ])
             ->recordActions([
