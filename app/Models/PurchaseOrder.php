@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Facades\DB;
 
-#[Fillable(['supplier_id', 'ordered_at', 'expected_at', 'status', 'total', 'note'])]
+#[Fillable(['supplier_id', 'ordered_at', 'expected_at', 'received_at', 'status', 'total', 'note'])]
 class PurchaseOrder extends Model
 {
     /**
@@ -24,6 +24,7 @@ class PurchaseOrder extends Model
             'total' => 'integer',
             'ordered_at' => 'date',
             'expected_at' => 'date',
+            'received_at' => 'datetime',
         ];
     }
 

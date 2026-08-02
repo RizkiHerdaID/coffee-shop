@@ -30,6 +30,7 @@ class EditPurchaseOrder extends EditRecord
                     $stocked = $this->record->receiveStock(__('purchase-orders.notifications.receive_note', ['id' => $this->record->id]));
 
                     $this->record->status = PurchaseOrderStatus::Received;
+                    $this->record->received_at = now();
                     $this->record->save();
 
                     Notification::make()

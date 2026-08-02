@@ -30,6 +30,15 @@ return [
         'cancelled' => 'Dibatalkan',
     ],
 
+    'scorecard' => [
+        'orders_count' => 'Jumlah PO',
+        'total_spend' => 'Total Belanja',
+        'outstanding' => 'PO Belum Tiba',
+        'avg_lead_time' => 'Rata-rata Waktu Tiba',
+        'on_time_rate' => 'Tepat Waktu',
+        'days' => 'hari',
+    ],
+
     'relation' => [
         'items' => [
             'label' => 'Item Pesanan',
