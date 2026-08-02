@@ -1,6 +1,6 @@
 ---
 name: herdr-parallel
-description: Use when the user asks for parallel work, parallel agents, "use herdr pane", or "use opencode in a pane". Covers running multiple opencode agents in herdr panes, pane split/run/read, and the herdr git-worktree feature-branch workflow for this project (~/.herdr/worktrees/coffee-shop/<branch>).
+description: Use when the user asks for parallel work, parallel agents, "use herdr pane", or "use opencode in a pane". Covers running multiple opencode agents in herdr panes, pane split/run/read, and the native herdr worktree flow (herdr worktree create + herdr-plus auto-layout) for feature branches (~/.herdr/worktrees/coffee-shop/<branch>).
 ---
 
 # herdr parallel agents + worktrees
@@ -36,20 +36,35 @@ Pitfalls learned in prior sessions:
 herdr agent start --kind opencode
 ```
 
-then submit each agent's task prompt. Use the project conventions in `AGENTS.md` (e.g. `sg docker` for every container command, `PAO_DISABLE=1` for tests). Split tasks along file boundaries so agents don't edit the same files concurrently.
+then submit each agent's task prompt. Use the project conventions in `AGENTS.md` (e.g. `sg docker` for every container command, `PAO_DISABLE=1` for tests). Split tasks along file boundaries so agents don't edit the same files concurrently. In a worktree workspace the "agent" tab already runs opencode (auto-layout) — use `herdr agent prompt <target> "..."` / `herdr agent read` / `herdr agent wait` on it; you do NOT need `agent start` there.
+
+## herdr-plus extras (user has the plugin installed)
+
+- **Projects** (action `cloudmanic.herdr-plus.projects` from herdr's plugin action menu; README suggests binding `prefix+up`): fuzzy-pick a declarative workspace template from `~/.config/herdr/plugins/config/cloudmanic.herdr-plus/projects/*.toml`; **ctrl+g** in the picker opens the project as a git worktree (empty branch → herdr generates `worktree/<name>`, bare names get `[worktree] branch_prefix` from the plugin's `config.toml`, names with `/` used verbatim).
+- **Quick Actions** (action `cloudmanic.herdr-plus.quick-actions`, suggested `prefix+down`): fuzzy launcher for one-off commands from `quick-actions/*.toml` (global) and `<repo>/.herdr-plus/quick-actions/` (repo-scoped, runs from the directory you launched from).
+- Neither needs config for the worktree flow to work — the `worktrees/` layout above is the only file that matters for worktrees.
 
 ## Worktrees (feature branches)
 
-Worktrees live at `~/.herdr/worktrees/coffee-shop/<branch>`:
+Native herdr flow (herdr ≥0.7). A worktree is a **normal herdr workspace with Git provenance** — `herdr worktree create` does `git worktree add` AND opens a workspace, grouped with the parent repo in the sidebar (which shows `branch` + `git_status`). Do NOT hand-roll `git worktree add` + `herdr pane split` anymore — that bypasses grouping, events, and auto-layout. The branch-slug path is exactly the old convention: `~/.herdr/worktrees/coffee-shop/<branch>` (config `worktrees.directory`, default `~/.herdr/worktrees`).
 
 ```bash
-git worktree list
+# create worktree + workspace in one step (branch from HEAD; --base REF to fork elsewhere)
+herdr worktree create --cwd /home/rizki/projects/coffee-shop --branch feature-menu --no-focus --json
+#   → JSON has workspace_id / tab_id / pane_id; workspace label = branch slug
+herdr worktree open --cwd /home/rizki/projects/coffee-shop --branch feature-menu   # existing checkout
+
+herdr worktree list                                # all worktrees + open_workspace_id
 git -C ~/.herdr/worktrees/coffee-shop/feature-menu status
-git log --oneline main..feature-menu          # review before merging
+git log --oneline main..feature-menu               # review before merging
 git diff --stat main feature-menu
 git merge feature-menu -m "Merge feature-menu: <summary>"
+
+herdr worktree remove --workspace <id>             # git worktree remove (never deletes branch); --force for dirty
+herdr workspace close <id>                         # herdr state only — checkout stays; NOT a worktree remove
 ```
 
+- The **agent pane comes automatically**: herdr-plus auto-layout (`~/.config/herdr/plugins/config/cloudmanic.herdr-plus/worktrees/coffee-shop.toml`) reacts to the `worktree.created`/`worktree.opened` events and opens tabs (agent + terminal) into the fresh workspace — verified: plugin log says `applied worktree layout "coffee-shop.toml" to repo "coffee-shop" (branch "x"): 2 tab(s)`. Check with `herdr plugin log list --plugin cloudmanic.herdr-plus`. Layout files: `repo = "coffee-shop"` (case-insensitive) or `repo = "*"` wildcard; optional `branch`; specificity repo+branch > repo > wildcard+branch > wildcard; idempotent (skips workspaces that already have tabs). The tab "agent" runs `opencode` in the worktree cwd — an agent is live there immediately.
 - A worktree runs its OWN Sail containers (prefix `feature-menu-*`) with its own compose network and volumes. All worktrees can be up SIMULTANEOUSLY because each gets its own host ports (see below).
 - After merging a branch with new composer deps, run `sail composer install` in the main repo (container mounts the repo).
 - Commit style: imperative summary, e.g. `Add Filament admin panel, replace custom admin auth, add menu resource`.
@@ -73,17 +88,17 @@ Slot table (host ports; main repo keeps the defaults 80/5173/5432/6379/9000/8900
 
 CRITICAL: the script only overrides `APP_PORT` / `VITE_PORT` / `FORWARD_*`. Never change `DB_PORT`, `REDIS_PORT`, `MAIL_PORT`, or `AWS_ENDPOINT_URL` in a worktree `.env` — inside the container the app reaches services by hostname (`pgsql`, `redis`, `mailpit`, `minio`) within its own compose network; those values must stay at the `.env.example` defaults. The script appends only the forward vars and rewrites `APP_URL` to `http://localhost:<APP_PORT>`.
 
-Workflow per worktree:
+Workflow per worktree (right after `herdr worktree create` — do this BEFORE the agent in the "agent" tab starts testing, and note herdr's generated checkout path is the same one the helper expects):
 
 ```bash
-git worktree add ~/.herdr/worktrees/coffee-shop/feature-menu -b feature-menu
-scripts/worktree-env.sh ~/.herdr/worktrees/coffee-shop/feature-menu 1 --dev
-cp -al <main-repo>/vendor <main-repo>/node_modules <worktree>/   # fresh checkouts have neither
-sg docker -c "cd ~/.herdr/worktrees/coffee-shop/feature-menu && ./vendor/bin/sail up -d"
+WT=~/.herdr/worktrees/coffee-shop/feature-menu
+scripts/worktree-env.sh $WT 1 --dev
+cp -al <main-repo>/vendor <main-repo>/node_modules $WT/   # fresh checkouts have neither
+sg docker -c "cd $WT && ./vendor/bin/sail up -d"
 curl -s -o /dev/null -w "%{http_code}\n" http://localhost:8081/
 ```
 
-`cp -al` hardlinks vendor/node_modules from the main checkout (instant, no duplication; a later `composer install` in the worktree only breaks links for changed files). Remember `npm run build` in the worktree after view changes — `public/build` is gitignored and a missing build means HTTP 500 on every page.
+`cp -al` hardlinks vendor/node_modules from the main checkout (instant, no duplication; a later `composer install` in the worktree only breaks links for changed files). Remember `npm run build` in the worktree after view changes — `public/build` is gitignored and a missing build means HTTP 500 on every page. After `sail up` in a worktree, clear the entrypoint's cached config/views/routes in that worktree (AGENTS.md quirk 8), else the test suite 419s.
 
 RAM note: each stack is 5 containers (laravel.test, queue, pgsql, redis, minio, mailpit); keep only worktrees you are actively testing in. Stale containers from worktrees created BEFORE this scheme still hold the default ports — `sail down` those once before relying on slots.
 

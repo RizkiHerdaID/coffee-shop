@@ -1,0 +1,2 @@
+name = "Pint: format code"
+command = "vendor/bin/pint"
