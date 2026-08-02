@@ -36,7 +36,7 @@ Pitfalls learned in prior sessions:
 herdr agent start --kind opencode
 ```
 
-then submit each agent's task prompt. Use the project conventions in `AGENTS.md` (e.g. `sg docker` for every container command, `PAO_DISABLE=1` for tests). Split tasks along file boundaries so agents don't edit the same files concurrently. In a worktree workspace the "agent" tab already runs opencode (auto-layout) — use `herdr agent prompt <target> "..."` / `herdr agent read` / `herdr agent wait` on it; you do NOT need `agent start` there.
+then submit each agent's task prompt. Use the project conventions in `AGENTS.md` (e.g. `sg docker` for every container command, `PAO_DISABLE=1` for tests). Split tasks along file boundaries so agents don't edit the same files concurrently. In a worktree workspace the "agents" tab already runs 3 opencode agents (auto-layout) — the lead agent is the FIRST pane; sub-agents are the OTHER pre-provisioned panes in the same tab. Use `herdr agent prompt <pane> "..."` / `herdr agent read` / `herdr agent wait` on them. Do NOT run `herdr pane split`/`agent start` from inside a lead — it opens new terminals instead of staying in the shared layout.
 
 ## herdr-plus extras (user has the plugin installed)
 
@@ -64,7 +64,7 @@ herdr worktree remove --workspace <id>             # git worktree remove (never 
 herdr workspace close <id>                         # herdr state only — checkout stays; NOT a worktree remove
 ```
 
-- The **agent pane comes automatically**: herdr-plus auto-layout (`~/.config/herdr/plugins/config/cloudmanic.herdr-plus/worktrees/coffee-shop.toml`) reacts to the `worktree.created`/`worktree.opened` events and opens tabs (agent + terminal) into the fresh workspace — verified: plugin log says `applied worktree layout "coffee-shop.toml" to repo "coffee-shop" (branch "x"): 2 tab(s)`. Check with `herdr plugin log list --plugin cloudmanic.herdr-plus`. Layout files: `repo = "coffee-shop"` (case-insensitive) or `repo = "*"` wildcard; optional `branch`; specificity repo+branch > repo > wildcard+branch > wildcard; idempotent (skips workspaces that already have tabs). The tab "agent" runs `opencode` in the worktree cwd — an agent is live there immediately.
+- The **agent fleet comes automatically**: herdr-plus auto-layout (`~/.config/herdr/plugins/config/cloudmanic.herdr-plus/worktrees/coffee-shop.toml`) reacts to the `worktree.created`/`worktree.opened` events and opens tabs into the fresh workspace. Current layout: an **`agents` tab with 3 `opencode` panes side by side** (`[[tabs.panes]]`, `split = "right"`) + a `terminal` tab. ALL agents live in the SAME tab/view — leads must NOT spawn new panes/terminals (that scatters agents into separate terminals, seen in the suppliers/expenses fleets). The lead prompts its pre-provisioned siblings: `herdr pane list` to find pane IDs, then `herdr agent prompt <pane> "task"`. Check with `herdr plugin log list --plugin cloudmanic.herdr-plus`. Layout files: `repo = "coffee-shop"` (case-insensitive) or `repo = "*"` wildcard; optional `branch`; specificity repo+branch > repo > wildcard+branch > wildcard; idempotent (skips workspaces that already have tabs).
 - A worktree runs its OWN Sail containers (prefix `feature-menu-*`) with its own compose network and volumes. All worktrees can be up SIMULTANEOUSLY because each gets its own host ports (see below).
 - After merging a branch with new composer deps, run `sail composer install` in the main repo (container mounts the repo).
 - Commit style: imperative summary, e.g. `Add Filament admin panel, replace custom admin auth, add menu resource`.
@@ -112,8 +112,8 @@ The host is a Ryzen 7 5700X (6c/12t), **16GB RAM, zero swap by default**. A full
 - `sg docker -c "docker ps | wc -l"` — each worktree stack ≈ 1GB.
 
 **Hard rules for multi-agent runs:**
-1. **Max 2 worktrees × 2 sub-agents per lead** on this hardware (≈6 agents total). 4 full fleets (15 agents) is NOT viable — it nearly OOMed.
-2. **Kill idle sub-agent panes immediately** (`herdr pane split`d agents that finished or haven't been prompted yet) — idle opencode panes still hold ~700MB. Never leave a completed sub-agent pane alive while more work is pending.
+1. **Max 2 worktrees at a time** (each opens 3 opencode agents via auto-layout = 6 agents ≈ 4.2GB) on this hardware. 4 full fleets (12 agents) is NOT viable — it nearly OOMed at 15 agents.
+2. **Kill idle sub-agent panes immediately** — idle opencode panes still hold ~700MB. Never leave a completed sub-agent pane alive while more work is pending. (Layout panes can be closed per-run with `herdr pane close`/workspace close when idle.)
 3. **Stagger verification**: do NOT run test suites + Vite builds across all worktrees simultaneously — that is the peak-memory spike. Two at a time max.
 4. **Free stacks as soon as branches merge**: `sg docker -c "cd <wt> && ./vendor/bin/sail down"` + close the workspace recovers ~1.5GB each.
 5. **8GB swapfile is the one-time fix**: `sudo fallocate -l 8G /swapfile && sudo chmod 600 /swapfile && sudo mkswap /swapfile && sudo swapon /swapfile && echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab` — turns OOM risk into graceful slowdown. (Passwordless sudo is NOT available to agents; the user runs this.)
