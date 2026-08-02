@@ -50,6 +50,16 @@
     <script type="application/ld+json">{!! json_encode($localBusiness, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) !!}</script>
 
     @vite(['resources/css/app.css', 'resources/js/app.js'])
+
+    @php
+        $fontsManifest = json_decode((string) file_get_contents(public_path('build/fonts-manifest.json')), true);
+        $heroFontVariant = collect($fontsManifest['families']['instrument-sans']['variants'] ?? [])->get('600:normal');
+        $heroFont = collect($heroFontVariant['files'] ?? [])->firstWhere('format', 'woff2');
+    @endphp
+    @if ($heroFont)
+    <link rel="preload" href="{{ asset('build/'.$heroFont['file']) }}" as="font" type="font/woff2" crossorigin="anonymous" fetchpriority="high">
+    @endif
+    @fonts('instrument-sans')
 </head>
 <body class="bg-stone-950 text-stone-200 antialiased font-sans">
     <header class="fixed inset-x-0 top-0 z-50 border-b border-stone-800/60 bg-stone-950/80 backdrop-blur">

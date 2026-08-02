@@ -40,7 +40,12 @@
         <article data-category="{{ $item->category }}" data-item-id="{{ $item->id }}" data-item-name="{{ $item->name }}" data-item-price="{{ $item->price }}" data-available="{{ $item->available ? '1' : '0' }}" class="menu-card overflow-hidden rounded-2xl border border-stone-800 bg-stone-950 {{ $item->available ? '' : 'opacity-50' }}">
             <div class="relative aspect-[4/3] w-full bg-stone-800/60">
                 @if ($item->photo)
-                <img src="{{ Storage::disk('public')->url($item->photo) }}" alt="{{ $item->name }}" loading="lazy" class="h-full w-full object-cover">
+                @php
+                    $photoSize = @getimagesize(Storage::disk('public')->path($item->photo));
+                    $photoWidth = $photoSize[0] ?? 800;
+                    $photoHeight = $photoSize[1] ?? 600;
+                @endphp
+                <img src="{{ Storage::disk('public')->url($item->photo) }}" alt="{{ $item->name }}" loading="lazy" decoding="async" width="{{ $photoWidth }}" height="{{ $photoHeight }}" class="h-full w-full object-cover">
                 @else
                 <div class="flex h-full w-full items-center justify-center text-5xl" aria-hidden="true">&#9749;</div>
                 @endif

@@ -74,7 +74,7 @@
                 <div class="flex shrink-0 items-center gap-4">
                     <p class="shrink-0 font-semibold text-amber-500">Rp {{ number_format($item->price, 0, ",", ".") }}</p>
                     @if ($item->photo)
-                    <img src="{{ Storage::disk('public')->url($item->photo) }}" alt="{{ $item->name }}" class="h-20 w-20 rounded-xl object-cover">
+                    <img src="{{ Storage::disk('public')->url($item->photo) }}" alt="{{ $item->name }}" loading="lazy" decoding="async" width="80" height="80" class="h-20 w-20 rounded-xl object-cover">
                     @endif
                 </div>
             </div>
