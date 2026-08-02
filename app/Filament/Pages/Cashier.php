@@ -32,6 +32,18 @@ class Cashier extends Page
      */
     public array $cart = [];
 
+    /**
+     * Free-text modifiers per cart line, keyed by menu item id.
+     *
+     * @var array<int, string>
+     */
+    public array $cartNotes = [];
+
+    /**
+     * Free-text note for the whole order (printed on the kitchen ticket).
+     */
+    public ?string $notes = null;
+
     public string $category = '';
 
     public ?string $customerPhone = null;
@@ -103,18 +115,19 @@ class Cashier extends Page
         $this->cart[$menuItemId]--;
 
         if ($this->cart[$menuItemId] <= 0) {
-            unset($this->cart[$menuItemId]);
+            unset($this->cart[$menuItemId], $this->cartNotes[$menuItemId]);
         }
     }
 
     public function removeItem(int $menuItemId): void
     {
-        unset($this->cart[$menuItemId]);
+        unset($this->cart[$menuItemId], $this->cartNotes[$menuItemId]);
     }
 
     public function clearCart(): void
     {
         $this->cart = [];
+        $this->cartNotes = [];
     }
 
     public function createOrder(): void
@@ -127,6 +140,9 @@ class Cashier extends Page
 
         $this->validate([
             'customerPhone' => ['nullable', 'string', 'max:20'],
+            'notes' => ['nullable', 'string', 'max:500'],
+            'cartNotes' => ['nullable', 'array'],
+            'cartNotes.*' => ['nullable', 'string', 'max:500'],
         ]);
 
         $order = DB::transaction(function () use ($lines): Order {
@@ -135,6 +151,7 @@ class Cashier extends Page
                 'status' => OrderStatus::Pending,
                 'total' => $lines->sum('subtotal'),
                 'customer_phone' => filled($this->customerPhone) ? $this->customerPhone : null,
+                'notes' => filled($this->notes) ? trim($this->notes) : null,
                 'shift_id' => Shift::active()?->id,
                 'created_by' => auth('admin')->id(),
             ]);
@@ -154,6 +171,7 @@ class Cashier extends Page
                     'price' => $line['item']->price,
                     'qty' => $line['qty'],
                     'subtotal' => $line['subtotal'],
+                    'notes' => filled($line['notes']) ? trim($line['notes']) : null,
                 ]);
 
                 $this->consumeRecipeStock($order, $orderItem, $line['qty'], $menuItems);
@@ -163,6 +181,8 @@ class Cashier extends Page
         });
 
         $this->cart = [];
+        $this->cartNotes = [];
+        $this->notes = null;
         $this->customerPhone = null;
         $this->selectOrder($order->id);
 
@@ -382,6 +402,7 @@ class Cashier extends Page
                 ? [
                     'item' => $items[$menuItemId],
                     'qty' => $qty,
+                    'notes' => (string) ($this->cartNotes[$menuItemId] ?? ''),
                     'subtotal' => $qty * $items[$menuItemId]->price,
                 ]
                 : null)

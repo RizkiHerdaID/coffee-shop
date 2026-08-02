@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Enums\OrderStatus;
 use App\Filament\Pages\Cashier;
+use App\Jobs\PrintKitchenTicket;
 use App\Models\Admin;
 use App\Models\MenuItem;
 use App\Models\Order;
@@ -247,5 +248,154 @@ class PosCashierTest extends TestCase
 
         $this->assertDatabaseCount('orders', 0);
         $this->assertDatabaseCount('order_items', 0);
+    }
+
+    /**
+     * Order/line notes (modifiers).
+     *
+     * Cashier exposes `notes` (?string, order-level) and `cartNotes`
+     * (menu item id => note string, per line); nullable `notes` columns on
+     * `orders` and `order_items`; PrintKitchenTicket::renderLines() prints
+     * each line note on its own indented line under the item, then the
+     * order-level note under all items.
+     */
+    public function test_creating_order_persists_order_level_note(): void
+    {
+        $admin = Admin::factory()->create();
+        $item = MenuItem::create(['name' => 'Espresso', 'price' => 20000]);
+
+        Livewire::actingAs($admin, 'admin')
+            ->test(Cashier::class)
+            ->call('addToCart', $item->id)
+            ->set('notes', 'Gula dikit, makasih')
+            ->call('createOrder')
+            ->assertHasNoErrors();
+
+        $this->assertDatabaseHas('orders', [
+            'total' => 20000,
+            'notes' => 'Gula dikit, makasih',
+        ]);
+    }
+
+    public function test_creating_order_without_notes_stores_null(): void
+    {
+        $admin = Admin::factory()->create();
+        $item = MenuItem::create(['name' => 'Espresso', 'price' => 20000]);
+
+        Livewire::actingAs($admin, 'admin')
+            ->test(Cashier::class)
+            ->call('addToCart', $item->id)
+            ->call('createOrder');
+
+        $this->assertDatabaseHas('orders', ['notes' => null]);
+        $this->assertDatabaseHas('order_items', ['notes' => null]);
+    }
+
+    public function test_creating_order_persists_per_line_notes(): void
+    {
+        $admin = Admin::factory()->create();
+        $espresso = MenuItem::create(['name' => 'Espresso', 'price' => 20000]);
+        $croissant = MenuItem::create(['name' => 'Croissant', 'price' => 25000]);
+
+        Livewire::actingAs($admin, 'admin')
+            ->test(Cashier::class)
+            ->call('addToCart', $espresso->id)
+            ->call('addToCart', $espresso->id)
+            ->call('addToCart', $croissant->id)
+            ->set('cartNotes.'.$espresso->id, 'Less ice, double shot')
+            ->assertSet('cartNotes.'.$espresso->id, 'Less ice, double shot')
+            ->call('createOrder')
+            ->assertHasNoErrors();
+
+        $order = Order::firstOrFail();
+
+        $this->assertDatabaseHas('order_items', [
+            'order_id' => $order->id,
+            'menu_item_id' => $espresso->id,
+            'notes' => 'Less ice, double shot',
+        ]);
+        $this->assertDatabaseHas('order_items', [
+            'order_id' => $order->id,
+            'menu_item_id' => $croissant->id,
+            'notes' => null,
+        ]);
+    }
+
+    public function test_notes_do_not_leak_into_the_next_order(): void
+    {
+        $admin = Admin::factory()->create();
+        $item = MenuItem::create(['name' => 'Espresso', 'price' => 20000]);
+
+        $component = Livewire::actingAs($admin, 'admin')->test(Cashier::class);
+
+        $component
+            ->call('addToCart', $item->id)
+            ->set('notes', 'Pisah cup')
+            ->set('cartNotes.'.$item->id, 'Separate cup')
+            ->call('createOrder')
+            ->assertHasNoErrors();
+
+        $component
+            ->call('addToCart', $item->id)
+            ->call('createOrder')
+            ->assertHasNoErrors();
+
+        $this->assertDatabaseCount('orders', 2);
+
+        $orders = Order::orderBy('id')->get();
+        $this->assertSame('Pisah cup', $orders[0]->notes);
+        $this->assertNull($orders[1]->notes);
+
+        $this->assertSame('Separate cup', $orders[0]->items()->first()->notes);
+        $this->assertNull($orders[1]->items()->first()->notes);
+    }
+
+    public function test_kitchen_ticket_renders_line_notes_under_each_item(): void
+    {
+        $admin = Admin::factory()->create();
+        $espresso = MenuItem::create(['name' => 'Espresso', 'price' => 20000]);
+        $croissant = MenuItem::create(['name' => 'Croissant', 'price' => 25000]);
+
+        Livewire::actingAs($admin, 'admin')
+            ->test(Cashier::class)
+            ->call('addToCart', $espresso->id)
+            ->call('addToCart', $espresso->id)
+            ->call('addToCart', $croissant->id)
+            ->set('cartNotes.'.$espresso->id, 'Less ice')
+            ->set('cartNotes.'.$croissant->id, 'No butter')
+            ->set('notes', 'Gula dikit, makasih')
+            ->call('createOrder')
+            ->assertHasNoErrors();
+
+        $order = Order::firstOrFail();
+        $lines = (new PrintKitchenTicket($order))->renderLines();
+        $output = implode("\n", $lines);
+
+        $this->assertContains('  - Less ice'."\n", $lines);
+        $this->assertContains('  - No butter'."\n", $lines);
+        $this->assertStringContainsString('Less ice', $output);
+        $this->assertStringContainsString('No butter', $output);
+        $this->assertStringContainsString('Gula dikit, makasih', $output);
+        $this->assertGreaterThan(strpos($output, 'Espresso'), strpos($output, 'Less ice'));
+        $this->assertGreaterThan(strpos($output, 'Croissant'), strpos($output, 'No butter'));
+        $this->assertGreaterThan(strpos($output, 'No butter'), strpos($output, 'Gula dikit, makasih'));
+    }
+
+    public function test_kitchen_ticket_without_notes_omits_note_lines(): void
+    {
+        $admin = Admin::factory()->create();
+        $item = MenuItem::create(['name' => 'Espresso', 'price' => 20000]);
+
+        Livewire::actingAs($admin, 'admin')
+            ->test(Cashier::class)
+            ->call('addToCart', $item->id)
+            ->call('createOrder')
+            ->assertHasNoErrors();
+
+        $order = Order::firstOrFail();
+        $lines = (new PrintKitchenTicket($order))->renderLines();
+
+        $this->assertStringContainsString('Espresso'."\n", implode("\n", $lines));
+        $this->assertDoesNotMatchRegularExpression('/^\s+- /m', implode("\n", $lines));
     }
 }

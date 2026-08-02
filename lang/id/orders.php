@@ -7,6 +7,7 @@ return [
     'customer_phone_placeholder' => '08xxxxxxxxxx',
     'status' => 'Status',
     'export' => 'Ekspor CSV/XLSX',
+    'notes' => 'Catatan',
 
     'exports' => [
         'completed' => 'Ekspor pesanan selesai: :count baris.',

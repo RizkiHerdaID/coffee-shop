@@ -7,6 +7,7 @@ return [
     'customer_phone_placeholder' => '08xxxxxxxxxx',
     'status' => 'Status',
     'export' => 'Export CSV/XLSX',
+    'notes' => 'Notes',
 
     'exports' => [
         'completed' => 'Orders export completed: :count rows.',

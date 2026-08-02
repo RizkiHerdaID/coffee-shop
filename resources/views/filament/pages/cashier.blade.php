@@ -59,10 +59,20 @@
                 <div class="space-y-3">
                     @forelse ($this->cartLines as $line)
                         <div class="flex items-start justify-between gap-2 rounded-xl border border-gray-200 p-3">
-                            <div class="min-w-0">
+                            <div class="min-w-0 flex-1">
                                 <p class="truncate text-sm font-semibold text-gray-900">{{ $line['item']->name }}</p>
                                 <p class="text-xs text-gray-500">Rp {{ number_format($line['item']->price, 0, ',', '.') }} × {{ $line['qty'] }}</p>
                                 <p class="text-sm font-bold text-amber-600">Rp {{ number_format($line['subtotal'], 0, ',', '.') }}</p>
+                                <label for="line-notes-{{ $line['item']->id }}" class="mt-2 block text-xs font-medium text-gray-600">
+                                    {{ __('dashboard.line_notes') }}
+                                </label>
+                                <textarea
+                                    id="line-notes-{{ $line['item']->id }}"
+                                    rows="2"
+                                    wire:model.blur="cartNotes.{{ $line['item']->id }}"
+                                    placeholder="{{ __('dashboard.line_notes_placeholder') }}"
+                                    class="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs text-gray-900 placeholder:text-gray-400 focus:border-amber-500 focus:ring-amber-500"
+                                ></textarea>
                             </div>
                             <div class="flex shrink-0 items-center gap-1">
                                 <x-filament::icon-button icon="heroicon-m-minus" size="sm" wire:click="decrementItem({{ $line['item']->id }})" :tooltip="__('pos.qty')" />
@@ -87,6 +97,20 @@
                         placeholder="{{ __('pos.customer_phone_placeholder') }}"
                         class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:border-amber-500 focus:ring-amber-500"
                     >
+
+                    <label for="cashier-order-notes" class="mt-4 block text-sm font-medium text-gray-700">
+                        {{ __('dashboard.order_notes') }}
+                    </label>
+                    <textarea
+                        id="cashier-order-notes"
+                        rows="2"
+                        wire:model.blur="notes"
+                        placeholder="{{ __('dashboard.order_notes_placeholder') }}"
+                        class="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:border-amber-500 focus:ring-amber-500"
+                    ></textarea>
+                    @error('notes')
+                        <p class="mt-1 text-sm text-danger-600">{{ $message }}</p>
+                    @enderror
 
                     <div class="mt-4 flex items-center justify-between">
                         <span class="text-sm font-medium text-gray-600">{{ __('pos.total') }}</span>

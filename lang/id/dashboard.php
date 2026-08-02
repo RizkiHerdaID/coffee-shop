@@ -7,6 +7,12 @@ return [
     'revenue' => 'Pendapatan',
     'count' => 'Jumlah Pesanan',
 
+    'order_notes' => 'Catatan Pesanan',
+    'order_notes_placeholder' => 'Opsional — contoh: tanpa es, bungkus',
+    'line_notes' => 'Catatan Item',
+    'line_notes_placeholder' => 'Opsional — contoh: tanpa gula',
+    'notes_max' => 'Catatan maksimal :max karakter.',
+
     'low_stock_heading' => 'Stok Menipis',
     'low_stock_empty_heading' => 'Stok aman',
     'low_stock_empty_description' => 'Tidak ada item stok di bawah batas minimum.',

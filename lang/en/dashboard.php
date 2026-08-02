@@ -7,6 +7,12 @@ return [
     'revenue' => 'Revenue',
     'count' => 'Order Count',
 
+    'order_notes' => 'Order Note',
+    'order_notes_placeholder' => 'Optional — e.g. no ice, wrap it',
+    'line_notes' => 'Item Note',
+    'line_notes_placeholder' => 'Optional — e.g. less sugar',
+    'notes_max' => 'Note may not exceed :max characters.',
+
     'low_stock_heading' => 'Low Stock',
     'low_stock_empty_heading' => 'Stock is healthy',
     'low_stock_empty_description' => 'No items are below their minimum threshold.',
