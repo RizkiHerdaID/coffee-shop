@@ -43,7 +43,7 @@ jobs:
       - name: Report failure details
         if: failure()
         run: |
-          sed 's/^/::error::/' phpunit-output.log | head -80
+          sed 's/^/::error::/' phpunit-output.log | tail -80
 
       - name: Check code style
         run: vendor/bin/pint --test
