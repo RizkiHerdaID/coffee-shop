@@ -5,12 +5,16 @@ namespace App\Filament\Widgets;
 use App\Enums\OrderStatus;
 use App\Models\OrderItem;
 use Filament\Widgets\ChartWidget;
+use Illuminate\Contracts\Support\Htmlable;
 
 class TopItemsChart extends ChartWidget
 {
     protected int|string|array $columnSpan = 'full';
 
-    protected ?string $heading = 'Top items by revenue';
+    public function getHeading(): string|Htmlable|null
+    {
+        return __('dashboard.top_items_heading');
+    }
 
     protected function getType(): string
     {
@@ -35,7 +39,7 @@ class TopItemsChart extends ChartWidget
         return [
             'datasets' => [
                 [
-                    'label' => 'Revenue',
+                    'label' => __('dashboard.revenue'),
                     'data' => array_values($rows->all()),
                 ],
             ],

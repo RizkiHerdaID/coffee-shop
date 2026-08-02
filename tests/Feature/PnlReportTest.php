@@ -271,6 +271,33 @@ class PnlReportTest extends TestCase
         $this->assertSame(10 * 1500 + 3 * 2000, $data['inventory_value']);
     }
 
+    /**
+     * Card 104: revenue is NET of paid/served orders. The discounted order
+     * (gross 65.000 − 10.000) counts 55.000, so a gross-summing report
+     * (85.000) would fail this.
+     */
+    public function test_revenue_uses_net_totals_of_discounted_orders(): void
+    {
+        $this->createOrderAt(65000, '2026-07-05', OrderStatus::Paid, 'fixed', 10000); // net 55.000
+        $this->createOrderAt(20000, '2026-07-06', OrderStatus::Served);               // net 20.000
+        $this->createOrderAt(99999, '2026-07-07', OrderStatus::Pending, 'fixed', 50000); // excluded
+
+        $data = $this->reportData('2026-07-01', '2026-07-31');
+
+        $this->assertSame(75000, $data['revenue']);
+        $this->assertSame(2, $data['orders_count']);
+    }
+
+    public function test_revenue_uses_percent_discount_values(): void
+    {
+        $this->createOrderAt(20000, '2026-07-05', OrderStatus::Paid, 'percent', 10); // net 18.000
+        $this->createOrderAt(65000, '2026-07-06', OrderStatus::Served, 'percent', 15); // net 55.250
+
+        $data = $this->reportData('2026-07-01', '2026-07-31');
+
+        $this->assertSame(73250, $data['revenue']);
+    }
+
     public function test_page_requires_authentication(): void
     {
         $this->get(route('filament.admin.pages.pnl-report'))
@@ -316,15 +343,17 @@ class PnlReportTest extends TestCase
             ->invoke($page, $from, $to);
     }
 
-    private function createOrderAt(int $total, string $date, OrderStatus $status): Order
+    private function createOrderAt(int $total, string $date, OrderStatus $status, ?string $discountType = null, ?int $discountAmount = null): Order
     {
         $this->orderSeq++;
 
-        return Order::withoutEvents(function () use ($total, $date, $status): Order {
+        return Order::withoutEvents(function () use ($total, $date, $status, $discountType, $discountAmount): Order {
             $order = new Order([
                 'order_number' => 'PNL-'.str_pad((string) $this->orderSeq, 3, '0', STR_PAD_LEFT),
                 'status' => $status,
                 'total' => $total,
+                'discount_type' => $discountType,
+                'discount_amount' => $discountAmount,
                 'created_by' => $this->admin->id,
             ]);
 

@@ -255,4 +255,29 @@ class RecipeStockConsumeTest extends TestCase
             'quantity' => 250,
         ]);
     }
+
+    /**
+     * Card 123: an invalid cart quantity (0, negative, absurdly large) must
+     * be rejected before the order exists, so no recipe stock is consumed.
+     */
+    public function test_invalid_cart_quantity_is_rejected_before_any_stock_deduction(): void
+    {
+        $admin = Admin::factory()->create();
+        $espresso = MenuItem::create(['name' => 'Espresso', 'price' => 20000]);
+        $beans = StockItem::create(['name' => 'Biji Kopi', 'unit' => 'gram', 'quantity' => 1000]);
+        $espresso->ingredients()->attach($beans->id, ['quantity' => 18]);
+
+        foreach ([0, -1, 100000] as $qty) {
+            Livewire::actingAs($admin, 'admin')
+                ->test(Cashier::class)
+                ->set('cart', [$espresso->id => $qty])
+                ->call('createOrder')
+                ->assertHasErrors(['cart']);
+        }
+
+        $this->assertDatabaseCount('orders', 0);
+        $this->assertDatabaseCount('order_items', 0);
+        $this->assertDatabaseCount('stock_movements', 0);
+        $this->assertSame(1000, $beans->fresh()->quantity);
+    }
 }

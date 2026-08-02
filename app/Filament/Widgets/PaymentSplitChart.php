@@ -31,6 +31,7 @@ class PaymentSplitChart extends ChartWidget
             ->join('orders', 'orders.id', '=', 'payments.order_id')
             ->selectRaw('payments.method, SUM(payments.amount) as total')
             ->whereDate('payments.paid_at', today())
+            ->where('payments.amount', '>', 0)
             ->whereNotIn('orders.status', [OrderStatus::Pending, OrderStatus::Refunded, OrderStatus::Cancelled])
             ->groupBy('payments.method')
             ->pluck('total', 'method');

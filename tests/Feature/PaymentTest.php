@@ -65,7 +65,7 @@ class PaymentTest extends TestCase
             ->assertRedirect(route('filament.admin.auth.login'));
     }
 
-    public function test_cash_payment_with_overpayment_records_payment_marks_order_paid_and_sets_change_due(): void
+    public function test_cash_overpayment_applies_only_the_order_total_and_tracks_the_change(): void
     {
         $admin = Admin::factory()->create();
         $order = $this->makeOrder($admin, 65000);
@@ -85,7 +85,8 @@ class PaymentTest extends TestCase
         $this->assertDatabaseHas('payments', [
             'order_id' => $order->id,
             'method' => 'cash',
-            'amount' => 100000,
+            'amount' => 65000,
+            'change' => 35000,
             'reference' => null,
             'admin_id' => $admin->id,
         ]);
@@ -94,6 +95,72 @@ class PaymentTest extends TestCase
         $this->assertSame(PaymentMethod::Cash, $payment->method);
         $this->assertNotNull($payment->paid_at);
         $this->assertTrue($payment->paid_at->isPast());
+
+        // The applied amount (never the tendered 100.000) feeds paid_total,
+        // so the drawer math cannot absorb change.
+        $this->assertSame(65000, $order->fresh()->paid_total);
+        $this->assertSame(65000, $order->fresh()->net_total);
+        $this->assertSame(0, $order->fresh()->remaining);
+    }
+
+    public function test_exact_cash_and_non_cash_payments_store_zero_change(): void
+    {
+        $admin = Admin::factory()->create();
+
+        $exact = $this->makeOrder($admin, 50000);
+        Livewire::actingAs($admin, 'admin')
+            ->test(Cashier::class)
+            ->call('selectOrder', $exact->id)
+            ->set('paymentMethod', 'cash')
+            ->set('paymentAmount', 50000)
+            ->call('capturePayment')
+            ->assertHasNoErrors();
+
+        $qris = $this->makeOrder($admin, 40000);
+        Livewire::actingAs($admin, 'admin')
+            ->test(Cashier::class)
+            ->call('selectOrder', $qris->id)
+            ->set('paymentMethod', 'qris')
+            ->set('paymentAmount', 40000)
+            ->call('capturePayment')
+            ->assertHasNoErrors();
+
+        $this->assertDatabaseHas('payments', [
+            'order_id' => $exact->id,
+            'method' => 'cash',
+            'amount' => 50000,
+            'change' => 0,
+        ]);
+        $this->assertDatabaseHas('payments', [
+            'order_id' => $qris->id,
+            'method' => 'qris',
+            'amount' => 40000,
+            'change' => 0,
+        ]);
+    }
+
+    public function test_partial_cash_payment_stores_applied_amount_without_change(): void
+    {
+        $admin = Admin::factory()->create();
+        $order = $this->makeOrder($admin, 65000);
+
+        Livewire::actingAs($admin, 'admin')
+            ->test(Cashier::class)
+            ->call('selectOrder', $order->id)
+            ->set('paymentMethod', 'cash')
+            ->set('paymentAmount', 20000)
+            ->call('capturePayment')
+            ->assertHasNoErrors()
+            ->assertSet('changeDue', 0);
+
+        $this->assertSame(OrderStatus::Pending, $order->fresh()->status);
+        $this->assertDatabaseHas('payments', [
+            'order_id' => $order->id,
+            'method' => 'cash',
+            'amount' => 20000,
+            'change' => 0,
+        ]);
+        $this->assertSame(20000, $order->fresh()->paid_total);
     }
 
     public function test_cash_payment_with_exact_amount_marks_order_paid_without_change(): void

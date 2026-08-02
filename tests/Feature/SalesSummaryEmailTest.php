@@ -29,13 +29,19 @@ class SalesSummaryEmailTest extends TestCase
         parent::tearDown();
     }
 
-    private function createOrder(string $orderNumber, int $total, string $createdAt, array $items = []): Order
+    /**
+     * @param  array<int, array{name: string, price: int, qty: int, subtotal: int}>  $items
+     */
+    private function createOrder(string $orderNumber, int $total, string $createdAt, array $items = [], string $status = 'paid', ?string $discountType = null, ?int $discountAmount = null): Order
     {
         $admin = Admin::factory()->create();
 
         $order = Order::withoutEvents(fn () => Order::create([
             'order_number' => $orderNumber,
             'total' => $total,
+            'status' => $status,
+            'discount_type' => $discountType,
+            'discount_amount' => $discountAmount,
             'created_by' => $admin->id,
         ]));
 
@@ -57,13 +63,13 @@ class SalesSummaryEmailTest extends TestCase
     {
         $this->createOrder('ORD-D1', 60000, '2026-08-01 09:00:00', [
             ['name' => 'Espresso', 'price' => 20000, 'qty' => 3, 'subtotal' => 60000],
-        ]);
+        ], 'paid');
         $this->createOrder('ORD-D2', 55000, '2026-08-01 23:59:59', [
             ['name' => 'Cappuccino', 'price' => 25000, 'qty' => 1, 'subtotal' => 25000],
             ['name' => 'Teh Tarik', 'price' => 15000, 'qty' => 2, 'subtotal' => 30000],
-        ]);
-        $this->createOrder('ORD-D3', 100000, '2026-08-02 08:00:00');
-        $this->createOrder('ORD-D4', 50000, '2026-07-31 12:00:00');
+        ], 'paid');
+        $this->createOrder('ORD-D3', 100000, '2026-08-02 08:00:00', [], 'paid');
+        $this->createOrder('ORD-D4', 50000, '2026-07-31 12:00:00', [], 'paid');
 
         $this->artisan('summary:send', ['--period' => 'daily'])
             ->assertExitCode(0);
@@ -88,9 +94,9 @@ class SalesSummaryEmailTest extends TestCase
 
     public function test_weekly_period_covers_last_seven_days(): void
     {
-        $this->createOrder('ORD-W1', 50000, '2026-07-26 00:00:00');
-        $this->createOrder('ORD-W2', 30000, '2026-07-25 23:59:59');
-        $this->createOrder('ORD-W3', 20000, '2026-08-01 23:59:59');
+        $this->createOrder('ORD-W1', 50000, '2026-07-26 00:00:00', [], 'paid');
+        $this->createOrder('ORD-W2', 30000, '2026-07-25 23:59:59', [], 'paid');
+        $this->createOrder('ORD-W3', 20000, '2026-08-01 23:59:59', [], 'paid');
 
         $this->artisan('summary:send', ['--period' => 'weekly'])
             ->assertExitCode(0);
@@ -110,8 +116,8 @@ class SalesSummaryEmailTest extends TestCase
 
     public function test_date_override_replaces_today_for_period_math(): void
     {
-        $this->createOrder('ORD-X1', 45000, '2026-08-04 15:00:00');
-        $this->createOrder('ORD-X2', 15000, '2026-08-05 01:00:00');
+        $this->createOrder('ORD-X1', 45000, '2026-08-04 15:00:00', [], 'paid');
+        $this->createOrder('ORD-X2', 15000, '2026-08-05 01:00:00', [], 'paid');
 
         $this->artisan('summary:send', ['--period' => 'daily', '--date' => '2026-08-05'])
             ->assertExitCode(0);
@@ -126,7 +132,7 @@ class SalesSummaryEmailTest extends TestCase
 
     public function test_recipient_override_sends_to_given_address(): void
     {
-        $this->createOrder('ORD-T1', 10000, '2026-08-01 10:00:00');
+        $this->createOrder('ORD-T1', 10000, '2026-08-01 10:00:00', [], 'paid');
 
         $this->artisan('summary:send', ['--period' => 'daily', '--to' => 'billing@example.com'])
             ->assertExitCode(0);
@@ -140,7 +146,7 @@ class SalesSummaryEmailTest extends TestCase
     {
         config(['summary.recipient' => null]);
 
-        $this->createOrder('ORD-N1', 10000, '2026-08-01 10:00:00');
+        $this->createOrder('ORD-N1', 10000, '2026-08-01 10:00:00', [], 'paid');
 
         $this->artisan('summary:send', ['--period' => 'daily'])
             ->assertExitCode(1);
@@ -158,6 +164,62 @@ class SalesSummaryEmailTest extends TestCase
                 && $mail->stats['orders_count'] === 0
                 && $mail->stats['avg_order'] === 0
                 && $mail->stats['top_items'] === [];
+        });
+    }
+
+    /**
+     * Card 103: the summary counts ONLY paid/served orders — pending,
+     * refunded and cancelled orders are excluded from revenue, the count
+     * and the top items.
+     */
+    public function test_revenue_counts_only_paid_and_served_orders(): void
+    {
+        $this->createOrder('ORD-F1', 60000, '2026-08-01 09:00:00', [], 'paid');
+        $this->createOrder('ORD-F2', 50000, '2026-08-01 10:00:00', [], 'served');
+        $this->createOrder('ORD-F3', 99999, '2026-08-01 11:00:00', [], 'pending');
+        $this->createOrder('ORD-F4', 99999, '2026-08-01 12:00:00', [], 'refunded');
+        $this->createOrder('ORD-F5', 99999, '2026-08-01 13:00:00', [], 'cancelled');
+
+        $this->artisan('summary:send', ['--period' => 'daily'])
+            ->assertExitCode(0);
+
+        Mail::assertQueued(SalesSummary::class, function (SalesSummary $mail) {
+            return $mail->stats['revenue'] === 110000
+                && $mail->stats['orders_count'] === 2
+                && $mail->stats['avg_order'] === 55000;
+        });
+    }
+
+    public function test_revenue_uses_net_totals_for_discounted_orders(): void
+    {
+        $this->createOrder('ORD-N1', 65000, '2026-08-01 09:00:00', [], 'paid', 'fixed', 10000); // net 55.000
+        $this->createOrder('ORD-N2', 20000, '2026-08-01 10:00:00', [], 'paid');                // net 20.000
+
+        $this->artisan('summary:send', ['--period' => 'daily'])
+            ->assertExitCode(0);
+
+        Mail::assertQueued(SalesSummary::class, function (SalesSummary $mail) {
+            return $mail->stats['revenue'] === 75000
+                && $mail->stats['orders_count'] === 2;
+        });
+    }
+
+    public function test_top_items_come_from_paid_orders_only(): void
+    {
+        $this->createOrder('ORD-T1', 30000, '2026-08-01 09:00:00', [
+            ['name' => 'Espresso', 'price' => 30000, 'qty' => 1, 'subtotal' => 30000],
+        ], 'paid');
+        $this->createOrder('ORD-T2', 99000, '2026-08-01 10:00:00', [
+            ['name' => 'Cappuccino', 'price' => 99000, 'qty' => 5, 'subtotal' => 99000],
+        ], 'pending');
+
+        $this->artisan('summary:send', ['--period' => 'daily'])
+            ->assertExitCode(0);
+
+        Mail::assertQueued(SalesSummary::class, function (SalesSummary $mail) {
+            return $mail->stats['top_items'] === [
+                ['name' => 'Espresso', 'qty' => 1, 'revenue' => 30000],
+            ];
         });
     }
 }

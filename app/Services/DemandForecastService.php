@@ -13,14 +13,15 @@ class DemandForecastService
 
     /**
      * Paid orders created within the last $months months (current month
-     * inclusive), newest first. Only id/created_at/total are selected.
+     * inclusive), newest first. Only id/created_at/total/discount fields are
+     * selected; net totals are computed from the loaded models.
      *
      * @return Collection<int, Order>
      */
     public function paidOrders(?int $months = null): Collection
     {
         return Order::query()
-            ->select(['id', 'created_at', 'total'])
+            ->select(['id', 'created_at', 'total', 'discount_type', 'discount_amount'])
             ->whereNotIn('status', [OrderStatus::Pending, OrderStatus::Refunded, OrderStatus::Cancelled])
             ->where('created_at', '>=', $this->windowStart($months))
             ->orderByDesc('created_at')
@@ -40,7 +41,7 @@ class DemandForecastService
         foreach ($this->paidOrders($months) as $order) {
             $key = $this->weekdayKey($order->created_at);
             $aggregate['count'][$key]++;
-            $aggregate['revenue'][$key] += $order->total;
+            $aggregate['revenue'][$key] += $order->net_total;
         }
 
         return $aggregate;
@@ -67,7 +68,7 @@ class DemandForecastService
 
             if (isset($aggregate[$key])) {
                 $aggregate[$key]['count']++;
-                $aggregate[$key]['revenue'] += $order->total;
+                $aggregate[$key]['revenue'] += $order->net_total;
             }
         }
 

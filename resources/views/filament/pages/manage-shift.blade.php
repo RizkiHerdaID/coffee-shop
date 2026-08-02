@@ -139,7 +139,7 @@
                                             <p class="mt-0.5 truncate text-xs text-gray-500">{{ $movement->note }}</p>
                                         @endif
                                         <p class="mt-0.5 text-xs text-gray-400">
-                                            {{ $movement->created_at->format('H:i') }} · {{ $movement->admin?->name ?? '—' }}
+                                            {{ $movement->created_at->format('d/m/Y H:i') }} · {{ $movement->admin?->name ?? '—' }}
                                         </p>
                                     </div>
                                 </div>

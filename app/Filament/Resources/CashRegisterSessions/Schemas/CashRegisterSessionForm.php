@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\CashRegisterSessions\Schemas;
 
 use App\Enums\CashRegisterStatus;
+use App\Enums\OrderStatus;
 use App\Models\Order;
 use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\Select;
@@ -136,11 +137,12 @@ class CashRegisterSessionForm
     }
 
     /**
-     * Revenue formula (mirrors CashRegisterSession::revenue()):
-     * SUM of orders.total where orders.created_at >= opened_at and
-     * (closed_at is null OR orders.created_at <= closed_at). For an open
-     * session the window is bounded by "now" so the stored expected amount
-     * matches the model's expectedAmount().
+     * Revenue formula (mirrors CashRegisterSession::revenue()): SUM of
+     * paid/served orders' NET totals where orders.created_at >= opened_at
+     * and (closed_at is null OR orders.created_at <= closed_at). Pending,
+     * refunded and cancelled orders are excluded. For an open session the
+     * window is bounded by "now" so the stored expected amount matches the
+     * model's expectedAmount().
      */
     public static function revenue(?string $openedAt, ?string $closedAt): int
     {
@@ -148,10 +150,16 @@ class CashRegisterSessionForm
             return 0;
         }
 
-        return Order::query()
+        return (int) Order::query()
             ->where('created_at', '>=', $openedAt)
             ->where('created_at', '<=', $closedAt ?? now()->toDateTimeString())
-            ->sum('total');
+            ->whereNotIn('status', [
+                OrderStatus::Pending,
+                OrderStatus::Refunded,
+                OrderStatus::Cancelled,
+            ])
+            ->get()
+            ->sum(fn (Order $order): int => $order->net_total);
     }
 
     public static function expected(string $float, ?string $openedAt, ?string $closedAt): int
@@ -159,12 +167,16 @@ class CashRegisterSessionForm
         return self::rawMoney($float) + self::revenue($openedAt, $closedAt);
     }
 
+    /**
+     * Counted minus expected (same sign convention as Shift::discrepancy):
+     * a positive discrepancy means the drawer holds MORE than expected.
+     */
     public static function discrepancy(?int $expected, ?string $counted): ?int
     {
         if ($counted === null || $counted === '') {
             return null;
         }
 
-        return $expected - self::rawMoney($counted);
+        return self::rawMoney($counted) - $expected;
     }
 }

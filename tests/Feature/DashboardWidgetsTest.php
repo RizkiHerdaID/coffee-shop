@@ -3,10 +3,14 @@
 namespace Tests\Feature;
 
 use App\Enums\OrderStatus;
+use App\Filament\Pages\PnlReport;
 use App\Filament\Widgets\BestSellersChart;
 use App\Filament\Widgets\PeakHoursChart;
+use App\Filament\Widgets\RevenueChart;
+use App\Filament\Widgets\TodayStats;
 use App\Models\Admin;
 use App\Models\Order;
+use App\Models\Shift;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Lang;
 use ReflectionClass;
@@ -136,6 +140,72 @@ class DashboardWidgetsTest extends TestCase
     }
 
     /**
+     * Card 104: TodayStats must use the SAME revenue definition as
+     * Shift::salesTotal() — paid/served orders, NET totals.
+     */
+    public function test_today_stats_uses_net_revenue_and_counts_paid_served_orders(): void
+    {
+        $this->createOrderAt(65000, 8, 0, OrderStatus::Paid, 'fixed', 10000); // net 55.000
+        $this->createOrderAt(20000, 9, 0, OrderStatus::Served);               // net 20.000
+        $this->createOrderAt(99999, 10, 0, OrderStatus::Pending);
+        $this->createOrderAt(99999, 11, 0, OrderStatus::Refunded);
+        $this->createOrderAt(99999, 12, 0, OrderStatus::Cancelled);
+
+        $stats = $this->todayStats();
+
+        $this->assertSame('Rp 75.000', $stats[0]->getValue());
+        $this->assertSame(2, $stats[1]->getValue());
+    }
+
+    public function test_revenue_chart_uses_net_revenue_for_paid_and_served_orders(): void
+    {
+        $this->createOrderAt(65000, 8, 0, OrderStatus::Paid, 'fixed', 10000); // net 55.000
+        $this->createOrderAt(20000, 9, 0, OrderStatus::Served);               // net 20.000
+        $this->createOrderAt(99999, 10, 0, OrderStatus::Pending);
+
+        $data = $this->revenueChartData();
+
+        $todayData = $data['datasets'][0]['data'][13];
+        $this->assertSame(75000, $todayData);
+    }
+
+    /**
+     * Card 104 (core): every revenue surface reports the same number for the
+     * same fixture — P&L, TodayStats, RevenueChart and Shift::salesTotal.
+     * The discounted order (gross 85.000 → net 75.000) makes any
+     * gross-summing or all-status surface diverge.
+     */
+    public function test_revenue_is_identical_across_pnl_today_stats_revenue_chart_and_shift_sales_total(): void
+    {
+        $shift = Shift::create([
+            'opened_at' => today()->setTime(7, 0),
+            'opening_cash' => 100000,
+            'admin_id' => $this->admin->id,
+        ]);
+
+        $paid = $this->createOrderAt(65000, 8, 0, OrderStatus::Paid, 'fixed', 10000); // net 55.000
+        $paid->update(['shift_id' => $shift->id]);
+        $served = $this->createOrderAt(20000, 9, 0, OrderStatus::Served); // net 20.000
+        $served->update(['shift_id' => $shift->id]);
+        $pending = $this->createOrderAt(99999, 10, 0, OrderStatus::Pending);
+        $pending->update(['shift_id' => $shift->id]);
+
+        $shiftRevenue = $shift->salesTotal();
+        $this->assertSame(75000, $shiftRevenue);
+
+        $pnlRevenue = (new ReflectionClass(PnlReport::class))
+            ->getMethod('getReportData')
+            ->invoke(new PnlReport, today()->toDateString(), today()->toDateString())['revenue'];
+        $this->assertSame($shiftRevenue, $pnlRevenue);
+
+        $stats = $this->todayStats();
+        $this->assertSame('Rp '.number_format($shiftRevenue, 0, ',', '.'), $stats[0]->getValue());
+
+        $chart = $this->revenueChartData();
+        $this->assertSame($shiftRevenue, $chart['datasets'][0]['data'][13]);
+    }
+
+    /**
      * @return array<string, mixed>
      */
     private function peakHoursData(?string $filter = null): array
@@ -158,20 +228,42 @@ class DashboardWidgetsTest extends TestCase
             ->invoke(new BestSellersChart);
     }
 
+    /**
+     * @return array<int, mixed>
+     */
+    private function todayStats(): array
+    {
+        return (new ReflectionClass(TodayStats::class))
+            ->getMethod('getStats')
+            ->invoke(new TodayStats);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function revenueChartData(): array
+    {
+        return (new ReflectionClass(RevenueChart::class))
+            ->getMethod('getData')
+            ->invoke(new RevenueChart);
+    }
+
     private function todayIndex(): int
     {
         return (now()->dayOfWeek + 6) % 7;
     }
 
-    private function createOrderAt(int $total, int $hour, int $minute = 0, OrderStatus $status = OrderStatus::Paid): Order
+    private function createOrderAt(int $total, int $hour, int $minute = 0, OrderStatus $status = OrderStatus::Paid, ?string $discountType = null, ?int $discountAmount = null): Order
     {
         $this->orderSeq++;
 
-        return Order::withoutEvents(function () use ($total, $hour, $minute, $status) {
+        return Order::withoutEvents(function () use ($total, $hour, $minute, $status, $discountType, $discountAmount) {
             $order = new Order([
                 'order_number' => 'DASH-'.str_pad((string) $this->orderSeq, 3, '0', STR_PAD_LEFT),
                 'status' => $status,
                 'total' => $total,
+                'discount_type' => $discountType,
+                'discount_amount' => $discountAmount,
                 'created_by' => $this->admin->id,
             ]);
 

@@ -16,6 +16,8 @@ return [
     'create_order' => 'Buat Pesanan',
     'order_created' => 'Pesanan :order_number berhasil dibuat',
     'cart_empty' => 'Tambahkan menu terlebih dahulu sebelum membuat pesanan.',
+    'qty_min' => 'Jumlah item harus minimal 1.',
+    'qty_max' => 'Jumlah item maksimal :max per baris.',
 
     'paid' => 'Dibayar',
 

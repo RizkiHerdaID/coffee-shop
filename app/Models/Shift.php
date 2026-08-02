@@ -10,7 +10,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-#[Fillable(['opened_at', 'closed_at', 'opening_cash', 'closing_cash', 'expected_total', 'admin_id'])]
+#[Fillable(['opened_at', 'closed_at', 'opening_cash', 'closing_cash', 'admin_id'])]
 class Shift extends Model
 {
     /**
@@ -25,7 +25,6 @@ class Shift extends Model
             'closed_at' => 'datetime',
             'opening_cash' => 'integer',
             'closing_cash' => 'integer',
-            'expected_total' => 'integer',
         ];
     }
 
@@ -104,7 +103,8 @@ class Shift extends Model
     }
 
     /**
-     * Payment amounts by method for the shift's paid orders.
+     * Payment intake by method for the shift's paid orders (positive rows
+     * only — refunds are negative rows and are reported separately).
      *
      * @return array<string, int>
      */
@@ -112,6 +112,7 @@ class Shift extends Model
     {
         $rows = $this->paidOrders()
             ->join('payments', 'payments.order_id', '=', 'orders.id')
+            ->where('payments.amount', '>', 0)
             ->selectRaw('payments.method, SUM(payments.amount) as total')
             ->groupBy('payments.method')
             ->pluck('total', 'method');
@@ -138,7 +139,7 @@ class Shift extends Model
     }
 
     /**
-     * Cash returned to customers (negative cash payment rows; none exist yet).
+     * Cash returned to customers (negative cash payment rows).
      */
     public function cashRefunds(): int
     {

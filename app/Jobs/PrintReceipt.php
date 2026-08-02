@@ -59,10 +59,16 @@ class PrintReceipt implements ShouldQueue
             );
         }
 
-        if ($order->paid_total > $order->net_total) {
+        // Change is stored on the payment row (payments.change) because
+        // payments.amount holds the APPLIED amount — tendered surplus never
+        // lands in the amount column, so paid_total can never exceed
+        // net_total and this is the only correct source for the change line.
+        $change = (int) $order->payments->sum('change');
+
+        if ($change > 0) {
             $lines[] = $this->formatLine(
                 __('pos.receipt.change'),
-                'Rp '.number_format($order->paid_total - $order->net_total, 0, ',', '.'),
+                'Rp '.number_format($change, 0, ',', '.'),
                 $width,
             );
         }

@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Enums\OrderStatus;
 use App\Mail\SalesSummary;
 use App\Models\Order;
 use App\Models\OrderItem;
@@ -74,9 +75,19 @@ class SendSummaryEmail extends Command
 
         $end = $today->copy()->subDay()->endOfDay();
 
-        $orders = Order::query()->whereBetween('created_at', [$start, $end])->get();
+        // Paid/served orders only (pending, refunded and cancelled are not
+        // revenue), NET totals — matches Shift::salesTotal()/P&L so the
+        // summary never disagrees with the shift reports.
+        $orders = Order::query()
+            ->whereBetween('created_at', [$start, $end])
+            ->whereNotIn('status', [
+                OrderStatus::Pending,
+                OrderStatus::Refunded,
+                OrderStatus::Cancelled,
+            ])
+            ->get();
 
-        $revenue = (int) $orders->sum('total');
+        $revenue = (int) $orders->sum(fn (Order $order): int => $order->net_total);
         $count = $orders->count();
         $avg = $count > 0 ? (int) round($revenue / $count) : 0;
 

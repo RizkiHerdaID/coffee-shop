@@ -40,7 +40,7 @@ class PeakHoursChart extends ChartWidget
         $mode = $this->filter ?? 'revenue';
 
         $orders = Order::query()
-            ->select(['created_at', 'total'])
+            ->select(['created_at', 'total', 'discount_type', 'discount_amount'])
             ->whereNotIn('status', [OrderStatus::Pending, OrderStatus::Refunded, OrderStatus::Cancelled])
             ->where('created_at', '>=', today()->subDays(29))
             ->get();
@@ -54,7 +54,7 @@ class PeakHoursChart extends ChartWidget
             if ($mode === 'count') {
                 $data[$index][$hour]++;
             } else {
-                $data[$index][$hour] += $order->total;
+                $data[$index][$hour] += $order->net_total;
             }
         }
 

@@ -9,10 +9,12 @@ use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\Shift;
 use BackedEnum;
+use Closure;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -26,6 +28,12 @@ class Cashier extends Page
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedShoppingCart;
 
     protected static ?int $navigationSort = 1;
+
+    /**
+     * Sensible upper bound for a single cart line quantity; enforced by the
+     * create-order validation and by the +/- controls and repeat-order.
+     */
+    private const MAX_CART_QTY = 99;
 
     /**
      * @var array<int, int> menu item id => quantity
@@ -109,12 +117,23 @@ class Cashier extends Page
             return;
         }
 
-        $this->cart[$menuItemId] = ($this->cart[$menuItemId] ?? 0) + 1;
+        $current = (int) ($this->cart[$menuItemId] ?? 0);
+
+        if ($current >= static::MAX_CART_QTY) {
+            Notification::make()
+                ->title(__('pos.qty_max', ['max' => static::MAX_CART_QTY]))
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        $this->cart[$menuItemId] = $current + 1;
     }
 
     public function incrementItem(int $menuItemId): void
     {
-        if (isset($this->cart[$menuItemId])) {
+        if (isset($this->cart[$menuItemId]) && $this->cart[$menuItemId] < static::MAX_CART_QTY) {
             $this->cart[$menuItemId]++;
         }
     }
@@ -181,7 +200,7 @@ class Cashier extends Page
                 continue;
             }
 
-            $this->cart[$line->menu_item_id] = $line->qty;
+            $this->cart[$line->menu_item_id] = min((int) $line->qty, static::MAX_CART_QTY);
 
             if (filled($line->notes)) {
                 $this->cartNotes[$line->menu_item_id] = $line->notes;
@@ -199,19 +218,22 @@ class Cashier extends Page
 
     public function createOrder(): void
     {
-        $lines = $this->cartLines;
-
-        if ($lines->isEmpty()) {
-            throw ValidationException::withMessages(['cart' => __('pos.cart_empty')]);
-        }
-
         $this->validate([
+            'cart' => ['required', 'array', $this->cartQuantityRule()],
             'customerPhone' => ['nullable', 'string', 'max:255'],
             'notes' => ['nullable', 'string', 'max:500'],
             'cartNotes' => ['nullable', 'array'],
             'cartNotes.*' => ['nullable', 'string', 'max:500'],
             'discountType' => ['nullable', Rule::in(['', 'fixed', 'percent'])],
+        ], [
+            'cart.required' => __('pos.cart_empty'),
         ]);
+
+        $lines = $this->cartLines;
+
+        if ($lines->isEmpty()) {
+            throw ValidationException::withMessages(['cart' => __('pos.cart_empty')]);
+        }
 
         [$discountType, $discountAmount] = $this->normalizeDiscount($lines->sum('subtotal'));
 
@@ -276,6 +298,30 @@ class Cashier extends Page
             ->title(__('pos.order_created', ['order_number' => $order->order_number]))
             ->success()
             ->send();
+    }
+
+    /**
+     * Validates every cart line quantity: positive integers, capped at
+     * MAX_CART_QTY. Fails on the 'cart' key (not per-line dotted keys) so
+     * the error surfaces as one clean message.
+     */
+    protected function cartQuantityRule(): Closure
+    {
+        return function (string $attribute, mixed $value, Closure $fail): void {
+            foreach ((array) $value as $qty) {
+                if (! is_int($qty) || $qty < 1) {
+                    $fail(__('pos.qty_min'));
+
+                    return;
+                }
+
+                if ($qty > static::MAX_CART_QTY) {
+                    $fail(__('pos.qty_max', ['max' => static::MAX_CART_QTY]));
+
+                    return;
+                }
+            }
+        };
     }
 
     /**
@@ -398,63 +444,50 @@ class Cashier extends Page
 
         $method = PaymentMethod::tryFrom($this->paymentMethod) ?? PaymentMethod::Cash;
 
-        if ($method === PaymentMethod::Cash) {
-            $tendered = (int) str_replace('.', '', (string) $this->paymentAmount);
-
-            if (blank($this->paymentAmount)) {
-                throw ValidationException::withMessages(['paymentAmount' => __('pos.payment.amount_required')]);
-            }
-
-            if ($tendered < 1) {
-                throw ValidationException::withMessages(['paymentAmount' => __('pos.payment.amount_min')]);
-            }
-
-            $applied = $tendered;
-            $change = max($tendered - $order->remaining, 0);
-            $reference = null;
-        } else {
-            // QRIS / e-wallet: take a partial amount when entered; blank
-            // settles the remaining exactly.
-            if (blank($this->paymentAmount)) {
-                $applied = $order->remaining;
-            } else {
-                $applied = (int) str_replace('.', '', (string) $this->paymentAmount);
-
-                if ($applied < 1) {
-                    throw ValidationException::withMessages(['paymentAmount' => __('pos.payment.amount_min')]);
-                }
-
-                if ($applied > $order->remaining) {
-                    throw ValidationException::withMessages(['paymentAmount' => __('dashboard.amount_exceeds_remaining')]);
-                }
-            }
-
-            $change = 0;
-            $reference = filled($this->paymentReference) ? $this->paymentReference : null;
+        if ($method === PaymentMethod::Cash && blank($this->paymentAmount)) {
+            throw ValidationException::withMessages(['paymentAmount' => __('pos.payment.amount_required')]);
         }
 
-        DB::transaction(function () use ($order, $method, $applied, $reference): void {
-            $order->payments()->create([
+        if (filled($this->paymentAmount) && (int) str_replace('.', '', (string) $this->paymentAmount) < 1) {
+            throw ValidationException::withMessages(['paymentAmount' => __('pos.payment.amount_min')]);
+        }
+
+        $reference = filled($this->paymentReference) ? $this->paymentReference : null;
+
+        DB::transaction(function () use ($order, $method, $reference): void {
+            // Row lock serializes concurrent captures for the same order so
+            // two rapid payments cannot both succeed. The status and
+            // remaining balance are re-read under the lock.
+            $fresh = Order::query()->whereKey($order->id)->lockForUpdate()->first();
+
+            if ($fresh === null || $fresh->status !== OrderStatus::Pending) {
+                throw ValidationException::withMessages(['selectedOrderId' => __('pos.payment.already_paid')]);
+            }
+
+            [$applied, $change] = $this->resolveAppliedAmount($fresh, $method);
+
+            $fresh->payments()->create([
                 'method' => $method,
                 'amount' => $applied,
+                'change' => $change,
                 'reference' => $reference,
                 'paid_at' => now(),
                 'admin_id' => auth('admin')->id(),
             ]);
 
-            $order->markPaidIfCovered();
+            $fresh->markPaidIfCovered();
         });
 
         $order->refresh();
-        $this->changeDue = $change;
+        $this->changeDue = (int) $order->payments()->sum('change');
         $this->paymentReference = '';
         $this->paymentAmount = $order->remaining > 0 ? number_format($order->remaining, 0, ',', '.') : '';
 
         if ($order->status === OrderStatus::Paid) {
             Notification::make()
                 ->title(__('pos.payment.paid', ['order_number' => $order->order_number]))
-                ->body($change > 0
-                    ? __('pos.payment.change_due', ['amount' => 'Rp '.number_format($change, 0, ',', '.')])
+                ->body($this->changeDue > 0
+                    ? __('pos.payment.change_due', ['amount' => 'Rp '.number_format($this->changeDue, 0, ',', '.')])
                     : null)
                 ->success()
                 ->send();
@@ -467,6 +500,40 @@ class Cashier extends Page
                 ->info()
                 ->send();
         }
+    }
+
+    /**
+     * Resolve [applied, change] for a capture against the order's CURRENT
+     * state (read under the row lock). Cash payments may over-tender: the
+     * applied amount is capped at the remaining balance and the surplus is
+     * stored as change — the drawer only ever accounts for what is applied.
+     *
+     * @return array{0: int, 1: int}
+     */
+    protected function resolveAppliedAmount(Order $order, PaymentMethod $method): array
+    {
+        if ($method === PaymentMethod::Cash) {
+            $tendered = (int) str_replace('.', '', (string) $this->paymentAmount);
+
+            return [
+                min($tendered, $order->remaining),
+                max($tendered - $order->remaining, 0),
+            ];
+        }
+
+        // QRIS / e-wallet: take a partial amount when entered; blank settles
+        // the remaining exactly. Never exceeds the remaining balance.
+        if (blank($this->paymentAmount)) {
+            return [$order->remaining, 0];
+        }
+
+        $applied = (int) str_replace('.', '', (string) $this->paymentAmount);
+
+        if ($applied > $order->remaining) {
+            throw ValidationException::withMessages(['paymentAmount' => __('dashboard.amount_exceeds_remaining')]);
+        }
+
+        return [$applied, 0];
     }
 
     /**
@@ -605,17 +672,61 @@ class Cashier extends Page
             ->find($this->selectedOrderId);
     }
 
+    /**
+     * Next order number ORD-YYYYMMDD-####, handed out atomically from a
+     * per-day counter row. The counter row is locked FOR UPDATE inside the
+     * surrounding transaction, so concurrent creators serialize on it —
+     * including the very first order of the day, which has no previous
+     * order row to lock (the seed is derived from any orders that already
+     * exist for the day).
+     */
     protected function generateOrderNumber(): string
     {
-        $prefix = 'ORD-'.now()->format('Ymd').'-';
+        $date = now()->format('Ymd');
 
-        $last = Order::query()
-            ->where('order_number', 'like', $prefix.'%')
-            ->orderByDesc('order_number')
-            ->value('order_number');
+        $sequence = DB::transaction(function () use ($date): int {
+            $counter = DB::table('order_counters')
+                ->where('date', $date)
+                ->lockForUpdate()
+                ->first();
 
-        $sequence = $last === null ? 1 : ((int) substr($last, -4)) + 1;
+            if ($counter === null) {
+                $last = Order::query()
+                    ->where('order_number', 'like', 'ORD-'.$date.'-%')
+                    ->orderByDesc('order_number')
+                    ->value('order_number');
 
-        return $prefix.str_pad((string) $sequence, 4, '0', STR_PAD_LEFT);
+                $next = $last === null ? 1 : ((int) substr($last, -4)) + 1;
+
+                try {
+                    DB::table('order_counters')->insert([
+                        'date' => $date,
+                        'last_number' => $next,
+                    ]);
+                } catch (UniqueConstraintViolationException) {
+                    // Another creator seeded the counter concurrently — fall
+                    // back to incrementing the committed value under lock.
+                    $counter = DB::table('order_counters')
+                        ->where('date', $date)
+                        ->lockForUpdate()
+                        ->first();
+
+                    $next = ((int) ($counter->last_number ?? $next)) + 1;
+
+                    if ($counter !== null) {
+                        DB::table('order_counters')->where('date', $date)->update(['last_number' => $next]);
+                    }
+                }
+
+                return $next;
+            }
+
+            $next = $counter->last_number + 1;
+            DB::table('order_counters')->where('date', $date)->update(['last_number' => $next]);
+
+            return $next;
+        });
+
+        return 'ORD-'.$date.'-'.str_pad((string) $sequence, 4, '0', STR_PAD_LEFT);
     }
 }

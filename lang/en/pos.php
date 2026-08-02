@@ -16,6 +16,8 @@ return [
     'create_order' => 'Create Order',
     'order_created' => 'Order :order_number has been created',
     'cart_empty' => 'Add menu items before creating an order.',
+    'qty_min' => 'Item quantity must be at least 1.',
+    'qty_max' => 'Item quantity may not exceed :max per line.',
 
     'paid' => 'Paid',
 

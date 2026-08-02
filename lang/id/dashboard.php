@@ -7,6 +7,12 @@ return [
     'demand_forecast_heading' => 'Perkiraan Permintaan (3 Bulan Terakhir)',
     'revenue' => 'Pendapatan',
     'count' => 'Jumlah Pesanan',
+    'today_revenue' => 'Pendapatan Hari Ini',
+    'today_orders' => 'Pesanan Hari Ini',
+    'avg_order_value' => 'Rata-rata Nilai Pesanan',
+    'paid_served' => 'Pesanan lunas & selesai',
+    'revenue_chart_heading' => 'Pendapatan (14 Hari Terakhir)',
+    'top_items_heading' => 'Produk Terlaris (Pendapatan)',
 
     'order_notes' => 'Catatan Pesanan',
     'order_notes_placeholder' => 'Opsional — contoh: tanpa es, bungkus',

@@ -934,8 +934,10 @@ class PosCashierTest extends TestCase
         $this->assertDatabaseHas('payments', [
             'order_id' => $order->id,
             'method' => 'cash',
-            'amount' => 60000,
+            'amount' => 55000,
+            'change' => 5000,
         ]);
+        $this->assertSame(55000, $order->fresh()->paid_total);
     }
 
     public function test_percent_discount_is_computed_as_a_percentage_of_the_gross_total(): void
@@ -1165,5 +1167,54 @@ class PosCashierTest extends TestCase
             ->assertSee('-Rp 10.000')
             ->assertSee('Rp 55.000')
             ->assertDontSee('Rp 65.000');
+    }
+
+    /**
+     * POS input hardening (card 123).
+     *
+     * The cart is a plain array and the UI keeps quantities positive through
+     * add/increment/decrement, but a corrupted state (0, negative, absurdly
+     * large) must never reach the order line. createOrder() rejects it with
+     * a validation error on 'cart' and writes nothing.
+     */
+    public function test_cart_quantity_of_zero_or_less_is_rejected_when_creating_an_order(): void
+    {
+        $admin = Admin::factory()->create();
+        $item = MenuItem::create(['name' => 'Espresso', 'price' => 20000]);
+
+        foreach ([0, -1, -5] as $qty) {
+            Livewire::actingAs($admin, 'admin')
+                ->test(Cashier::class)
+                ->set('cart', [$item->id => $qty])
+                ->call('createOrder')
+                ->assertHasErrors(['cart']);
+        }
+
+        $this->assertDatabaseCount('orders', 0);
+        $this->assertDatabaseCount('order_items', 0);
+    }
+
+    public function test_absurdly_large_cart_quantity_is_rejected_but_a_sane_one_orders(): void
+    {
+        $admin = Admin::factory()->create();
+        $item = MenuItem::create(['name' => 'Espresso', 'price' => 20000]);
+
+        Livewire::actingAs($admin, 'admin')
+            ->test(Cashier::class)
+            ->set('cart', [$item->id => 100000])
+            ->call('createOrder')
+            ->assertHasErrors(['cart']);
+
+        Livewire::actingAs($admin, 'admin')
+            ->test(Cashier::class)
+            ->set('cart', [$item->id => 99])
+            ->call('createOrder')
+            ->assertHasNoErrors();
+
+        $this->assertDatabaseCount('orders', 1);
+        $this->assertDatabaseHas('order_items', [
+            'qty' => 99,
+            'subtotal' => 99 * 20000,
+        ]);
     }
 }

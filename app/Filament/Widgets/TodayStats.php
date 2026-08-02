@@ -12,25 +12,26 @@ class TodayStats extends StatsOverviewWidget
 {
     protected function getStats(): array
     {
-        $query = Order::query()
+        $orders = Order::query()
             ->whereDate('created_at', today())
-            ->whereNotIn('status', [OrderStatus::Pending, OrderStatus::Refunded, OrderStatus::Cancelled]);
+            ->whereNotIn('status', [OrderStatus::Pending, OrderStatus::Refunded, OrderStatus::Cancelled])
+            ->get();
 
-        $count = (clone $query)->count();
-        $revenue = (clone $query)->sum('total');
+        $count = $orders->count();
+        $revenue = $orders->sum(fn (Order $order): int => $order->net_total);
         $average = $count > 0 ? intdiv($revenue, $count) : 0;
 
         return [
-            Stat::make('Today Revenue', 'Rp '.number_format($revenue, 0, ',', '.'))
-                ->description('Paid & served orders')
+            Stat::make(__('dashboard.today_revenue'), 'Rp '.number_format($revenue, 0, ',', '.'))
+                ->description(__('dashboard.paid_served'))
                 ->icon(Heroicon::OutlinedBanknotes)
                 ->color('success'),
-            Stat::make('Today Orders', $count)
-                ->description('Paid & served orders')
+            Stat::make(__('dashboard.today_orders'), $count)
+                ->description(__('dashboard.paid_served'))
                 ->icon(Heroicon::OutlinedShoppingBag)
                 ->color('primary'),
-            Stat::make('Average Order Value', 'Rp '.number_format($average, 0, ',', '.'))
-                ->description('Paid & served orders')
+            Stat::make(__('dashboard.avg_order_value'), 'Rp '.number_format($average, 0, ',', '.'))
+                ->description(__('dashboard.paid_served'))
                 ->icon(Heroicon::OutlinedChartBar)
                 ->color('warning'),
         ];

@@ -85,8 +85,11 @@ class PnlReport extends Page
             ->whereDate('created_at', '>=', $start)
             ->whereDate('created_at', '<=', $end);
 
-        $revenue = (int) $paidOrders->sum('total');
-        $ordersCount = $paidOrders->count();
+        // NET revenue of paid/served orders only — same definition as
+        // Shift::salesTotal() so P&L reconciles with shift Z-reports.
+        $paidOrdersCollection = $paidOrders->get();
+        $revenue = $paidOrdersCollection->sum(fn (Order $order): int => $order->net_total);
+        $ordersCount = $paidOrdersCollection->count();
 
         $items = OrderItem::query()
             ->whereHas('order', function (Builder $query) use ($start, $end): void {
@@ -102,6 +105,11 @@ class PnlReport extends Page
             ->with('menuItem.ingredients')
             ->get();
 
+        // COGS uses the CURRENT recipe-ingredient cost (menu_item_stock_item
+        // pivot quantity × stock item cost) at report time — there is no
+        // per-order cost snapshot column, so historical ingredient price
+        // changes are reflected in current reports (documented current-cost
+        // approach; a snapshot would need a schema change).
         $cogs = $items->sum(fn (OrderItem $item): int => (int) $item->qty * (int) $item->menuItem?->ingredients?->sum(
             fn (StockItem $ingredient): int => (int) $ingredient->cost * (int) $ingredient->pivot->quantity
         ));

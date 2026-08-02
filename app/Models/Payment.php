@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-#[Fillable(['order_id', 'method', 'amount', 'reference', 'paid_at', 'admin_id'])]
+#[Fillable(['order_id', 'method', 'amount', 'change', 'reference', 'paid_at', 'admin_id'])]
 class Payment extends Model
 {
     /**
@@ -20,6 +20,7 @@ class Payment extends Model
         return [
             'method' => PaymentMethod::class,
             'amount' => 'integer',
+            'change' => 'integer',
             'paid_at' => 'datetime',
         ];
     }

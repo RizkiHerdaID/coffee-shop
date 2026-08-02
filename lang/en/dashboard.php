@@ -7,6 +7,12 @@ return [
     'demand_forecast_heading' => 'Demand Forecast (Last 3 Months)',
     'revenue' => 'Revenue',
     'count' => 'Order Count',
+    'today_revenue' => 'Today Revenue',
+    'today_orders' => 'Today Orders',
+    'avg_order_value' => 'Average Order Value',
+    'paid_served' => 'Paid & served orders',
+    'revenue_chart_heading' => 'Revenue (last 14 days)',
+    'top_items_heading' => 'Top items by revenue',
 
     'order_notes' => 'Order Note',
     'order_notes_placeholder' => 'Optional — e.g. no ice, wrap it',

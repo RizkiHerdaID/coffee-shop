@@ -11,6 +11,7 @@ use BackedEnum;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Filament\Support\Icons\Heroicon;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Collection;
 use Illuminate\Validation\ValidationException;
 
@@ -86,12 +87,15 @@ class ManageShift extends Page
         $ids = $shifts->pluck('id');
 
         $orderRows = Order::query()
-            ->selectRaw('shift_id, COUNT(*) as orders_count, SUM(total) as sales_total')
+            ->select('shift_id', 'total', 'discount_type', 'discount_amount')
             ->whereIn('shift_id', $ids)
             ->whereNotIn('status', [OrderStatus::Pending, OrderStatus::Refunded, OrderStatus::Cancelled])
-            ->groupBy('shift_id')
             ->get()
-            ->keyBy('shift_id');
+            ->groupBy('shift_id')
+            ->map(fn ($orders): array => [
+                'orders_count' => $orders->count(),
+                'sales_total' => $orders->sum(fn (Order $order): int => $order->net_total),
+            ]);
 
         $paymentRows = Payment::query()
             ->join('orders', 'orders.id', '=', 'payments.order_id')
@@ -143,7 +147,9 @@ class ManageShift extends Page
     }
 
     /**
-     * Today's cash movements of the active shift, newest first.
+     * Cash movements of the active shift since it opened, newest first.
+     * Filtering by "today" would hide overnight-shift movements made before
+     * midnight.
      *
      * @return Collection<int, ShiftCashMovement>
      */
@@ -157,7 +163,7 @@ class ManageShift extends Page
 
         return $shift->cashMovements()
             ->with('admin')
-            ->whereDate('created_at', today())
+            ->where('created_at', '>=', $shift->opened_at)
             ->orderByDesc('created_at')
             ->orderByDesc('id')
             ->get();
@@ -231,11 +237,17 @@ class ManageShift extends Page
             throw ValidationException::withMessages(['openingCash' => __('pos.shift.invalid_amount')]);
         }
 
-        $shift = Shift::create([
-            'opened_at' => now(),
-            'opening_cash' => $this->parseAmount($this->openingCash),
-            'admin_id' => auth('admin')->id(),
-        ]);
+        try {
+            $shift = Shift::create([
+                'opened_at' => now(),
+                'opening_cash' => $this->parseAmount($this->openingCash),
+                'admin_id' => auth('admin')->id(),
+            ]);
+        } catch (UniqueConstraintViolationException) {
+            // A concurrent request opened a shift between the check above
+            // and this insert — the partial unique index rejected ours.
+            throw ValidationException::withMessages(['openingCash' => __('pos.shift.already_open')]);
+        }
 
         $this->openingCash = '';
 
@@ -271,11 +283,20 @@ class ManageShift extends Page
             throw ValidationException::withMessages(['closingCash' => __('pos.shift.invalid_amount')]);
         }
 
-        $shift->update([
-            'closed_at' => now(),
-            'closing_cash' => $this->parseAmount($this->closingCash),
-            'expected_total' => $shift->salesTotal(),
-        ]);
+        // Conditional update: if a concurrent request already closed the
+        // shift between the check above and this update, the affected-row
+        // count is 0 and we do not overwrite the first closing.
+        $closed = Shift::query()
+            ->whereKey($shift->id)
+            ->whereNull('closed_at')
+            ->update([
+                'closed_at' => now(),
+                'closing_cash' => $this->parseAmount($this->closingCash),
+            ]);
+
+        if ($closed !== 1) {
+            throw ValidationException::withMessages(['closingCash' => __('pos.shift.none_open')]);
+        }
 
         Notification::make()
             ->title(__('pos.shift.close_success'))

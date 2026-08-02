@@ -67,11 +67,12 @@ class ShiftTest extends TestCase
         ]);
     }
 
-    private function cashPayment(Order $order, Admin $admin, int $amount, ?string $reference = null): Payment
+    private function cashPayment(Order $order, Admin $admin, int $amount, ?string $reference = null, int $change = 0): Payment
     {
         return $order->payments()->create([
             'method' => PaymentMethod::Cash,
             'amount' => $amount,
+            'change' => $change,
             'reference' => $reference,
             'paid_at' => now(),
             'admin_id' => $admin->id,
@@ -89,7 +90,6 @@ class ShiftTest extends TestCase
             'closed_at' => now()->subHours(1),
             'opening_cash' => 100000,
             'closing_cash' => 150000,
-            'expected_total' => 50000,
             'admin_id' => $admin->id,
         ]);
 
@@ -114,7 +114,6 @@ class ShiftTest extends TestCase
             'closed_at' => now()->subHours(1),
             'opening_cash' => 100000,
             'closing_cash' => 150000,
-            'expected_total' => 50000,
             'admin_id' => $admin->id,
         ]);
 
@@ -140,6 +139,7 @@ class ShiftTest extends TestCase
     {
         $admin = $this->admin();
         $shift = $this->openShift($admin);
+        $shift->update(['closed_at' => now(), 'closing_cash' => 0]);
         $other = $this->openShift($admin, 100000);
 
         $this->paidOrder($shift, $admin, 20000);
@@ -233,18 +233,22 @@ class ShiftTest extends TestCase
         ], $shift->paymentsByMethod());
     }
 
-    public function test_payments_by_method_nets_partial_refunds_on_in_scope_orders(): void
+    public function test_payments_by_method_counts_applied_cash_and_reports_refunds_separately(): void
     {
         $admin = $this->admin();
-        $shift = $this->openShift($admin);
+        $shift = $this->openShift($admin, 100000);
 
         $order = $this->paidOrder($shift, $admin, 50000);
         $this->cashPayment($order, $admin, 50000);
         $this->cashPayment($order, $admin, -15000); // partial refund, order stays paid
 
-        $this->assertSame(35000, $shift->paymentsByMethod()['cash']);
+        // Card 102: the payment split shows the APPLIED cash intake (50.000);
+        // refund rows are reported by cashRefunds() so the Z-report lines sum
+        // to expectedCash() instead of double-counting the refund.
+        $this->assertSame(50000, $shift->paymentsByMethod()['cash']);
         $this->assertSame(50000, $shift->cashPaid());
         $this->assertSame(-15000, $shift->cashRefunds());
+        $this->assertSame(135000, $shift->expectedCash());
     }
 
     public function test_expected_cash_ignores_fully_refunded_orders(): void
@@ -280,23 +284,18 @@ class ShiftTest extends TestCase
         $admin = $this->admin();
         $shift = $this->openShift($admin, 250000);
 
-        // Cashier records the full tendered amount (change is not subtracted),
-        // so order A contributes 200.000 to the drawer.
+        // The cashier APPLIES 150.000 to the 150.000 order; the 50.000 of
+        // change from a 200.000 tender lives in payments.change and never
+        // enters the drawer math.
         $order = $this->paidOrder($shift, $admin, 150000);
-        $this->cashPayment($order, $admin, 200000);
-        $order->payments()->create([
-            'method' => PaymentMethod::Qris,
-            'amount' => 0, // QRIS settles remaining exactly
-            'paid_at' => now(),
-            'admin_id' => $admin->id,
-        ]);
+        $this->cashPayment($order, $admin, 150000, change: 50000);
 
         $refunded = $this->paidOrder($shift, $admin, 50000);
         $this->cashPayment($refunded, $admin, 50000);
         $this->cashPayment($refunded, $admin, -15000); // cash refund row
 
-        // 250.000 + 200.000 + 50.000 − 15.000 = 485.000
-        $this->assertSame(485000, $shift->expectedCash());
+        // 250.000 + 150.000 + 50.000 − 15.000 = 435.000
+        $this->assertSame(435000, $shift->expectedCash());
     }
 
     public function test_expected_cash_math_with_no_cash_activity_equals_opening_cash(): void
@@ -339,7 +338,6 @@ class ShiftTest extends TestCase
         $shift->update([
             'closed_at' => now(),
             'closing_cash' => 160000,
-            'expected_total' => 50000,
         ]);
 
         $this->assertSame(150000, $shift->expectedCash());
@@ -412,7 +410,6 @@ class ShiftTest extends TestCase
         $this->assertDatabaseCount('shifts', 1);
         $this->assertDatabaseHas('shifts', [
             'opening_cash' => 500000,
-            'expected_total' => null,
             'closing_cash' => null,
             'admin_id' => $admin->id,
         ]);
@@ -455,7 +452,7 @@ class ShiftTest extends TestCase
         $this->assertDatabaseHas('shifts', ['opening_cash' => 100000]);
     }
 
-    public function test_closing_a_shift_stores_closing_cash_expected_total_and_closed_at(): void
+    public function test_closing_a_shift_stores_closing_cash_and_closed_at(): void
     {
         $admin = $this->admin();
         $shift = $this->openShift($admin, 500000);
@@ -472,7 +469,7 @@ class ShiftTest extends TestCase
         $shift->refresh();
         $this->assertNotNull($shift->closed_at);
         $this->assertSame(535000, $shift->closing_cash);
-        $this->assertSame(50000, $shift->expected_total);
+        $this->assertSame(50000, $shift->salesTotal());
     }
 
     public function test_closing_a_shift_requires_counted_cash_and_an_open_shift(): void
@@ -524,7 +521,6 @@ class ShiftTest extends TestCase
         $shift->update([
             'closed_at' => now(),
             'closing_cash' => 535000,
-            'expected_total' => 50000,
         ]);
 
         Livewire::actingAs($admin, 'admin')
@@ -565,7 +561,6 @@ class ShiftTest extends TestCase
         $shift->update([
             'closed_at' => now(),
             'closing_cash' => 535000,
-            'expected_total' => 50000,
         ]);
 
         $this->actingAs($admin, 'admin')
@@ -592,7 +587,6 @@ class ShiftTest extends TestCase
         $shift->update([
             'closed_at' => now(),
             'closing_cash' => 500000,
-            'expected_total' => 0,
         ]);
 
         $this->actingAs($admin, 'admin')
@@ -604,6 +598,57 @@ class ShiftTest extends TestCase
             ->assertSee('DISCREPANCY')
             ->assertSee('MATCH')
             ->assertDontSee('LAPORAN PENUTUPAN SHIFT');
+    }
+
+    /**
+     * Card 102: the Z-report cash section must reconcile EXACTLY with
+     * expectedCash() — opening + applied cash − refunds + deposits − petty.
+     * Each line is exclusive so nothing is double-counted; the over-tendered
+     * change (14.500) stays out of the cash-payments line.
+     */
+    public function test_z_report_components_reconcile_exactly_with_expected_cash(): void
+    {
+        $admin = $this->admin();
+        $shift = $this->openShift($admin, 250000);
+
+        $cashOrder = $this->paidOrder($shift, $admin, 85500);
+        $this->cashPayment($cashOrder, $admin, 85500, change: 14500); // 100.000 tendered
+
+        $qrisOrder = $this->paidOrder($shift, $admin, 20000);
+        $qrisOrder->payments()->create([
+            'method' => PaymentMethod::Qris,
+            'amount' => 20000,
+            'paid_at' => now(),
+            'admin_id' => $admin->id,
+        ]);
+
+        $refunded = $this->paidOrder($shift, $admin, 50000);
+        $this->cashPayment($refunded, $admin, 50000);
+        $this->cashPayment($refunded, $admin, -10000); // partial refund, order stays paid
+
+        $this->deposit($shift, $admin, 50000);
+        $this->pettyOut($shift, $admin, 15000);
+
+        // 250.000 + 85.500 + 50.000 − 10.000 + 50.000 − 15.000 = 410.500
+        $this->assertSame(135500, $shift->cashPaid()); // 85.500 + 50.000 applied captures
+        $this->assertSame(-10000, $shift->cashRefunds());
+        $this->assertSame(50000, $shift->deposits());
+        $this->assertSame(15000, $shift->pettyOut());
+        $this->assertSame(410500, $shift->expectedCash());
+
+        $shift->update(['closed_at' => now(), 'closing_cash' => 410500]);
+        $this->assertSame(0, $shift->discrepancy());
+
+        $this->actingAs($admin, 'admin')
+            ->get(route('pos.zreport', $shift))
+            ->assertOk()
+            ->assertSee('Rp 135.500') // cash payments: applied only, change excluded
+            ->assertSee('Rp 20.000') // qris
+            ->assertSee('Rp -10.000') // refunds on their own line
+            ->assertSee('Rp 50.000') // deposits
+            ->assertSee('Rp 15.000') // petty out
+            ->assertSee('Rp 410.500') // expected == counted
+            ->assertSee('COCOK');
     }
 
     private function deposit(Shift $shift, Admin $admin, int $amount, ?string $note = null): ShiftCashMovement
@@ -687,6 +732,7 @@ class ShiftTest extends TestCase
     {
         $admin = $this->admin();
         $shift = $this->openShift($admin, 100000);
+        $shift->update(['closed_at' => now(), 'closing_cash' => 0]);
         $other = $this->openShift($admin, 100000);
 
         $this->deposit($other, $admin, 50000);
@@ -872,7 +918,6 @@ class ShiftTest extends TestCase
         $shift->update([
             'closed_at' => now(),
             'closing_cash' => 400000,
-            'expected_total' => 0,
         ]);
 
         $this->actingAs($admin, 'admin')
@@ -894,7 +939,6 @@ class ShiftTest extends TestCase
         $shift->update([
             'closed_at' => now(),
             'closing_cash' => 400000,
-            'expected_total' => 0,
         ]);
 
         Livewire::actingAs($admin, 'admin')
@@ -916,7 +960,6 @@ class ShiftTest extends TestCase
         $shift->update([
             'closed_at' => now(),
             'closing_cash' => 450000,
-            'expected_total' => 50000,
         ]);
 
         $component = Livewire::actingAs($admin, 'admin')->test(ManageShift::class);

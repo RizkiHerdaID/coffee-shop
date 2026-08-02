@@ -54,7 +54,6 @@ class RefundsVoidsTest extends TestCase
         $shift->update([
             'closed_at' => now(),
             'closing_cash' => $shift->opening_cash,
-            'expected_total' => 0,
         ]);
     }
 
@@ -501,7 +500,14 @@ class RefundsVoidsTest extends TestCase
     // Z-report
     // ---------------------------------------------------------------------
 
-    public function test_z_report_shows_partial_cash_refunds(): void
+    /**
+     * Card 102: the Z-report cash section shows applied cash payments and
+     * refunds on SEPARATE exclusive lines so the components reconcile with
+     * expectedCash() — 100.000 opening + 50.000 applied − 15.000 refund =
+     * 135.000. (Regression: the split previously netted the refund into the
+     * 35.000 cash line AND printed the −15.000 refund line — double-count.)
+     */
+    public function test_z_report_shows_partial_cash_refunds_without_double_counting(): void
     {
         $admin = $this->admin();
         $shift = $this->openShift($admin, 100000);
@@ -510,7 +516,6 @@ class RefundsVoidsTest extends TestCase
         $shift->update([
             'closed_at' => now(),
             'closing_cash' => 135000,
-            'expected_total' => 35000,
         ]);
 
         $this->actingAs($admin, 'admin')
@@ -518,7 +523,39 @@ class RefundsVoidsTest extends TestCase
             ->assertOk()
             ->assertSee('PENGEMBALIAN TUNAI')
             ->assertSee('Rp -15.000')
-            ->assertSee('Rp 35.000')
-            ->assertSee('Rp 135.000');
+            ->assertSee('Rp 50.000')
+            ->assertSee('Rp 135.000')
+            ->assertSee('COCOK');
+
+        $this->assertSame(100000, $shift->opening_cash);
+        $this->assertSame(50000, $shift->cashPaid());
+        $this->assertSame(-15000, $shift->cashRefunds());
+        $this->assertSame(135000, $shift->expectedCash());
+        $this->assertSame(0, $shift->discrepancy());
+    }
+
+    public function test_refund_after_over_tender_refunds_the_applied_amount_only(): void
+    {
+        $admin = $this->admin();
+        $shift = $this->openShift($admin, 200000);
+        $order = $this->paidOrder($shift, $admin, 85500);
+        $order->payments()->create([
+            'method' => PaymentMethod::Cash,
+            'amount' => 85500,
+            'change' => 14500, // 100.000 tendered; change never enters the drawer
+            'paid_at' => now(),
+            'admin_id' => $admin->id,
+        ]);
+
+        $this->actingAs($admin, 'admin');
+        $this->assertTrue($order->refund(20000));
+
+        $order->refresh();
+
+        $this->assertSame(OrderStatus::Paid, $order->status);
+        $this->assertSame(65500, $order->paid_total);
+        $this->assertSame(-20000, $order->payments()->latest('id')->firstOrFail()->amount);
+        $this->assertSame(-20000, $shift->cashRefunds());
+        $this->assertSame(265500, $shift->expectedCash()); // 200.000 + 85.500 − 20.000
     }
 }

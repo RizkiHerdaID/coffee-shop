@@ -156,6 +156,12 @@
                         </div>
                     @endif
                 @endforeach
+                @if (($order->payments->sum('change') ?? 0) > 0)
+                    <div class="line">
+                        <span>{{ __('pos.receipt.change') }}</span>
+                        <span>Rp {{ number_format((int) $order->payments->sum('change'), 0, ',', '.') }}</span>
+                    </div>
+                @endif
             </div>
 
             <hr>

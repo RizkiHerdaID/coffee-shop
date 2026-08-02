@@ -5,12 +5,16 @@ namespace App\Filament\Widgets;
 use App\Enums\OrderStatus;
 use App\Models\Order;
 use Filament\Widgets\ChartWidget;
+use Illuminate\Contracts\Support\Htmlable;
 
 class RevenueChart extends ChartWidget
 {
     protected int|string|array $columnSpan = 'full';
 
-    protected ?string $heading = 'Revenue (last 14 days)';
+    public function getHeading(): string|Htmlable|null
+    {
+        return __('dashboard.revenue_chart_heading');
+    }
 
     protected function getType(): string
     {
@@ -23,11 +27,11 @@ class RevenueChart extends ChartWidget
     protected function getData(): array
     {
         $rows = Order::query()
-            ->selectRaw('DATE(created_at) as date, SUM(total) as revenue')
             ->whereNotIn('status', [OrderStatus::Pending, OrderStatus::Refunded, OrderStatus::Cancelled])
             ->whereDate('created_at', '>=', today()->subDays(13))
-            ->groupBy('date')
-            ->pluck('revenue', 'date');
+            ->get(['created_at', 'total', 'discount_type', 'discount_amount'])
+            ->groupBy(fn (Order $order): string => $order->created_at->toDateString())
+            ->map(fn ($orders): int => $orders->sum(fn (Order $order): int => $order->net_total));
 
         $labels = [];
         $data = [];
@@ -41,7 +45,7 @@ class RevenueChart extends ChartWidget
         return [
             'datasets' => [
                 [
-                    'label' => 'Revenue',
+                    'label' => __('dashboard.revenue'),
                     'data' => $data,
                 ],
             ],

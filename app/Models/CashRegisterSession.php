@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\CashRegisterStatus;
+use App\Enums\OrderStatus;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -34,9 +35,12 @@ class CashRegisterSession extends Model
     }
 
     /**
-     * Revenue: SUM of orders.total for orders where
-     * orders.created_at >= opened_at AND (closed_at IS NULL OR orders.created_at <= closed_at).
-     * Returns 0 when opened_at is null.
+     * Revenue: SUM of paid/served orders' NET totals (gross minus discount)
+     * with orders.created_at >= opened_at AND (closed_at IS NULL OR
+     * orders.created_at <= closed_at). Pending, refunded and cancelled
+     * orders are excluded — same definition as Shift::salesTotal() so the
+     * session report reconciles with shift reports. Returns 0 when
+     * opened_at is null.
      */
     public function revenue(): int
     {
@@ -44,10 +48,16 @@ class CashRegisterSession extends Model
             return 0;
         }
 
-        $query = Order::query()->where('created_at', '>=', $this->opened_at)
-            ->where('created_at', '<=', $this->closed_at ?? now());
-
-        return (int) $query->sum('total');
+        return (int) Order::query()
+            ->where('created_at', '>=', $this->opened_at)
+            ->where('created_at', '<=', $this->closed_at ?? now())
+            ->whereNotIn('status', [
+                OrderStatus::Pending,
+                OrderStatus::Refunded,
+                OrderStatus::Cancelled,
+            ])
+            ->get()
+            ->sum(fn (Order $order): int => $order->net_total);
     }
 
     /**
