@@ -1,0 +1,88 @@
+{
+    "$schema": "https://opencode.ai/config.json",
+    "mcp": {
+        "laravel-boost": {
+            "type": "local",
+            "enabled": true,
+            "command": [
+                "vendor/bin/sail",
+                "artisan",
+                "boost:mcp"
+            ]
+        },
+        "vikunja": {
+            "type": "local",
+            "enabled": true,
+            "command": [
+                "npx",
+                "-y",
+                "@eargollo/vikunja-mcp"
+            ],
+            "environment": {
+                "VIKUNJA_URL": "https://vikunja.rizkilab.my.id/api/v1",
+                "VIKUNJA_API_TOKEN": "REPLACE_WITH_TOKEN_FROM_~/.vikunja-agent-token",
+                "VIKUNJA_MCP_ALLOW_WRITE": "1"
+            }
+        },
+        "postgres": {
+            "type": "local",
+            "enabled": true,
+            "command": [
+                "docker",
+                "run",
+                "-i",
+                "--rm",
+                "--network=host",
+                "-e",
+                "DATABASE_URI=postgresql://sail:REPLACE_WITH_DB_PASSWORD@localhost:REPLACE_DB_PORT/coffee_shop",
+                "crystaldba/postgres-mcp",
+                "--access-mode=restricted"
+            ]
+        },
+        "redis": {
+            "type": "local",
+            "enabled": true,
+            "command": [
+                "docker",
+                "run",
+                "-i",
+                "--rm",
+                "--network=host",
+                "mcp/redis"
+            ]
+        },
+        "semgrep": {
+            "type": "local",
+            "enabled": true,
+            "command": [
+                "docker",
+                "run",
+                "-i",
+                "--rm",
+                "-v",
+                ".:/src",
+                "-w",
+                "/src",
+                "semgrep/semgrep",
+                "semgrep",
+                "mcp",
+                "-t",
+                "stdio"
+            ]
+        },
+        "phpcodearcheology": {
+            "type": "local",
+            "enabled": true,
+            "command": [
+                "vendor/bin/phpcodearcheology",
+                "mcp",
+                "app"
+            ]
+        }
+    },
+    "skills": {
+        "paths": [
+            ".agents/skills"
+        ]
+    }
+}
