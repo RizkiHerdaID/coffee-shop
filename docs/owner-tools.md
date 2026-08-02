@@ -84,6 +84,18 @@ PO fields: `supplier_id`, `ordered_at`, `expected_at`, `status`, `total` (intege
 | UI | `app/Filament/Resources/MenuItems/RelationManagers/RecipesRelationManager.php` — attach stock items with quantity, columns for quantity/cost/line COGS (money-formatted), `MenuItemResource` embeds it |
 | POS consumption | `app/Filament/Pages/Cashier.php:195+` `consumeRecipeStock()` — on sale, each ingredient is deducted via `stockOut()` with the `order_item_id` recorded; **lenient fallback**: if a deduction fails (insufficient stock) the sale proceeds and the notification lists the skipped ingredient names (commit `c943ead`) |
 
+### Monthly P&L report
+
+| Piece | Location |
+| --- | --- |
+| Page | `app/Filament/Pages/PnlReport.php` (`getReportData(?string $from, ?string $to): array` — protected, reflection-tested) + `resources/views/filament/pages/pnl-report.blade.php` |
+| Route | `admin/pnl-report` (`filament.admin.pages.pnl-report`), registered in `AdminPanelProvider::pages()` |
+| Lang | `lang/{id,en}/pnl.php` |
+
+- Period picker (from/to, default = current month, inclusive `whereDate` bounds on `orders.created_at` / `expenses.spent_at`); "Dari" after "Sampai" shows a localized error instead of figures.
+- Revenue = `SUM(orders.total)` for paid orders (status NOT IN pending/refunded/cancelled — mirrors `Shift::paidOrders()`); COGS = Σ `order_items.qty × MenuItem::cogs()` (lines with a deleted `menu_item_id` contribute 0); expenses grouped by `ExpenseCategory` (all 8 cases 0-filled).
+- Statement shows revenue − COGS = gross margin − expenses = net margin, plus gross/net margin percentages and a period-independent inventory valuation (Σ `stock_items.cost × quantity`).
+
 ### AI copy generation (DeepSeek)
 
 | Piece | Location |

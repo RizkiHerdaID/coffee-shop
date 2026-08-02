@@ -23,7 +23,6 @@ Priority legend: **P1** = Urgent & Important · **P2** = Important / Not Urgent 
 | Order/line notes to kitchen ticket (modifiers) | S (notes) / M (presets) | Nullable notes on `orders` + `order_items` (or JSON modifiers), Textarea in cashier cart flow, printed under each line in `PrintKitchenTicket`; later structured presets on `MenuItem`. Baristas can't fulfill custom orders today. |
 | Mid-shift cash movements (deposits / petty cash) | M | `shift_cash_movements` table (type in/out, amount, note, admin) + ManageShift UI; `expectedCash()` = opening + cashPaid + cashRefunds − deposits + petty_out; Z-report + recent-shifts SQL update. Fixes most common cashier discrepancy. **Changes shift-math contract → extend ShiftTest.** |
 | PO receiving + stock-linked line items | M | Nullable `stock_item_id` on `purchase_order_items` (keep description fallback), auto-fill total from lines, Receive action → `stockIn()` per item + status received; restock suggestions view from low-stock items. Closes the low-stock-alert → restock loop. FLAG: `PurchaseOrdersTest` assertions on description need updates. |
-| Monthly P&L report page | M (S static variant) | Filament page with period picker: revenue (paid orders) − COGS (`OrderItem.qty × MenuItem::cogs()`) − expenses by `ExpenseCategory`; gross/net margin; optional inventory valuation. Compounds when recipe consumption ships. |
 | Uptime + scheduler heartbeat monitoring | S | External check of `/up` every 5 min (healthchecks.io free or self-hosted Uptime Kuma on homelab) + scheduler heartbeat so a dead cron/queue alerts instead of silently missing the 08:00 summary + hourly low-stock alerts; `pingWithoutOverlapping` on scheduled commands in `bootstrap/app.php`. |
 
 ## P3 — urgent, not important
@@ -55,3 +54,4 @@ Priority legend: **P1** = Urgent & Important · **P2** = Important / Not Urgent 
 | --- | --- |
 | POS refunds + voids (audit-safe corrections) | `55e1217` / `d84d21b` — negative payment rows, `refunded`/`cancelled` statuses, shift-safe totals (see `docs/pos.md`) |
 | Recipe-based stock consumption on sales | `c943ead` — `consumeRecipeStock()` on POS orders, lenient fallback, `stock_movements.order_item_id` (see `docs/owner-tools.md`) |
+| Monthly P&L report page | pnl-report branch — `PnlReport` page at `admin/pnl-report`, period picker, revenue − COGS − expenses by category, gross/net margin + inventory valuation (see `docs/owner-tools.md`) |
