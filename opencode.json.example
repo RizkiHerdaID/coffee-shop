@@ -78,6 +78,17 @@
                 "mcp",
                 "app"
             ]
+        },
+        "playwright": {
+            "type": "local",
+            "enabled": true,
+            "command": [
+                "npx",
+                "-y",
+                "@playwright/mcp@latest",
+                "--isolated",
+                "--headless"
+            ]
         }
     },
     "skills": {

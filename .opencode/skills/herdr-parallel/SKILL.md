@@ -224,4 +224,5 @@ The host is a Ryzen 7 5700X (6c/12t), **16GB RAM, zero swap by default**. A full
 ## When to use Task tool vs herdr panes
 
 - Quick parallel exploration/review → built-in `explore`/`general` Task agents are fine (they appear in the pane too).
+- **Read-only audits / pre-merge bug-hunts → built-in `explore` Task agents, NOT herdr panes** (no worktree, no Sail stack, no RAM concern beyond the agents themselves). 5 parallel agents + MCP verification protocol: `.opencode/skills/pre-merge-bug-hunt/SKILL.md`.
 - Actual parallel implementation work the user asked for → real herdr panes with opencode agents.

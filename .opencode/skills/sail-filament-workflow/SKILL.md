@@ -33,6 +33,8 @@ After clearing, the suite should pass fully; the 4 AdminAuth failures are a cach
 4. `sg docker -c "npm run build"` after ANY view/CSS change — a stale `public/build` (gitignored) causes HTTP 500 or stale CSS.
 5. Smoke-test live: `curl -s -o /dev/null -w "%{http_code}\n" http://localhost:PORT/` + grep the rendered HTML (e.g. `curl -s http://localhost:8081/menu | rg "Rp 25.000"`).
 
+For money/POS/report work, a green suite is NOT enough — green tests can encode the wrong behavior. Before merging, run the pre-merge bug-hunt protocol (`.opencode/skills/pre-merge-bug-hunt/SKILL.md`): the 5-area explore fleet, claim spot-checks, live-DB integrity queries, and content-based semgrep.
+
 For Filament admin work, the panel also needs the cache cleared (see above); a fresh resource needs `php artisan optimize:clear` + re-optimize inside the container before it renders.
 
 ## Filament v5 gotchas
