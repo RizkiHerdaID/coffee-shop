@@ -32,6 +32,12 @@ return [
         'stock_in' => 'Stok Masuk',
         'stock_out' => 'Stok Keluar',
         'submit' => 'Simpan',
+        'export' => 'Ekspor CSV/XLSX',
+    ],
+
+    'exports' => [
+        'completed' => 'Ekspor stok selesai: :count baris.',
+        'failed' => ':failed_count baris gagal.',
     ],
 
     'notifications' => [

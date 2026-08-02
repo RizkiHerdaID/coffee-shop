@@ -42,6 +42,12 @@ return [
 
     'actions' => [
         'create' => 'Buat Pengeluaran',
+        'export' => 'Ekspor CSV/XLSX',
+    ],
+
+    'exports' => [
+        'completed' => 'Ekspor pengeluaran selesai: :count baris.',
+        'failed' => ':failed_count baris gagal.',
     ],
 
     'notifications' => [

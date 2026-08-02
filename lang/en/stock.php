@@ -32,6 +32,12 @@ return [
         'stock_in' => 'Stock In',
         'stock_out' => 'Stock Out',
         'submit' => 'Save',
+        'export' => 'Export CSV/XLSX',
+    ],
+
+    'exports' => [
+        'completed' => 'Stock export completed: :count rows.',
+        'failed' => ':failed_count rows failed.',
     ],
 
     'notifications' => [

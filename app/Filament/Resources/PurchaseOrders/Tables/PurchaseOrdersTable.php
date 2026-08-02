@@ -3,9 +3,11 @@
 namespace App\Filament\Resources\PurchaseOrders\Tables;
 
 use App\Enums\PurchaseOrderStatus;
+use App\Filament\Exports\PurchaseOrderExporter;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
+use Filament\Actions\ExportAction;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
@@ -68,6 +70,9 @@ class PurchaseOrdersTable
                 BulkActionGroup::make([
                     DeleteBulkAction::make(),
                 ]),
+                ExportAction::make()
+                    ->label(__('purchase-orders.actions.export'))
+                    ->exporter(PurchaseOrderExporter::class),
             ]);
     }
 }

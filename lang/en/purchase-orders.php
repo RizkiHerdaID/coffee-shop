@@ -31,4 +31,13 @@ return [
             'empty_heading' => 'No order items yet',
         ],
     ],
+
+    'actions' => [
+        'export' => 'Export CSV/XLSX',
+    ],
+
+    'exports' => [
+        'completed' => 'Purchase orders export completed: :count rows.',
+        'failed' => ':failed_count rows failed.',
+    ],
 ];

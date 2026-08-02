@@ -2,11 +2,13 @@
 
 namespace App\Filament\Resources\StockItems\Tables;
 
+use App\Filament\Exports\StockItemExporter;
 use App\Models\StockItem;
 use Filament\Actions\Action;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
+use Filament\Actions\ExportAction;
 use Filament\Forms\Components\TextInput;
 use Filament\Support\RawJs;
 use Filament\Tables\Columns\TextColumn;
@@ -105,6 +107,9 @@ class StockItemsTable
                 BulkActionGroup::make([
                     DeleteBulkAction::make(),
                 ]),
+                ExportAction::make()
+                    ->label(__('stock.actions.export'))
+                    ->exporter(StockItemExporter::class),
             ]);
     }
 }

@@ -7,6 +7,11 @@ return [
     'revenue' => 'Revenue',
     'count' => 'Order Count',
 
+    'low_stock_heading' => 'Low Stock',
+    'low_stock_empty_heading' => 'Stock is healthy',
+    'low_stock_empty_description' => 'No items are below their minimum threshold.',
+    'low_stock_manage' => 'Manage Stock',
+
     'filter' => [
         'revenue' => 'Revenue',
         'count' => 'Order Count',
