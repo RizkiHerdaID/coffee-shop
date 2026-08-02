@@ -57,9 +57,10 @@ class Cashier extends Page
     public string $paymentMethod = PaymentMethod::Cash->value;
 
     /**
-     * Tendered cash, Indonesian thousands separators allowed (e.g. "100.000");
-     * also accepts plain digits. QRIS/e-wallet ignore this and settle the
-     * remaining amount exactly.
+     * Amount charged, Indonesian thousands separators allowed (e.g. "100.000");
+     * also accepts plain digits. For cash this is the tendered amount (change
+     * allowed); for QRIS/e-wallet it may be a PARTIAL amount, blank settles
+     * the remaining exactly.
      */
     public string $paymentAmount = '';
 
@@ -346,8 +347,22 @@ class Cashier extends Page
             $change = max($tendered - $order->remaining, 0);
             $reference = null;
         } else {
-            // QRIS / e-wallet settle exactly the remaining amount.
-            $applied = $order->remaining;
+            // QRIS / e-wallet: take a partial amount when entered; blank
+            // settles the remaining exactly.
+            if (blank($this->paymentAmount)) {
+                $applied = $order->remaining;
+            } else {
+                $applied = (int) str_replace('.', '', (string) $this->paymentAmount);
+
+                if ($applied < 1) {
+                    throw ValidationException::withMessages(['paymentAmount' => __('pos.payment.amount_min')]);
+                }
+
+                if ($applied > $order->remaining) {
+                    throw ValidationException::withMessages(['paymentAmount' => __('dashboard.amount_exceeds_remaining')]);
+                }
+            }
+
             $change = 0;
             $reference = filled($this->paymentReference) ? $this->paymentReference : null;
         }
@@ -386,6 +401,21 @@ class Cashier extends Page
                 ->info()
                 ->send();
         }
+    }
+
+    /**
+     * Fill the payment amount with the order's remaining balance so a single
+     * capture settles the rest. No-op without a selected pending order.
+     */
+    public function payRest(): void
+    {
+        $order = $this->selectedOrder;
+
+        if ($order === null || $order->remaining < 1) {
+            return;
+        }
+
+        $this->paymentAmount = number_format($order->remaining, 0, ',', '.');
     }
 
     public function markServed(int $orderId): void

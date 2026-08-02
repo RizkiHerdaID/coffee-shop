@@ -15,6 +15,11 @@ return [
     'repeat_last_order' => 'Ulangi Pesanan Terakhir',
     'repeat_no_previous' => 'Belum ada pesanan untuk diulang.',
 
+    'amount' => 'Nominal Pembayaran',
+    'amount_placeholder' => 'Contoh: 25.000',
+    'pay_rest' => 'Bayar Sisa',
+    'amount_exceeds_remaining' => 'Nominal melebihi sisa tagihan.',
+
     'low_stock_heading' => 'Stok Menipis',
     'low_stock_empty_heading' => 'Stok aman',
     'low_stock_empty_description' => 'Tidak ada item stok di bawah batas minimum.',

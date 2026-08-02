@@ -189,10 +189,10 @@
                             </div>
                         @endif
 
-                        @if ($this->paymentMethod === \App\Enums\PaymentMethod::Cash->value)
-                            <div class="mt-4">
+                        <div class="mt-4 flex items-end gap-2">
+                            <div class="min-w-0 flex-1">
                                 <label for="cashier-payment-amount" class="mb-1 block text-sm font-medium text-gray-700">
-                                    {{ __('pos.payment.tendered') }}
+                                    {{ $this->paymentMethod === \App\Enums\PaymentMethod::Cash->value ? __('pos.payment.tendered') : __('dashboard.amount') }}
                                 </label>
                                 <input
                                     id="cashier-payment-amount"
@@ -201,14 +201,19 @@
                                     wire:model="paymentAmount"
                                     x-data="{ money: (v) => { const digits = String(v).replace(/[^\d]/g, ''); return digits === '' ? '' : Number(digits).toLocaleString('id-ID'); } }"
                                     x-mask:dynamic="money($input)"
-                                    placeholder="{{ __('pos.payment.tendered_placeholder') }}"
+                                    placeholder="{{ $this->paymentMethod === \App\Enums\PaymentMethod::Cash->value ? __('pos.payment.tendered_placeholder') : __('dashboard.amount_placeholder') }}"
                                     class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:border-amber-500 focus:ring-amber-500"
                                 >
                                 @error('paymentAmount')
                                     <p class="mt-1 text-sm text-danger-600">{{ $message }}</p>
                                 @enderror
                             </div>
-                        @endif
+                            @if ($this->selectedOrder->remaining > 0)
+                                <x-filament::button color="gray" size="sm" icon="heroicon-m-arrow-down" wire:click="payRest">
+                                    {{ __('dashboard.pay_rest') }}
+                                </x-filament::button>
+                            @endif
+                        </div>
 
                         @if ($this->paymentMethod !== \App\Enums\PaymentMethod::Cash->value)
                             <div class="mt-4">

@@ -15,6 +15,11 @@ return [
     'repeat_last_order' => 'Repeat Last Order',
     'repeat_no_previous' => 'No previous order to repeat.',
 
+    'amount' => 'Payment Amount',
+    'amount_placeholder' => 'e.g. 25,000',
+    'pay_rest' => 'Pay Rest',
+    'amount_exceeds_remaining' => 'Amount exceeds the remaining balance.',
+
     'low_stock_heading' => 'Low Stock',
     'low_stock_empty_heading' => 'Stock is healthy',
     'low_stock_empty_description' => 'No items are below their minimum threshold.',

@@ -498,4 +498,246 @@ class PosCashierTest extends TestCase
 
         $this->assertDatabaseCount('orders', 0);
     }
+
+    /**
+     * Split payments (wave 5).
+     *
+     * QRIS/e-wallet may take a PARTIAL amount: capturePayment() applies the
+     * entered paymentAmount instead of always settling the remaining balance;
+     * a blank amount still settles the full remainder (previous behaviour).
+     * Cash was already partial-capable (it applies the tendered amount). The
+     * order stays pending until the sum of all payment rows covers the total,
+     * then markPaidIfCovered() transitions it to paid exactly once.
+     */
+    public function test_qris_partial_payment_leaves_the_remainder_payable(): void
+    {
+        $admin = Admin::factory()->create();
+        $espresso = MenuItem::create(['name' => 'Espresso', 'price' => 20000]);
+        $croissant = MenuItem::create(['name' => 'Croissant', 'price' => 25000]);
+
+        $component = Livewire::actingAs($admin, 'admin')->test(Cashier::class);
+
+        $component
+            ->call('addToCart', $espresso->id)
+            ->call('addToCart', $espresso->id)
+            ->call('addToCart', $croissant->id)
+            ->call('createOrder')
+            ->assertHasNoErrors();
+
+        $order = Order::latest('id')->firstOrFail();
+
+        $component
+            ->set('paymentMethod', 'qris')
+            ->set('paymentAmount', '20.000')
+            ->set('paymentReference', 'QRIS-PARTIAL-1')
+            ->call('capturePayment')
+            ->assertHasNoErrors()
+            ->assertSet('changeDue', 0)
+            ->assertSet('paymentAmount', '45.000')
+            ->assertSet('paymentReference', '');
+
+        $this->assertSame(OrderStatus::Pending, $order->fresh()->status);
+        $this->assertSame(20000, $order->fresh()->paid_total);
+        $this->assertSame(45000, $order->fresh()->remaining);
+
+        $this->assertDatabaseCount('payments', 1);
+        $this->assertDatabaseHas('payments', [
+            'order_id' => $order->id,
+            'method' => 'qris',
+            'amount' => 20000,
+            'reference' => 'QRIS-PARTIAL-1',
+            'admin_id' => $admin->id,
+        ]);
+    }
+
+    public function test_ewallet_partial_payment_then_cash_settles_the_rest_with_multiple_payment_rows(): void
+    {
+        $admin = Admin::factory()->create();
+        $espresso = MenuItem::create(['name' => 'Espresso', 'price' => 20000]);
+        $croissant = MenuItem::create(['name' => 'Croissant', 'price' => 25000]);
+
+        $component = Livewire::actingAs($admin, 'admin')->test(Cashier::class);
+
+        $component
+            ->call('addToCart', $espresso->id)
+            ->call('addToCart', $espresso->id)
+            ->call('addToCart', $croissant->id)
+            ->call('createOrder')
+            ->assertHasNoErrors();
+
+        $order = Order::latest('id')->firstOrFail();
+
+        $component
+            ->set('paymentMethod', 'ewallet')
+            ->set('paymentAmount', '20.000')
+            ->call('capturePayment')
+            ->assertHasNoErrors();
+
+        $this->assertSame(OrderStatus::Pending, $order->fresh()->status);
+        $this->assertSame(45000, $order->fresh()->remaining);
+
+        $component
+            ->set('paymentMethod', 'cash')
+            ->set('paymentAmount', '45.000')
+            ->call('capturePayment')
+            ->assertHasNoErrors()
+            ->assertSet('changeDue', 0);
+
+        $this->assertSame(OrderStatus::Paid, $order->fresh()->status);
+        $this->assertSame(65000, $order->fresh()->paid_total);
+        $this->assertSame(0, $order->fresh()->remaining);
+
+        $this->assertDatabaseCount('payments', 2);
+        $this->assertDatabaseHas('payments', [
+            'order_id' => $order->id,
+            'method' => 'ewallet',
+            'amount' => 20000,
+            'reference' => null,
+            'admin_id' => $admin->id,
+        ]);
+        $this->assertDatabaseHas('payments', [
+            'order_id' => $order->id,
+            'method' => 'cash',
+            'amount' => 45000,
+            'admin_id' => $admin->id,
+        ]);
+        $this->assertSame(65000, (int) $order->payments()->sum('amount'));
+    }
+
+    public function test_qris_partial_payment_then_ewallet_settles_the_rest(): void
+    {
+        $admin = Admin::factory()->create();
+        $espresso = MenuItem::create(['name' => 'Espresso', 'price' => 20000]);
+        $croissant = MenuItem::create(['name' => 'Croissant', 'price' => 25000]);
+
+        $component = Livewire::actingAs($admin, 'admin')->test(Cashier::class);
+
+        $component
+            ->call('addToCart', $espresso->id)
+            ->call('addToCart', $espresso->id)
+            ->call('addToCart', $croissant->id)
+            ->call('createOrder')
+            ->assertHasNoErrors();
+
+        $order = Order::latest('id')->firstOrFail();
+
+        $component
+            ->set('paymentMethod', 'qris')
+            ->set('paymentAmount', '25.000')
+            ->set('paymentReference', 'QRIS-PART-1')
+            ->call('capturePayment')
+            ->assertHasNoErrors();
+
+        $this->assertSame(OrderStatus::Pending, $order->fresh()->status);
+        $this->assertSame(40000, $order->fresh()->remaining);
+
+        $component
+            ->set('paymentMethod', 'ewallet')
+            ->set('paymentAmount', '40.000')
+            ->set('paymentReference', 'EWALLET-REST-1')
+            ->call('capturePayment')
+            ->assertHasNoErrors();
+
+        $this->assertSame(OrderStatus::Paid, $order->fresh()->status);
+        $this->assertDatabaseCount('payments', 2);
+        $this->assertSame(65000, (int) $order->payments()->sum('amount'));
+        $this->assertDatabaseHas('payments', [
+            'order_id' => $order->id,
+            'method' => 'qris',
+            'amount' => 25000,
+            'reference' => 'QRIS-PART-1',
+        ]);
+        $this->assertDatabaseHas('payments', [
+            'order_id' => $order->id,
+            'method' => 'ewallet',
+            'amount' => 40000,
+            'reference' => 'EWALLET-REST-1',
+        ]);
+    }
+
+    public function test_qris_without_entered_amount_still_settles_the_full_remaining(): void
+    {
+        $admin = Admin::factory()->create();
+        $espresso = MenuItem::create(['name' => 'Espresso', 'price' => 20000]);
+        $croissant = MenuItem::create(['name' => 'Croissant', 'price' => 25000]);
+
+        $component = Livewire::actingAs($admin, 'admin')->test(Cashier::class);
+
+        $component
+            ->call('addToCart', $espresso->id)
+            ->call('addToCart', $espresso->id)
+            ->call('addToCart', $croissant->id)
+            ->call('createOrder')
+            ->assertHasNoErrors();
+
+        $order = Order::latest('id')->firstOrFail();
+
+        $component
+            ->set('paymentMethod', 'qris')
+            ->set('paymentAmount', '')
+            ->call('capturePayment')
+            ->assertHasNoErrors()
+            ->assertSet('changeDue', 0)
+            ->assertSet('paymentAmount', '');
+
+        $this->assertSame(OrderStatus::Paid, $order->fresh()->status);
+        $this->assertSame(0, $order->fresh()->remaining);
+
+        $this->assertDatabaseCount('payments', 1);
+        $this->assertDatabaseHas('payments', [
+            'order_id' => $order->id,
+            'method' => 'qris',
+            'amount' => 65000,
+            'admin_id' => $admin->id,
+        ]);
+    }
+
+    public function test_cash_partial_payment_leaves_the_remainder_payable(): void
+    {
+        $admin = Admin::factory()->create();
+        $espresso = MenuItem::create(['name' => 'Espresso', 'price' => 20000]);
+        $croissant = MenuItem::create(['name' => 'Croissant', 'price' => 25000]);
+
+        $component = Livewire::actingAs($admin, 'admin')->test(Cashier::class);
+
+        $component
+            ->call('addToCart', $espresso->id)
+            ->call('addToCart', $espresso->id)
+            ->call('addToCart', $croissant->id)
+            ->call('createOrder')
+            ->assertHasNoErrors();
+
+        $order = Order::latest('id')->firstOrFail();
+
+        $component
+            ->set('paymentMethod', 'cash')
+            ->set('paymentAmount', '20.000')
+            ->call('capturePayment')
+            ->assertHasNoErrors()
+            ->assertSet('changeDue', 0)
+            ->assertSet('paymentAmount', '45.000');
+
+        $this->assertSame(OrderStatus::Pending, $order->fresh()->status);
+        $this->assertSame(20000, $order->fresh()->paid_total);
+        $this->assertSame(45000, $order->fresh()->remaining);
+
+        $component
+            ->set('paymentAmount', '45.000')
+            ->call('capturePayment')
+            ->assertHasNoErrors();
+
+        $this->assertSame(OrderStatus::Paid, $order->fresh()->status);
+        $this->assertDatabaseCount('payments', 2);
+        $this->assertSame(65000, (int) $order->payments()->sum('amount'));
+        $this->assertDatabaseHas('payments', [
+            'order_id' => $order->id,
+            'method' => 'cash',
+            'amount' => 20000,
+        ]);
+        $this->assertDatabaseHas('payments', [
+            'order_id' => $order->id,
+            'method' => 'cash',
+            'amount' => 45000,
+        ]);
+    }
 }
