@@ -16,6 +16,7 @@ conventions and environment quirks.
 | [`i18n/menu-contact.md`](i18n/menu-contact.md) | Menu & contact page final Indonesian copy |
 | [`i18n/layout-meta.md`](i18n/layout-meta.md) | Layout/nav/footer/meta final Indonesian copy + switcher UX |
 | [`roadmap.md`](roadmap.md) | Future work prioritized (P1–P4) — mirror of the Vikunja board backlog, plus recently completed items |
+| [`workflow.md`](workflow.md) | Mermaid chart of the parallel agent orchestration (Vikunja → dispatch → gates → cleanup) |
 
 ## How to update these docs
 
