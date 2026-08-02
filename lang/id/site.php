@@ -34,4 +34,8 @@ return [
     ],
 
     'wa_message' => 'Halo Coffee Shop, saya mau pesan kopi.',
+
+    'banner' => [
+        'dismiss_aria' => 'Tutup banner',
+    ],
 ];

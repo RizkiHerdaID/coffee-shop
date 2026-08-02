@@ -2,6 +2,10 @@
 
 @section('title', __('menu.title'))
 
+@section('promo-banner')
+    @include('partials.promo-banner')
+@endsection
+
 @section('content')
 @php
     $pickupI18n = [

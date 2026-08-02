@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Jobs\SendReservationConfirmation;
 use App\Models\LoyaltyCard;
 use App\Models\MenuItem;
+use App\Models\Promo;
 use App\Models\Reservation;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
@@ -16,12 +17,18 @@ final class PageController extends Controller
     {
         $items = MenuItem::query()->where('available', true)->orderBy('sort_order')->get();
 
-        return view('home', ['highlights' => $items->take(4)]);
+        return view('home', [
+            'highlights' => $items->take(4),
+            'promo' => Promo::query()->visible()->orderBy('sort_order')->first(),
+        ]);
     }
 
     public function menu(): View
     {
-        return view('menu', ['menu' => MenuItem::query()->orderBy('sort_order')->get()]);
+        return view('menu', [
+            'menu' => MenuItem::query()->orderBy('sort_order')->get(),
+            'promo' => Promo::query()->visible()->orderBy('sort_order')->first(),
+        ]);
     }
 
     public function qr(string $table): View

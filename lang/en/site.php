@@ -34,4 +34,8 @@ return [
     ],
 
     'wa_message' => 'Hi Coffee Shop, I would like to order a coffee.',
+
+    'banner' => [
+        'dismiss_aria' => 'Dismiss banner',
+    ],
 ];

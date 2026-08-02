@@ -10,16 +10,26 @@ class AiCopyService
 {
     public function generateDescription(string $menuName, ?int $priceIdr = null): string
     {
-        $apiKey = config('services.deepseek.api_key');
-
-        if (blank($apiKey)) {
-            throw MissingAiKeyException::create();
-        }
-
         $userPrompt = "Buat deskripsi promosi untuk menu \"{$menuName}\"";
 
         if ($priceIdr !== null) {
             $userPrompt .= ' dengan harga Rp '.number_format($priceIdr, 0, ',', '.');
+        }
+
+        return $this->requestCopy($userPrompt);
+    }
+
+    public function generatePromoSubtitle(string $promoTitle): string
+    {
+        return $this->requestCopy("Buat subjudul promosi untuk \"{$promoTitle}\" di kedai kopi");
+    }
+
+    private function requestCopy(string $userPrompt): string
+    {
+        $apiKey = config('services.deepseek.api_key');
+
+        if (blank($apiKey)) {
+            throw MissingAiKeyException::create();
         }
 
         $response = Http::withToken($apiKey)
@@ -31,8 +41,8 @@ class AiCopyService
                     [
                         'role' => 'system',
                         'content' => 'Kamu adalah penulis pemasaran untuk sebuah kedai kopi di Indonesia. '
-                            .'Tulis deskripsi promosi menu yang SINGKAT dalam bahasa Indonesia: maksimal satu kalimat pendek (10-15 kata). '
-                            .'Jawab HANYA dengan teks deskripsi: tanpa tanda kutip, tanpa kata pengantar, tanpa penjelasan tambahan.',
+                            .'Tulis teks promosi yang SINGKAT dalam bahasa Indonesia: maksimal satu kalimat pendek (10-15 kata). '
+                            .'Jawab HANYA dengan teks: tanpa tanda kutip, tanpa kata pengantar, tanpa penjelasan tambahan.',
                     ],
                     ['role' => 'user', 'content' => $userPrompt],
                 ],
@@ -52,7 +62,7 @@ class AiCopyService
             $finishReason = $response->json('choices.0.finish_reason');
 
             throw new RuntimeException(
-                'DeepSeek API response contained no description'
+                'DeepSeek API response contained no content'
                 .(is_string($finishReason) ? " (finish_reason: {$finishReason})" : '')
                 .': '.mb_substr($response->body(), 0, 300)
             );

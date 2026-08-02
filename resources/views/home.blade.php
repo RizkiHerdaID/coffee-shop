@@ -2,6 +2,10 @@
 
 @section('title', __('home.title'))
 
+@section('promo-banner')
+    @include('partials.promo-banner')
+@endsection
+
 @section('content')
 <section class="relative overflow-hidden pt-32 pb-20 sm:pt-40 sm:pb-28">
     <div class="pointer-events-none absolute -top-40 right-0 h-96 w-96 rounded-full bg-amber-500/10 blur-3xl"></div>

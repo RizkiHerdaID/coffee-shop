@@ -63,6 +63,9 @@
 </head>
 <body class="bg-stone-950 text-stone-200 antialiased font-sans">
     <header class="fixed inset-x-0 top-0 z-50 border-b border-stone-800/60 bg-stone-950/80 backdrop-blur">
+        @hasSection('promo-banner')
+            @yield('promo-banner')
+        @endif
         <nav class="mx-auto flex max-w-6xl items-center justify-between px-4 py-4 sm:px-6">
             <a href="{{ route('home') }}" class="flex items-center gap-2 text-lg font-bold tracking-tight text-amber-500">
                 <span class="text-2xl">&#9749;</span>

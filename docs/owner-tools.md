@@ -107,6 +107,19 @@ PO fields: `supplier_id`, `ordered_at`, `expected_at`, `status`, `total` (intege
 
 Note the divergence from research: the research priced OpenAI (`gpt-5-nano`/`gpt-4o-mini`) and Gemini; the implementation went with **DeepSeek** (`deepseek-chat`), which is cheaper at shop volume and strong in Indonesian — see Decisions.
 
+### Promo banners (public site)
+
+| Piece | Location |
+| --- | --- |
+| Table | `database/migrations/2026_08_02_180000_create_promos_table.php` — `title`, `subtitle`/`badge`/`cta_text`/`cta_url` nullable, `starts_at` required, `ends_at` nullable, `active` default true, `sort_order` |
+| Model | `app/Models/Promo.php` — `#[Fillable]`, datetime/boolean/integer casts, `scopeVisible()` (active + `starts_at <= now` + `ends_at` null or `>= now`) |
+| Resource | `app/Filament/Resources/Promos/` — list (with `ToggleColumn` active toggle), create/edit; subtitle has a DeepSeek "generate with AI" suffix action (`AiCopyService::generatePromoSubtitle`) visible only when `DEEPSEEK_API_KEY` is set |
+| Banner | `resources/views/partials/promo-banner.blade.php` — amber bar (badge + title + subtitle + optional CTA) yielded into the fixed header via `@section('promo-banner')` on home + menu only; dismiss is client-side `localStorage['promo-dismissed-<id>']`, so the banner never reappears until another promo is active |
+| Wiring | `app/Http/Controllers/PageController.php` `home()`/`menu()` — `Promo::query()->visible()->orderBy('sort_order')->first()` passed as `$promo` (only the first promo renders) |
+| Seed | `database/seeders/PromoSeeder.php` — idempotent `updateOrCreate` "Promo Kopi Pagi", registered in `DatabaseSeeder` |
+| Lang | `lang/{id,en}/promos.php` (resource strings) + `site.banner.dismiss_aria` (only banner key added to `site.php`) |
+| Tests | `tests/Feature/PromoTest.php` (scope window logic, home/menu render/hide, sort-order-first, admin resource pages) |
+
 ### Daily/weekly summary email
 
 | Piece | Location |
