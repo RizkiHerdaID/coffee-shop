@@ -38,10 +38,32 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
     })
     ->withSchedule(function (Schedule $schedule): void {
-        $schedule->command('summary:send --period=daily')->dailyAt(config('summary.daily.time'));
-        $schedule->command('summary:send --period=weekly')->weeklyOn(1, config('summary.weekly.time'));
-        $schedule->command('stock:alert-low')->hourly();
-        $schedule->command('pulse:check')->everyMinute();
+        // Optional scheduler heartbeat: when UPTIME_HEARTBEAT_URL is set, each
+        // command pings it after a successful run (and never overlaps), so an
+        // external monitor (healthchecks.io / Uptime Kuma) can alert when the
+        // scheduler stops. Laravel 13 has no pingWithoutOverlapping(); the
+        // withoutOverlapping() + pingOnSuccessIf() pair is the equivalent.
+        $heartbeatUrl = config('uptime.heartbeat_url');
+
+        $schedule->command('summary:send --period=daily')
+            ->dailyAt(config('summary.daily.time'))
+            ->withoutOverlapping()
+            ->pingOnSuccessIf(filled($heartbeatUrl), $heartbeatUrl);
+
+        $schedule->command('summary:send --period=weekly')
+            ->weeklyOn(1, config('summary.weekly.time'))
+            ->withoutOverlapping()
+            ->pingOnSuccessIf(filled($heartbeatUrl), $heartbeatUrl);
+
+        $schedule->command('stock:alert-low')
+            ->hourly()
+            ->withoutOverlapping()
+            ->pingOnSuccessIf(filled($heartbeatUrl), $heartbeatUrl);
+
+        $schedule->command('pulse:check')
+            ->everyMinute()
+            ->withoutOverlapping()
+            ->pingOnSuccessIf(filled($heartbeatUrl), $heartbeatUrl);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(
