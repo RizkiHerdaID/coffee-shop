@@ -25,6 +25,7 @@
         "laravel/sail": "^1.64",
         "mockery/mockery": "^1.6",
         "nunomaduro/collision": "^8.6",
+        "php-code-archeology/php-code-archeology": "^2.11",
         "phpunit/phpunit": "^12.5.12"
     },
     "autoload": {
@@ -88,7 +89,8 @@
         "sort-packages": true,
         "allow-plugins": {
             "pestphp/pest-plugin": true,
-            "php-http/discovery": true
+            "php-http/discovery": true,
+            "php-code-archeology/php-code-archeology": true
         }
     },
     "minimum-stability": "stable",
