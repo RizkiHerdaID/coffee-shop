@@ -3,6 +3,8 @@
 return [
     'name' => 'Coffee Shop',
 
+    'tables' => 4,
+
     'phone' => '+6281234567890',
     'phone_display' => '+62 812-3456-7890',
 
