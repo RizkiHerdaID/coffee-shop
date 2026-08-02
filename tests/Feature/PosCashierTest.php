@@ -199,6 +199,26 @@ class PosCashierTest extends TestCase
         ]);
     }
 
+    public function test_creating_order_accepts_long_phone_matching_loyalty_card_capacity(): void
+    {
+        $admin = Admin::factory()->create();
+        $item = MenuItem::create(['name' => 'Espresso', 'price' => 20000]);
+        $longPhone = '08123456789012345678901234567890';
+
+        Livewire::actingAs($admin, 'admin')
+            ->test(Cashier::class)
+            ->call('addToCart', $item->id)
+            ->set('customerPhone', $longPhone)
+            ->call('createOrder')
+            ->assertHasNoErrors();
+
+        $this->assertDatabaseHas('orders', [
+            'customer_phone' => $longPhone,
+            'total' => 20000,
+            'created_by' => $admin->id,
+        ]);
+    }
+
     public function test_creating_orders_generates_unique_order_numbers(): void
     {
         $admin = Admin::factory()->create();

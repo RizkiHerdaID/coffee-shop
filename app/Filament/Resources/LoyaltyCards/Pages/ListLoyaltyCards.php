@@ -26,7 +26,7 @@ class ListLoyaltyCards extends ListRecords
                         ->label(__('loyalty.fields.phone'))
                         ->tel()
                         ->required()
-                        ->maxLength(20),
+                        ->maxLength(255),
                     TextInput::make('qty')
                         ->label(__('loyalty.actions.grant_qty'))
                         ->numeric()

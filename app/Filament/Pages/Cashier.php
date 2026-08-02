@@ -206,7 +206,7 @@ class Cashier extends Page
         }
 
         $this->validate([
-            'customerPhone' => ['nullable', 'string', 'max:20'],
+            'customerPhone' => ['nullable', 'string', 'max:255'],
             'notes' => ['nullable', 'string', 'max:500'],
             'cartNotes' => ['nullable', 'array'],
             'cartNotes.*' => ['nullable', 'string', 'max:500'],
