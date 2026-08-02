@@ -5,6 +5,7 @@ namespace App\Filament\Resources\MenuItems\Schemas;
 use App\Exceptions\MissingAiKeyException;
 use App\Services\AiCopyService;
 use Filament\Actions\Action;
+use Filament\Forms\Components\CheckboxList;
 use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
@@ -114,6 +115,15 @@ class MenuItemForm
                 Toggle::make('available')
                     ->label(__('menu-items.fields.available'))
                     ->default(true),
+                CheckboxList::make('badges')
+                    ->label(__('menu.badges.label'))
+                    ->options([
+                        'vegan' => __('menu.badges.vegan'),
+                        'spicy' => __('menu.badges.spicy'),
+                        'gluten_free' => __('menu.badges.gluten_free'),
+                        'halal' => __('menu.badges.halal'),
+                    ])
+                    ->columns(2),
                 TextInput::make('sort_order')
                     ->label(__('menu-items.fields.sort_order'))
                     ->numeric()

@@ -18,6 +18,14 @@ return [
     'sold_out' => 'Habis',
     'empty' => 'Tidak ada menu dalam kategori ini.',
 
+    'badges' => [
+        'label' => 'Label menu',
+        'vegan' => 'Vegan',
+        'spicy' => 'Pedas',
+        'gluten_free' => 'Bebas Gluten',
+        'halal' => 'Halal',
+    ],
+
     'pickup' => [
         'add' => 'Tambah ke pesanan',
         'increase_aria' => 'Tambah jumlah :item',

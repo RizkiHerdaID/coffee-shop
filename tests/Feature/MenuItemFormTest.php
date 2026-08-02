@@ -93,4 +93,53 @@ class MenuItemFormTest extends TestCase
             ->assertSee(__('menu.categories.snack'))
             ->assertSee(__('menu.categories.food'));
     }
+
+    public function test_create_form_stores_badges_array(): void
+    {
+        Livewire::test(CreateMenuItem::class)
+            ->fillForm([
+                'name' => 'Kopi Susu',
+                'price' => '25.000',
+                'badges' => ['vegan', 'spicy'],
+            ])
+            ->call('create')
+            ->assertHasNoFormErrors();
+
+        $item = MenuItem::where('name', 'Kopi Susu')->firstOrFail();
+
+        $this->assertSame(['vegan', 'spicy'], $item->badges);
+    }
+
+    public function test_edit_form_prefills_stored_badges(): void
+    {
+        $item = MenuItem::create(['name' => 'Cold Brew', 'price' => 38000, 'badges' => ['halal']]);
+
+        Livewire::test(EditMenuItem::class, ['record' => $item->getKey()])
+            ->assertFormSet(['badges' => ['halal']]);
+    }
+
+    public function test_create_form_shows_localized_badge_options(): void
+    {
+        Livewire::test(CreateMenuItem::class)
+            ->assertSee(__('menu.badges.vegan'))
+            ->assertSee(__('menu.badges.spicy'))
+            ->assertSee(__('menu.badges.gluten_free'))
+            ->assertSee(__('menu.badges.halal'));
+    }
+
+    public function test_create_form_allows_creating_item_without_badges(): void
+    {
+        Livewire::test(CreateMenuItem::class)
+            ->fillForm([
+                'name' => 'Espresso',
+                'price' => '25.000',
+                'badges' => [],
+            ])
+            ->call('create')
+            ->assertHasNoFormErrors();
+
+        $item = MenuItem::where('name', 'Espresso')->firstOrFail();
+
+        $this->assertEmpty($item->badges ?? []);
+    }
 }

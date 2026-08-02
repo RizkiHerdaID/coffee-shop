@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
-#[Fillable(['name', 'price', 'note', 'sort_order', 'photo', 'category', 'available'])]
+#[Fillable(['name', 'price', 'note', 'badges', 'sort_order', 'photo', 'category', 'available'])]
 class MenuItem extends Model
 {
     /**
@@ -21,6 +21,7 @@ class MenuItem extends Model
             'photo' => 'string',
             'category' => 'string',
             'available' => 'boolean',
+            'badges' => 'array',
         ];
     }
 

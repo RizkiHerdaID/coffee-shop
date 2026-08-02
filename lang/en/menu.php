@@ -18,6 +18,14 @@ return [
     'sold_out' => 'Sold out',
     'empty' => 'No menu items in this category.',
 
+    'badges' => [
+        'label' => 'Menu labels',
+        'vegan' => 'Vegan',
+        'spicy' => 'Spicy',
+        'gluten_free' => 'Gluten-Free',
+        'halal' => 'Halal',
+    ],
+
     'pickup' => [
         'add' => 'Add to order',
         'increase_aria' => 'Increase quantity of :item',

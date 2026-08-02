@@ -60,6 +60,7 @@
             <div class="p-6">
                 <h2 class="text-lg font-semibold text-white">{{ $item->name }}</h2>
                 <p class="mt-1 text-sm text-stone-400">{{ $item->note }}</p>
+                @include('partials.badge-chips', ['item' => $item])
                 <p class="mt-3 text-lg font-semibold text-amber-500">Rp {{ number_format($item->price, 0, ",", ".") }}</p>
                 @if ($item->available)
                 <div class="mt-4 flex items-center gap-3">

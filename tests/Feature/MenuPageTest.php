@@ -104,4 +104,53 @@ class MenuPageTest extends TestCase
         $response->assertSee('data-category="non-coffee"', false);
         $response->assertSee('data-category="snack"', false);
     }
+
+    public function test_menu_page_renders_badge_chips_for_items_with_badges(): void
+    {
+        $this->seed(MenuSeeder::class);
+
+        MenuItem::where('name', 'Matcha Latte')->firstOrFail()->update(['badges' => ['vegan', 'spicy']]);
+
+        $response = $this->get('/menu');
+
+        $response->assertOk();
+        $response->assertSee('Matcha Latte');
+        $response->assertSee(__('menu.badges.vegan'));
+        $response->assertSee(__('menu.badges.spicy'));
+    }
+
+    public function test_menu_page_does_not_render_badge_chips_when_none_are_set(): void
+    {
+        $this->seed(MenuSeeder::class);
+
+        MenuItem::query()->update(['badges' => null]);
+
+        $response = $this->get('/menu');
+
+        $response->assertOk();
+        $response->assertDontSee(__('menu.badges.vegan'));
+        $response->assertDontSee(__('menu.badges.spicy'));
+        $response->assertDontSee(__('menu.badges.gluten_free'));
+        $response->assertDontSee(__('menu.badges.halal'));
+    }
+
+    public function test_menu_page_badge_labels_are_localized(): void
+    {
+        $this->seed(MenuSeeder::class);
+
+        MenuItem::where('name', 'Banana Bread')->firstOrFail()->update(['badges' => ['gluten_free', 'vegan']]);
+
+        $idResponse = $this->get('/menu');
+
+        $idResponse->assertOk();
+        $idResponse->assertSee(__('menu.badges.gluten_free'));
+        $idResponse->assertSee(__('menu.badges.vegan'));
+
+        $enResponse = $this->get('/menu?lang=en');
+
+        app()->setLocale('en');
+        $enResponse->assertOk();
+        $enResponse->assertSee(__('menu.badges.gluten_free'));
+        $enResponse->assertSee(__('menu.badges.vegan'));
+    }
 }

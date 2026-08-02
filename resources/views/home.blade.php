@@ -74,6 +74,7 @@
                 <div>
                     <h3 class="font-semibold text-white">{{ $item->name }}</h3>
                     <p class="mt-1 text-sm text-stone-400">{{ $item->note }}</p>
+                    @include('partials.badge-chips', ['item' => $item])
                 </div>
                 <div class="flex shrink-0 items-center gap-4">
                     <p class="shrink-0 font-semibold text-amber-500">Rp {{ number_format($item->price, 0, ",", ".") }}</p>
