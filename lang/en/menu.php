@@ -17,4 +17,19 @@ return [
 
     'sold_out' => 'Sold out',
     'empty' => 'No menu items in this category.',
+
+    'pickup' => [
+        'add' => 'Add to order',
+        'increase_aria' => 'Increase quantity of :item',
+        'decrease_aria' => 'Decrease quantity of :item',
+        'cart_title' => 'Your Order',
+        'cart_empty' => 'Your cart is empty. Pick some items to start your order.',
+        'total' => 'Total',
+        'order' => 'Order via WhatsApp',
+        'remove_aria' => 'Remove :item from order',
+        'item_line' => ':name × :qty = :total',
+        'message_title' => 'Pickup Order — :shop',
+        'message_total' => 'Total: :total',
+        'message_pickup' => 'Pickup at the store',
+    ],
 ];

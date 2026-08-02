@@ -16,7 +16,7 @@ final class PageController extends Controller
 
     public function menu(): View
     {
-        return view('menu', ['menu' => MenuItem::query()->where('available', true)->orderBy('sort_order')->get()]);
+        return view('menu', ['menu' => MenuItem::query()->orderBy('sort_order')->get()]);
     }
 
     public function qr(string $table): View
