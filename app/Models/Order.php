@@ -3,6 +3,8 @@
 namespace App\Models;
 
 use App\Enums\OrderStatus;
+use App\Jobs\PrintKitchenTicket;
+use App\Jobs\PrintReceipt;
 use App\Jobs\SendOrderConfirmation;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
@@ -42,6 +44,40 @@ class Order extends Model
     public function payments(): HasMany
     {
         return $this->hasMany(Payment::class);
+    }
+
+    /**
+     * Sum of accepted payment rows (IDR, integer).
+     */
+    public function getPaidTotalAttribute(): int
+    {
+        return (int) $this->payments()->sum('amount');
+    }
+
+    /**
+     * Amount still owed; zero once paid_total covers the total.
+     */
+    public function getRemainingAttribute(): int
+    {
+        return max($this->total - $this->paid_total, 0);
+    }
+
+    /**
+     * Transition pending → paid once payments cover the total. Dispatches the
+     * receipt/kitchen print jobs exactly once, on the transition itself.
+     */
+    public function markPaidIfCovered(): bool
+    {
+        if ($this->status !== OrderStatus::Pending || $this->paid_total < $this->total) {
+            return false;
+        }
+
+        $this->update(['status' => OrderStatus::Paid]);
+
+        PrintReceipt::dispatch($this);
+        PrintKitchenTicket::dispatch($this);
+
+        return true;
     }
 
     public function shift(): BelongsTo
