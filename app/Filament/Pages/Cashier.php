@@ -130,6 +130,58 @@ class Cashier extends Page
         $this->cartNotes = [];
     }
 
+    /**
+     * One-tap repeat: load the most recent order's items into the cart.
+     *
+     * Replaces the current cart (items and per-line notes) with the last
+     * order's lines; order items whose menu item is missing or unavailable
+     * are skipped. No-op with an info notification when no order exists yet.
+     */
+    public function repeatOrder(): void
+    {
+        $lastOrder = Order::query()
+            ->with('items')
+            ->latest('id')
+            ->first();
+
+        if ($lastOrder === null) {
+            Notification::make()
+                ->title(__('dashboard.repeat_no_previous'))
+                ->info()
+                ->send();
+
+            return;
+        }
+
+        $availableIds = MenuItem::query()
+            ->whereIn('id', $lastOrder->items->pluck('menu_item_id')->filter())
+            ->where('available', true)
+            ->pluck('id')
+            ->flip();
+
+        $this->clearCart();
+
+        foreach ($lastOrder->items as $line) {
+            if ($line->menu_item_id === null || ! isset($availableIds[$line->menu_item_id])) {
+                continue;
+            }
+
+            $this->cart[$line->menu_item_id] = $line->qty;
+
+            if (filled($line->notes)) {
+                $this->cartNotes[$line->menu_item_id] = $line->notes;
+            }
+        }
+    }
+
+    /**
+     * Whether any order exists yet (drives the repeat-last-order button).
+     */
+    public function getHasPreviousOrdersProperty(): bool
+    {
+        return Order::query()->exists();
+    }
+
     public function createOrder(): void
     {
         $lines = $this->cartLines;

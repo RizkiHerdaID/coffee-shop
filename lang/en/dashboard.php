@@ -12,6 +12,8 @@ return [
     'line_notes' => 'Item Note',
     'line_notes_placeholder' => 'Optional — e.g. less sugar',
     'notes_max' => 'Note may not exceed :max characters.',
+    'repeat_last_order' => 'Repeat Last Order',
+    'repeat_no_previous' => 'No previous order to repeat.',
 
     'low_stock_heading' => 'Low Stock',
     'low_stock_empty_heading' => 'Stock is healthy',

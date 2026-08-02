@@ -398,4 +398,104 @@ class PosCashierTest extends TestCase
         $this->assertStringContainsString('Espresso'."\n", implode("\n", $lines));
         $this->assertDoesNotMatchRegularExpression('/^\s+- /m', implode("\n", $lines));
     }
+
+    /**
+     * Quick reorder.
+     *
+     * `Cashier::repeatOrder()` loads the most recent order's lines into the
+     * cart as a menu item id => qty map (skip unavailable items; no-op with a
+     * clean cart when there is no prior order).
+     */
+    public function test_repeat_order_loads_the_most_recent_orders_items_into_the_cart(): void
+    {
+        $admin = Admin::factory()->create();
+        $espresso = MenuItem::create(['name' => 'Espresso', 'price' => 20000]);
+        $croissant = MenuItem::create(['name' => 'Croissant', 'price' => 25000]);
+        $latte = MenuItem::create(['name' => 'Latte', 'price' => 30000]);
+
+        $component = Livewire::actingAs($admin, 'admin')->test(Cashier::class);
+
+        $component
+            ->call('addToCart', $espresso->id)
+            ->call('createOrder')
+            ->assertHasNoErrors();
+
+        $component
+            ->call('addToCart', $croissant->id)
+            ->call('addToCart', $latte->id)
+            ->call('addToCart', $latte->id)
+            ->call('createOrder')
+            ->assertHasNoErrors();
+
+        $component
+            ->call('repeatOrder')
+            ->assertCount('cart', 2)
+            ->assertSet('cart.'.$croissant->id, 1)
+            ->assertSet('cart.'.$latte->id, 2)
+            ->assertCount('cartLines', 2)
+            ->assertSet('cartTotal', 85000);
+
+        $this->assertDatabaseCount('orders', 2);
+    }
+
+    public function test_repeat_order_skips_unavailable_menu_items(): void
+    {
+        $admin = Admin::factory()->create();
+        $espresso = MenuItem::create(['name' => 'Espresso', 'price' => 20000]);
+        $croissant = MenuItem::create(['name' => 'Croissant', 'price' => 25000]);
+
+        Livewire::actingAs($admin, 'admin')
+            ->test(Cashier::class)
+            ->call('addToCart', $espresso->id)
+            ->call('addToCart', $croissant->id)
+            ->call('createOrder')
+            ->assertHasNoErrors();
+
+        $croissant->update(['available' => false]);
+
+        Livewire::actingAs($admin, 'admin')
+            ->test(Cashier::class)
+            ->call('repeatOrder')
+            ->assertCount('cart', 1)
+            ->assertSet('cart.'.$espresso->id, 1)
+            ->assertSet('cartTotal', 20000);
+    }
+
+    public function test_repeat_order_skips_deleted_menu_items(): void
+    {
+        $admin = Admin::factory()->create();
+        $espresso = MenuItem::create(['name' => 'Espresso', 'price' => 20000]);
+        $croissant = MenuItem::create(['name' => 'Croissant', 'price' => 25000]);
+
+        Livewire::actingAs($admin, 'admin')
+            ->test(Cashier::class)
+            ->call('addToCart', $espresso->id)
+            ->call('addToCart', $croissant->id)
+            ->call('createOrder')
+            ->assertHasNoErrors();
+
+        $croissant->delete();
+
+        Livewire::actingAs($admin, 'admin')
+            ->test(Cashier::class)
+            ->call('repeatOrder')
+            ->assertCount('cart', 1)
+            ->assertSet('cart.'.$espresso->id, 1)
+            ->assertSet('cartTotal', 20000);
+    }
+
+    public function test_repeat_order_with_no_prior_order_leaves_cart_empty(): void
+    {
+        $admin = Admin::factory()->create();
+        MenuItem::create(['name' => 'Espresso', 'price' => 20000]);
+
+        Livewire::actingAs($admin, 'admin')
+            ->test(Cashier::class)
+            ->call('repeatOrder')
+            ->assertCount('cart', 0)
+            ->assertSet('cartTotal', 0)
+            ->assertHasNoErrors();
+
+        $this->assertDatabaseCount('orders', 0);
+    }
 }

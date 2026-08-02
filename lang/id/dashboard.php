@@ -12,6 +12,8 @@ return [
     'line_notes' => 'Catatan Item',
     'line_notes_placeholder' => 'Opsional — contoh: tanpa gula',
     'notes_max' => 'Catatan maksimal :max karakter.',
+    'repeat_last_order' => 'Ulangi Pesanan Terakhir',
+    'repeat_no_previous' => 'Belum ada pesanan untuk diulang.',
 
     'low_stock_heading' => 'Stok Menipis',
     'low_stock_empty_heading' => 'Stok aman',

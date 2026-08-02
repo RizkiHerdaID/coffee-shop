@@ -49,11 +49,18 @@
             <div class="h-fit rounded-2xl border border-gray-300 bg-white p-5 shadow-sm lg:sticky lg:top-6">
                 <div class="mb-4 flex items-center justify-between">
                     <h2 class="text-lg font-bold text-gray-900">{{ __('pos.cart_section') }}</h2>
-                    @unless ($this->cartLines->isEmpty())
-                        <x-filament::button color="gray" size="sm" icon="heroicon-m-trash" wire:click="clearCart">
-                            {{ __('pos.clear_cart') }}
-                        </x-filament::button>
-                    @endunless
+                    <div class="flex items-center gap-2">
+                        @if ($this->hasPreviousOrders)
+                            <x-filament::button color="gray" size="sm" icon="heroicon-m-arrow-path" wire:click="repeatOrder">
+                                {{ __('dashboard.repeat_last_order') }}
+                            </x-filament::button>
+                        @endif
+                        @unless ($this->cartLines->isEmpty())
+                            <x-filament::button color="gray" size="sm" icon="heroicon-m-trash" wire:click="clearCart">
+                                {{ __('pos.clear_cart') }}
+                            </x-filament::button>
+                        @endunless
+                    </div>
                 </div>
 
                 <div class="space-y-3">
