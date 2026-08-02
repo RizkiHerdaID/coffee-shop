@@ -65,4 +65,39 @@ class MenuPageTest extends TestCase
         $response->assertOk();
         $response->assertDontSee('Espresso');
     }
+
+    public function test_seeded_items_have_categories(): void
+    {
+        $this->seed(MenuSeeder::class);
+
+        $this->assertSame(
+            ['coffee', 'non-coffee', 'snack'],
+            MenuItem::query()->pluck('category')->unique()->sort()->values()->all(),
+        );
+    }
+
+    public function test_menu_page_renders_filter_chips_for_present_categories_only(): void
+    {
+        $this->seed(MenuSeeder::class);
+
+        $response = $this->get('/menu');
+
+        $response->assertOk();
+        $response->assertSee('data-filter="all"', false);
+        $response->assertSee('data-filter="coffee"', false);
+        $response->assertSee('data-filter="non-coffee"', false);
+        $response->assertSee('data-filter="snack"', false);
+        $response->assertDontSee('data-filter="food"', false);
+    }
+
+    public function test_menu_page_tags_items_with_category(): void
+    {
+        $this->seed(MenuSeeder::class);
+
+        $response = $this->get('/menu');
+
+        $response->assertSee('data-category="coffee"', false);
+        $response->assertSee('data-category="non-coffee"', false);
+        $response->assertSee('data-category="snack"', false);
+    }
 }
