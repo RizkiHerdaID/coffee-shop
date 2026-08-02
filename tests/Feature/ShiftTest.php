@@ -179,6 +179,85 @@ class ShiftTest extends TestCase
         ], $shift->paymentsByMethod());
     }
 
+    public function test_sales_total_excludes_refunded_and_cancelled_orders(): void
+    {
+        $admin = $this->admin();
+        $shift = $this->openShift($admin);
+
+        $this->paidOrder($shift, $admin, 20000, OrderStatus::Paid);
+        $this->paidOrder($shift, $admin, 30000, OrderStatus::Served);
+        $this->paidOrder($shift, $admin, 99000, OrderStatus::Refunded);
+        $this->paidOrder($shift, $admin, 99000, OrderStatus::Cancelled);
+        $this->paidOrder($shift, $admin, 99000, OrderStatus::Pending);
+
+        $this->assertSame(50000, $shift->salesTotal());
+        $this->assertSame(2, $shift->paidOrdersCount());
+    }
+
+    public function test_payments_by_method_excludes_refunded_and_cancelled_orders(): void
+    {
+        $admin = $this->admin();
+        $shift = $this->openShift($admin);
+
+        $order = $this->paidOrder($shift, $admin, 100000);
+        $this->cashPayment($order, $admin, 60000);
+        $order->payments()->create([
+            'method' => PaymentMethod::Qris,
+            'amount' => 40000,
+            'paid_at' => now(),
+            'admin_id' => $admin->id,
+        ]);
+
+        $refunded = $this->paidOrder($shift, $admin, 50000, OrderStatus::Refunded);
+        $this->cashPayment($refunded, $admin, 50000);
+
+        $cancelled = $this->paidOrder($shift, $admin, 70000, OrderStatus::Cancelled);
+        $this->cashPayment($cancelled, $admin, 70000);
+
+        $pending = $this->paidOrder($shift, $admin, 99000, OrderStatus::Pending);
+        $this->cashPayment($pending, $admin, 99000);
+
+        $this->assertSame([
+            'cash' => 60000,
+            'qris' => 40000,
+            'ewallet' => 0,
+        ], $shift->paymentsByMethod());
+    }
+
+    public function test_payments_by_method_nets_partial_refunds_on_in_scope_orders(): void
+    {
+        $admin = $this->admin();
+        $shift = $this->openShift($admin);
+
+        $order = $this->paidOrder($shift, $admin, 50000);
+        $this->cashPayment($order, $admin, 50000);
+        $this->cashPayment($order, $admin, -15000); // partial refund, order stays paid
+
+        $this->assertSame(35000, $shift->paymentsByMethod()['cash']);
+        $this->assertSame(50000, $shift->cashPaid());
+        $this->assertSame(-15000, $shift->cashRefunds());
+    }
+
+    public function test_expected_cash_ignores_fully_refunded_orders(): void
+    {
+        $admin = $this->admin();
+        $shift = $this->openShift($admin, 100000);
+
+        $order = $this->paidOrder($shift, $admin, 50000);
+        $this->cashPayment($order, $admin, 50000);
+
+        // Fully refunded order: its payment rows (+50.000 capture, -50.000
+        // refund) both drop out of the shift math — the drawer nets zero, so
+        // expected cash returns to the opening amount.
+        $refunded = $this->paidOrder($shift, $admin, 50000, OrderStatus::Refunded);
+        $this->cashPayment($refunded, $admin, 50000);
+        $this->cashPayment($refunded, $admin, -50000);
+
+        $this->assertSame(150000, $shift->expectedCash());
+        $this->assertSame(50000, $shift->cashPaid());
+        $this->assertSame(0, $shift->cashRefunds());
+    }
+
     public function test_payments_by_method_defaults_to_zero_when_shift_has_no_payments(): void
     {
         $admin = $this->admin();

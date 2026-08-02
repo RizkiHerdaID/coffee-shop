@@ -23,6 +23,8 @@ return [
         'pending' => 'Pending',
         'paid' => 'Paid',
         'served' => 'Served',
+        'refunded' => 'Refunded',
+        'cancelled' => 'Cancelled',
     ],
 
     'payment' => [
@@ -62,6 +64,26 @@ return [
         'marked_paid' => ':order_number marked as paid',
         'marked_served' => ':order_number marked as served',
         'view_receipt' => 'Receipt',
+        'refund' => 'Refund',
+        'void' => 'Void',
+        'refunded' => ':order_number refunded',
+        'voided' => ':order_number voided',
+    ],
+
+    'refund' => [
+        'title' => 'Refund Order',
+        'amount' => 'Refund Amount',
+        'method' => 'Refund Method',
+        'reason' => 'Refund Reason',
+        'reason_placeholder' => 'Optional — e.g. wrong order / customer cancelled',
+        'exceeds_paid' => 'Refund amount cannot exceed the amount already paid.',
+        'failed' => 'Refund failed — this order cannot be refunded.',
+    ],
+
+    'void' => [
+        'title' => 'Void Order',
+        'confirm' => 'Void this order? It will be marked as cancelled.',
+        'failed' => 'Void failed — this order cannot be voided.',
     ],
 
     'receipt' => [

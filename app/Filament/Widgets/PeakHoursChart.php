@@ -41,7 +41,7 @@ class PeakHoursChart extends ChartWidget
 
         $orders = Order::query()
             ->select(['created_at', 'total'])
-            ->where('status', '!=', OrderStatus::Pending)
+            ->whereNotIn('status', [OrderStatus::Pending, OrderStatus::Refunded, OrderStatus::Cancelled])
             ->where('created_at', '>=', today()->subDays(29))
             ->get();
 

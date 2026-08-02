@@ -23,6 +23,8 @@ return [
         'pending' => 'Menunggu',
         'paid' => 'Lunas',
         'served' => 'Selesai',
+        'refunded' => 'Di-refund',
+        'cancelled' => 'Dibatalkan',
     ],
 
     'payment' => [
@@ -62,6 +64,26 @@ return [
         'marked_paid' => ':order_number ditandai lunas',
         'marked_served' => ':order_number ditandai selesai',
         'view_receipt' => 'Struk',
+        'refund' => 'Refund',
+        'void' => 'Batalkan',
+        'refunded' => ':order_number di-refund',
+        'voided' => ':order_number dibatalkan',
+    ],
+
+    'refund' => [
+        'title' => 'Refund Pesanan',
+        'amount' => 'Nominal Refund',
+        'method' => 'Metode Refund',
+        'reason' => 'Alasan Refund',
+        'reason_placeholder' => 'Opsional — contoh: pesanan salah / pelanggan membatalkan',
+        'exceeds_paid' => 'Nominal refund tidak boleh melebihi total yang sudah dibayar.',
+        'failed' => 'Refund gagal — pesanan tidak dapat di-refund.',
+    ],
+
+    'void' => [
+        'title' => 'Batalkan Pesanan',
+        'confirm' => 'Batalkan pesanan ini? Pesanan akan ditandai dibatalkan.',
+        'failed' => 'Pembatalan gagal — pesanan tidak dapat dibatalkan.',
     ],
 
     'receipt' => [

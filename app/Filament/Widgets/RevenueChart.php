@@ -24,7 +24,7 @@ class RevenueChart extends ChartWidget
     {
         $rows = Order::query()
             ->selectRaw('DATE(created_at) as date, SUM(total) as revenue')
-            ->where('status', '!=', OrderStatus::Pending)
+            ->whereNotIn('status', [OrderStatus::Pending, OrderStatus::Refunded, OrderStatus::Cancelled])
             ->whereDate('created_at', '>=', today()->subDays(13))
             ->groupBy('date')
             ->pluck('revenue', 'date');
