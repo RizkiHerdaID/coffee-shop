@@ -740,4 +740,86 @@ class PosCashierTest extends TestCase
             'amount' => 45000,
         ]);
     }
+
+    public function test_pay_rest_fills_the_amount_with_the_remaining_balance(): void
+    {
+        $admin = Admin::factory()->create();
+        $espresso = MenuItem::create(['name' => 'Espresso', 'price' => 20000]);
+        $croissant = MenuItem::create(['name' => 'Croissant', 'price' => 25000]);
+
+        $component = Livewire::actingAs($admin, 'admin')->test(Cashier::class);
+
+        $component
+            ->call('addToCart', $espresso->id)
+            ->call('addToCart', $espresso->id)
+            ->call('addToCart', $croissant->id)
+            ->call('createOrder')
+            ->assertHasNoErrors();
+
+        $order = Order::latest('id')->firstOrFail();
+
+        $component
+            ->set('paymentMethod', 'qris')
+            ->set('paymentAmount', '20.000')
+            ->call('capturePayment')
+            ->assertHasNoErrors();
+
+        $this->assertSame(OrderStatus::Pending, $order->fresh()->status);
+        $this->assertSame(45000, $order->fresh()->remaining);
+
+        $component
+            ->call('payRest')
+            ->assertSet('paymentAmount', '45.000')
+            ->call('capturePayment')
+            ->assertHasNoErrors();
+
+        $this->assertSame(OrderStatus::Paid, $order->fresh()->status);
+        $this->assertSame(0, $order->fresh()->remaining);
+        $this->assertDatabaseCount('payments', 2);
+        $this->assertDatabaseHas('payments', [
+            'order_id' => $order->id,
+            'method' => 'qris',
+            'amount' => 20000,
+        ]);
+        $this->assertDatabaseHas('payments', [
+            'order_id' => $order->id,
+            'method' => 'qris',
+            'amount' => 45000,
+        ]);
+    }
+
+    public function test_non_cash_payment_above_the_remaining_is_rejected(): void
+    {
+        $admin = Admin::factory()->create();
+        $espresso = MenuItem::create(['name' => 'Espresso', 'price' => 20000]);
+        $croissant = MenuItem::create(['name' => 'Croissant', 'price' => 25000]);
+
+        $component = Livewire::actingAs($admin, 'admin')->test(Cashier::class);
+
+        $component
+            ->call('addToCart', $espresso->id)
+            ->call('addToCart', $espresso->id)
+            ->call('addToCart', $croissant->id)
+            ->call('createOrder')
+            ->assertHasNoErrors();
+
+        $order = Order::latest('id')->firstOrFail();
+
+        $component
+            ->set('paymentMethod', 'qris')
+            ->set('paymentAmount', '70.000')
+            ->call('capturePayment')
+            ->assertHasErrors(['paymentAmount']);
+
+        $this->assertSame(OrderStatus::Pending, $order->fresh()->status);
+        $this->assertDatabaseCount('payments', 0);
+
+        $component
+            ->set('paymentMethod', 'ewallet')
+            ->set('paymentAmount', '70.000')
+            ->call('capturePayment')
+            ->assertHasErrors(['paymentAmount']);
+
+        $this->assertDatabaseCount('payments', 0);
+    }
 }
