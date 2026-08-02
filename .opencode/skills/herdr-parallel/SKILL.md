@@ -34,10 +34,24 @@ Pitfalls learned in prior sessions:
 ## Starting opencode agents in panes
 
 ```bash
-herdr agent start --kind opencode
+herdr pane split --pane <current-pane> --direction right --cwd <repo>   # plain sessions have NO pre-provisioned panes — split first
+herdr agent start --kind opencode --pane <new-pane-id>                  # bare `herdr agent start` without --pane fails: "unknown option"
+herdr agent rename <pane-id> <role-name>                                # e.g. docs-pos, docs-website — readable fleet lists
+herdr agent prompt <pane-id> "<task>"                                   # then submit the task
 ```
 
 then submit each agent's task prompt. Use the project conventions in `AGENTS.md` (e.g. `sg docker` for every container command, `PAO_DISABLE=1` for tests). Split tasks along file boundaries so agents don't edit the same files concurrently. In a worktree workspace the "agents" tab already runs 3 opencode agents (auto-layout) — the lead agent is the FIRST pane; sub-agents are the OTHER pre-provisioned panes in the same tab. Use `herdr agent prompt <pane> "..."` / `herdr agent read` / `herdr agent wait` on them. Do NOT run `herdr pane split`/`agent start` from inside a lead — it opens new terminals instead of staying in the shared layout. Idle pre-provisioned panes hold ~700MB each — close panes the lead doesn't need (`herdr pane close <pane>`) or keep fleet sizes matched to task size.
+
+**Docs-only / no-code batches (no worktree needed):** when the task touches only
+disjoint files that all land on `main` together (docs reformatting, research,
+report writing), run the fleet on the MAIN checkout — each agent gets one source→
+target pair, writes its report to `/tmp/opencode/<branch>-report.md`, stages its
+own files with `git add`/`git rm` scoped to its pair (never `git commit` — the
+lead owns the commit), and notifies via `herdr agent prompt w14:p1 "DONE ..."`.
+No Sail stack, no ports, no worktree lifecycle. Close the panes (`herdr pane
+close`) when all DONE messages arrive — each idle agent holds ~700MB. Don't plan
+to reuse agents from previous sessions: panes/agents from ended workspaces are
+already gone (`herdr pane list` shows only live ones).
 
 **Fleet sizing (v3 rule — role-based, layered):** match sub-agents to the feature's LAYER COUNT, NOT "always 3". A dedicated read-only "verify" pane is NOT used anymore — verification happens twice already (lead runs full suite + Pint before DONE; main session re-runs the suite on main before push). A verify pane just burns ~700MB idle (community-validated: herdr has no built-in subagent orchestration; the role-split convention is per-team — see herdr discussion #1274).
 - S-effort, single-layer (e.g. maps embed, one blade view) → lead only; close unneeded pre-provisioned panes immediately
