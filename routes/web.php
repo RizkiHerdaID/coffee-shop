@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Route;
 Route::get('/', [PageController::class, 'home'])->name('home');
 Route::get('/menu', [PageController::class, 'menu'])->name('menu');
 Route::get('/contact', [PageController::class, 'contact'])->name('contact');
+Route::get('/cek-poin', [PageController::class, 'points'])->name('points');
 
 Route::match(['get', 'post'], '/reservasi', [PageController::class, 'reservation'])
     ->name('reservation');

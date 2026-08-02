@@ -10,6 +10,7 @@ return [
     'nav' => [
         'home' => 'Beranda',
         'menu' => 'Menu',
+        'points' => 'Cek Poin',
         'reservation' => 'Reservasi',
         'contact' => 'Kontak',
         'reserve' => 'Pesan Meja',
