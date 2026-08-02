@@ -15,19 +15,35 @@ herdr pane current
 herdr pane split --direction right --cwd /home/rizki/projects/coffee-shop
 herdr pane split --pane w1:p1 --direction down --cwd /home/rizki/projects/coffee-shop
 
-herdr pane run w1:p3 "sg docker -c './vendor/bin/sail artisan test --filter=AdminAuthTest' && echo DONE"
-herdr pane read w1:p3 | tail -30   # read pane output after a sleep
+herdr pane run w1:p3 "sg docker -c './vendor/bin/sail artisan test --filter=AdminAuthTest' && echo __TESTS_OK__"
+herdr pane wait-output w1:p3 --match __TESTS_OK__ --timeout 600000   # event-driven wait; never sleep
+herdr pane read w1:p3 --source recent-unwrapped --lines 120          # read log-style output
 ```
 
 Pitfalls learned in prior sessions:
 
 - **Prompt quoting**: single-quoted prompts containing apostrophes break the shell command (`ops` agent's prompt failed to submit this way). Avoid apostrophes or escape them.
-- **`herdr pane run ... --wait` returns early** — it matches the first state change, not task completion. After dispatching, `sleep` then `herdr pane read <pane>`.
+- **`herdr pane run` has no completion wait** — `--wait` matches the first state change, not task completion. Never `sleep` then read: use the wait/read primitives below (validated 2026-08-02 by a 4-model research fleet — the sleep+read pattern was our single biggest reliability gap).
+
+**Wait/read primitives (official herdr; replace ALL sleep-polling):**
+```bash
+herdr pane wait-output <pane> --match __TESTS_OK__ --timeout 600000    # text-level wait for shells/tests/builds (--regex for patterns)
+herdr agent prompt <pane> "<task>" --wait --timeout 600000             # lifecycle wait: submit + wait for settled idle/done/blocked
+herdr agent wait <pane> --until idle --until done --timeout 600000     # wait for a specific settled state (crash-fallback for DONE-message)
+herdr agent wait <pane> --until blocked --timeout 5000                 # permission-prompt rescue: then read, approve, or simplify
+herdr agent read <pane> --source recent-unwrapped --lines 120          # reads for logs/transcripts (soft wraps joined)
+```
+- `agent prompt --wait` / `agent wait` are lifecycle-based, NOT turn-scoped: a working agent may settle on its current turn → false completion. Always pair with the report-file-on-disk check — `/tmp/opencode/<batch>-<role>-report.md` stays the completion evidence.
+- `pane wait-output` matches text already on screen — use batch-unique markers (`echo __TESTS_OK__`) or anchored regexes so a stale line cannot satisfy the wait.
+- Always pass `--timeout` — both wait commands have NO default and wait indefinitely (a hung wait pins a ~700MB pane).
+- Wrong pane state (`unknown`, idle-while-working)? `herdr agent explain <pane>` shows which detection rule matched and why (manifest source, fallback reason) — the first debugging step.
+- OpenCode is screen-manifest detected by default; `herdr integration install opencode` makes lifecycle hook-authoritative (`idle`/`working`/`blocked` semantics become reliable).
+- Alt-screen caveat: full-screen agents (OpenCode/Claude Code) lose scrolled rows to herdr's host scrollback — `--lines` cannot recover them. THIS is why report files stay the PRIMARY channel for fleet results (on-pane summaries ≤22 lines + disk report), and why pane reads use `--source recent-unwrapped`.
 - **Check the pane, don't trust acknowledgement** — fast models may acknowledge a task without doing it; read the pane output to confirm work happened. Agents may also silently ignore instructions (a "don't commit" instruction was violated) — verify the pane, and if a violation matters, dispatch a corrective prompt.
 - **Permission prompts block agents** — if a pane is stuck, read its output; the agent may be waiting on a permission prompt that needs approval or needs its task simplified to avoid it.
 - **`herdr agent read` only exposes the ~30 visible terminal lines** — an agent's full report scrolls out of reach. To collect a long result: prompt the agent to reprint it in a compact block that fits one screen (≤22 lines), or have it write the result to a file. Split long outputs into "print section X only" follow-ups.
 - **Agents and panes disappear when the session ends** — research agents' panes closed after their sessions, losing direct access. Capture lessons/post-mortems WHILE agents are alive, and have deliverables written to files (e.g. `docs/`) rather than only spoken into the pane.
-- **Completion notification (do NOT poll)**: the main session (`wE:p1`) should never `sleep`-poll agent status. Every lead prompt MUST end with: on completion, run `herdr agent prompt wE:p1 "DONE <branch>: commit <sha>, tests <N> passed, <files>, post-mortem: ..."` — this injects a message into the main opencode session, which wakes and reacts (merge, cleanup). Main session reads `herdr agent read <pane>` only on notification, not on a timer.
+- **Completion notification (do NOT poll)**: the main session (`wE:p1`) should never `sleep`-poll agent status. Every lead prompt MUST end with: on completion, run `herdr agent prompt wE:p1 "DONE <branch>: commit <sha>, tests <N> passed, <files>, post-mortem: ..."` — this injects a message into the main opencode session, which wakes and reacts (merge, cleanup). Main session reads `herdr agent read <pane>` only on notification, not on a timer. Keep the DONE-injection for its PAYLOAD (commit SHA, test counts — `agent wait` cannot carry one); add `herdr agent wait <lead-pane> --until idle --until done --timeout 600000` as the deterministic completion check and crash-fallback (an agent that dies never sends DONE).
 - **Branch worktrees from the current `main` HEAD** — branches created from an older base show unrelated infra commits as deletions in `git diff main <branch>`; the 3-way merge still resolves cleanly (main keeps its versions), but the diff noise is confusing. Re-create stale-base branches or accept the artifact.
 - **Post-mortems** — before closing agent panes, ask each agent (and yourself) for `LESSONS LEARNED` bullets; fold them into AGENTS.md quirks and these skills. This session's lessons are captured in `.opencode/skills/sail-filament-workflow/SKILL.md`.
 
@@ -36,7 +52,8 @@ Pitfalls learned in prior sessions:
 ```bash
 herdr pane split --pane <current-pane> --direction right --cwd <repo>   # plain sessions have NO pre-provisioned panes — split first
 herdr agent start --kind opencode --pane <new-pane-id>                  # bare `herdr agent start` without --pane fails: "unknown option"
-herdr agent rename <pane-id> <role-name>                                # e.g. docs-pos, docs-website — readable fleet lists
+herdr agent start <name> --kind opencode --pane <id> -- --model opencode-go/<model>   # multi-model fleets: native args pass after `--` (proven 2026-08-02: pro/glm/grok/qwen in 4 panes)
+herdr agent rename <pane-id> <role-name>                                # e.g. docs-pos, docs-website — readable fleet lists; rename EVERY role at fleet boot (stable targets)
 herdr agent prompt <pane-id> "<task>"                                   # then submit the task
 ```
 
@@ -75,10 +92,11 @@ was received.
 report file on disk), or a pane goes quiet >~10 min past its siblings' average, do
 NOT wait — dispatch a corrective prompt: "You reported DONE but <report file
 missing | claims unverified | file ownership violated>. Re-read the contract,
-finish the work, rewrite the report, re-notify." If the pane is stuck on a
-permission prompt, read its output and either approve the permission or simplify
-the task. Never accept a DONE message as evidence of completion — the report file
-on disk + lead spot-check are the evidence.
+finish the work, rewrite the report, re-notify." If a pane is stuck on a
+permission prompt, confirm it semantically with `herdr agent wait <pane>
+--until blocked --timeout 5000`, then read its output and either approve the
+permission or simplify the task. Never accept a DONE message as evidence of
+completion — the report file on disk + lead spot-check are the evidence.
 
 **Fleet sizing (v3 rule — role-based, layered):** match sub-agents to the feature's LAYER COUNT, NOT "always 3". A dedicated read-only "verify" pane is NOT used anymore — verification happens twice already (lead runs full suite + Pint before DONE; main session re-runs the suite on main before push). A verify pane just burns ~700MB idle (community-validated: herdr has no built-in subagent orchestration; the role-split convention is per-team — see herdr discussion #1274).
 - S-effort, single-layer (e.g. maps embed, one blade view) → lead only; close unneeded pre-provisioned panes immediately

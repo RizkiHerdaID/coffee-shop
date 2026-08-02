@@ -36,7 +36,7 @@ flowchart TD
     Ack --> GateCheck{Which gate?}
 
     GateCheck -->|Feature branch worktree| PreMerge[Pre-merge gate]
-    PreMerge --> PM1[1. herdr agent list<br/>all panes idle + last action read]
+    PreMerge --> PM1[1. herdr agent list — all panes<br/>done/idle, unknown = hard block<br/>+ last action read]
     PM1 --> PM2[2. All &lt;batch&gt;-&lt;role&gt;-report.md exist<br/>findings incorporated]
     PM2 --> PM3[3. Review agent phase-2 re-check<br/>of committed diff, read-only]
     PM3 --> PM4[4. git status clean<br/>git log main..branch reviewed]
@@ -67,3 +67,4 @@ flowchart TD
 | Only lead notifies | Prevents message storms when several agents finish at once |
 | Two gates | Worktree fleets get the heavy pre-merge gate (idle panes, phase-2 review, suite); docs-only fleets get the lighter 4-step check |
 | DONE is not evidence | The report file on disk + lead spot-check are the evidence, never the DONE message alone |
+| Wait primitives | `pane wait-output --match` (shells/tests) and `agent prompt --wait` / `agent wait --until` (agents) replace sleep-polling — not turn-scoped, pair with the report-file check; always `--timeout` |
