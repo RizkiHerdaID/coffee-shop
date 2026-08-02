@@ -102,6 +102,23 @@ curl -s -o /dev/null -w "%{http_code}\n" http://localhost:8081/
 
 RAM note: each stack is 5 containers (laravel.test, queue, pgsql, redis, minio, mailpit); keep only worktrees you are actively testing in. Stale containers from worktrees created BEFORE this scheme still hold the default ports — `sail down` those once before relying on slots.
 
+## Hardware guardrails (16GB / 12-thread dev machine — learned the hard way)
+
+The host is a Ryzen 7 5700X (6c/12t), **16GB RAM, zero swap by default**. A full parallel run costs more than the machine has: 4 worktrees × 6 containers ≈ 3–4GB, and EVERY opencode agent (lead + sub-agents) ≈ 700MB RSS. One fleet of 4 worktrees × ~4 agents hit 14.7GB used / 880MB free with load 29 — an OOM kill was one Vite build away.
+
+**Before fanning out agents** (run these, then budget):
+- `free -h` — if available < ~2GB, do NOT start more agents; kill idle panes first.
+- `herdr agent list` — count live agents; budget 700MB each.
+- `sg docker -c "docker ps | wc -l"` — each worktree stack ≈ 1GB.
+
+**Hard rules for multi-agent runs:**
+1. **Max 2 worktrees × 2 sub-agents per lead** on this hardware (≈6 agents total). 4 full fleets (15 agents) is NOT viable — it nearly OOMed.
+2. **Kill idle sub-agent panes immediately** (`herdr pane split`d agents that finished or haven't been prompted yet) — idle opencode panes still hold ~700MB. Never leave a completed sub-agent pane alive while more work is pending.
+3. **Stagger verification**: do NOT run test suites + Vite builds across all worktrees simultaneously — that is the peak-memory spike. Two at a time max.
+4. **Free stacks as soon as branches merge**: `sg docker -c "cd <wt> && ./vendor/bin/sail down"` + close the workspace recovers ~1.5GB each.
+5. **8GB swapfile is the one-time fix**: `sudo fallocate -l 8G /swapfile && sudo chmod 600 /swapfile && sudo mkswap /swapfile && sudo swapon /swapfile && echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab` — turns OOM risk into graceful slowdown. (Passwordless sudo is NOT available to agents; the user runs this.)
+6. **Check `uptime` load before starting**: if load > 12 on a 12-thread box, finish or kill existing work before fanning out more.
+
 ## When to use Task tool vs herdr panes
 
 - Quick parallel exploration/review → built-in `explore`/`general` Task agents are fine (they appear in the pane too).
