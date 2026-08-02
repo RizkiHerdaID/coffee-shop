@@ -3,6 +3,7 @@
 namespace App\Providers\Filament;
 
 use App\Filament\Auth\Login;
+use App\Filament\Pages\Cashier;
 use App\Filament\Widgets\BestSellersChart;
 use App\Filament\Widgets\PeakHoursChart;
 use App\Filament\Widgets\RevenueChart;
@@ -43,6 +44,7 @@ class AdminPanelProvider extends PanelProvider
             ->discoverPages(in: app_path('Filament/Pages'), for: 'App\Filament\Pages')
             ->pages([
                 Dashboard::class,
+                Cashier::class,
             ])
             ->widgets([
                 AccountWidget::class,
