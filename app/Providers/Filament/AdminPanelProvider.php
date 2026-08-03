@@ -15,6 +15,7 @@ use App\Filament\Widgets\PeakHoursChart;
 use App\Filament\Widgets\RevenueChart;
 use App\Filament\Widgets\TodayStats;
 use App\Filament\Widgets\TopItemsChart;
+use App\Http\Middleware\SetLocale;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
@@ -42,7 +43,7 @@ class AdminPanelProvider extends PanelProvider
             ->path('admin')
             ->login(Login::class)
             ->authGuard('admin')
-            ->brandName('Coffee Shop')
+            ->brandName(config('shop.name'))
             ->colors([
                 'primary' => Color::Amber,
             ])
@@ -71,6 +72,9 @@ class AdminPanelProvider extends PanelProvider
                 EncryptCookies::class,
                 AddQueuedCookiesToResponse::class,
                 StartSession::class,
+                // Honor the session/query locale like the public site so
+                // admin-side `__()` strings follow the chosen language.
+                SetLocale::class,
                 AuthenticateSession::class,
                 ShareErrorsFromSession::class,
                 PreventRequestForgery::class,

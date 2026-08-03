@@ -21,6 +21,8 @@
     <form method="POST" action="{{ route('reservation') }}" class="mt-12 rounded-2xl border border-stone-800 bg-stone-900/60 p-8">
         @csrf
 
+        <input type="text" name="website" value="" tabindex="-1" autocomplete="off" aria-hidden="true" class="hidden">
+
         <div class="grid gap-6 sm:grid-cols-2">
             <div>
                 <label for="name" class="block text-sm font-medium text-stone-300">{{ __('reservation.form.name') }}</label>

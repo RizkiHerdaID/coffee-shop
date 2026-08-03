@@ -58,6 +58,7 @@ return [
         'success' => 'Reservasi Anda berhasil dikirim. Kami akan mengonfirmasi melalui WhatsApp.',
         'invalid_phone' => 'Format nomor WhatsApp tidak valid.',
         'party_size_min' => 'Jumlah tamu minimal 1.',
+        'past_time' => 'Waktu reservasi harus di masa depan. Pilih jam yang belum lewat untuk hari ini.',
     ],
 
     'empty' => [

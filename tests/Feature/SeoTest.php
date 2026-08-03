@@ -93,4 +93,13 @@ class SeoTest extends TestCase
             $response->assertSee(url('/qr/'.$table), false);
         }
     }
+
+    public function test_og_url_does_not_carry_lang_query_param(): void
+    {
+        $response = $this->get('/menu?lang=en');
+
+        $response->assertOk();
+        $response->assertSee('property="og:url" content="'.url('/menu').'"', false);
+        $response->assertDontSee('property="og:url" content="'.url('/menu').'?lang=en"', false);
+    }
 }

@@ -20,7 +20,7 @@ return [
             'body' => 'Order by chat and get a reply in minutes — no phone tag, no wait.',
         ],
         'qris' => [
-            'title' => 'Terima QRIS',
+            'title' => 'Pay with QRIS',
             'body' => 'Pay with any QRIS wallet — scan, pay, done. No cash? No problem.',
         ],
         'delivery' => [
@@ -35,7 +35,10 @@ return [
         'eyebrow' => 'Crowd favourites',
         'heading' => 'From the menu',
         'full_menu' => 'Full menu',
+        'empty' => 'No menu items yet. Check back soon!',
     ],
+
+    'order_online' => 'Order online',
 
     'cta' => [
         'heading' => 'Your table is waiting.',

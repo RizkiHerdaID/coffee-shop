@@ -8,7 +8,9 @@
             'offers' => [
                 '@type' => 'Offer',
                 'priceCurrency' => 'IDR',
-                'price' => number_format($item->price, 0, ',', '.'),
+                // schema.org requires the raw numeric price — no thousands
+                // separators ("25.000" would make Google drop the markup).
+                'price' => $item->price,
                 'availability' => $item->available ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock',
                 'url' => url(route('menu')),
             ],

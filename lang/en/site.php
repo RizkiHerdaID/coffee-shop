@@ -5,6 +5,8 @@ return [
 
     'lang' => [
         'label' => 'Language',
+        'to_id' => 'Switch language to Indonesian',
+        'to_en' => 'Switch language to English',
     ],
 
     'nav' => [

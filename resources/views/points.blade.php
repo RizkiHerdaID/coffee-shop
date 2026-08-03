@@ -37,10 +37,14 @@
                 <p class="mt-2 text-4xl font-extrabold text-white">{{ $card->redeemed }}</p>
             </div>
         </div>
-        @if ($card->stamps % 10 !== 0)
+        @php
+            $stampsPerReward = config('loyalty.stamps_per_reward', 10);
+            $collected = $card->stamps % $stampsPerReward;
+        @endphp
+        @if ($collected !== 0)
         <p class="mt-6 text-sm text-stone-400">
-            {{ __('points.progress_label') }}: {{ __('points.progress_count', ['collected' => $card->stamps % 10]) }}
-            &mdash; {{ __('points.progress_remaining', ['count' => $card->remainingToNextFreeDrink()]) }}
+            {{ __('points.progress_label') }}: {{ __('points.progress_count', ['collected' => $collected, 'total' => $stampsPerReward]) }}
+            &mdash; {{ __('points.progress_remaining', ['count' => $stampsPerReward - $collected]) }}
         </p>
         @endif
         @else

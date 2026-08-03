@@ -58,6 +58,7 @@ return [
         'success' => 'Your reservation has been sent. We will confirm via WhatsApp.',
         'invalid_phone' => 'Invalid WhatsApp number format.',
         'party_size_min' => 'Party size must be at least 1.',
+        'past_time' => 'Reservation time must be in the future. Pick a time that has not passed today.',
     ],
 
     'empty' => [

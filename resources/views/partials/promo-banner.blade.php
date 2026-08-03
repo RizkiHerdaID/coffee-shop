@@ -13,8 +13,12 @@
             </p>
         </div>
         <div class="flex shrink-0 items-center gap-3">
-            @if ($promo->cta_text && $promo->cta_url)
-            <a href="{{ $promo->cta_url }}" class="shrink-0 rounded-full bg-stone-950 px-4 py-1.5 text-xs font-bold text-amber-400 transition hover:bg-stone-800">{{ $promo->cta_text }}</a>
+            @php
+                $ctaUrl = (string) ($promo->cta_url ?? '');
+                $ctaUrl = preg_match('#^(https?:)?//#i', $ctaUrl) || str_starts_with($ctaUrl, '/') || str_starts_with($ctaUrl, '#') ? $ctaUrl : '#';
+            @endphp
+            @if ($promo->cta_text && $ctaUrl !== '#')
+            <a href="{{ $ctaUrl }}" class="shrink-0 rounded-full bg-stone-950 px-4 py-1.5 text-xs font-bold text-amber-400 transition hover:bg-stone-800">{{ $promo->cta_text }}</a>
             @endif
             <button type="button" data-dismiss-promo aria-label="{{ __('site.banner.dismiss_aria') }}" class="shrink-0 rounded-full px-1.5 text-xl leading-none transition hover:bg-stone-950/10">&times;</button>
         </div>

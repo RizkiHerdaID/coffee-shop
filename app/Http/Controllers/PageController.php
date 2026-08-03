@@ -8,21 +8,63 @@ use App\Models\MenuItem;
 use App\Models\Promo;
 use App\Models\Reservation;
 use App\Models\Testimonial;
+use Carbon\Carbon;
 use Illuminate\Contracts\View\View;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
 
 final class PageController extends Controller
 {
     public function home(): View
     {
-        $items = MenuItem::query()->where('available', true)->orderBy('sort_order')->get();
+        // Light 5-minute cache: the public home page is hit on every visit and
+        // the menu/promo/testimonial data changes only via the admin panel.
+        // NOTE: the cache store refuses to unserialize PHP classes by default
+        // (Laravel's hardened cache serializer), so we cache PLAIN ARRAYS of
+        // raw query rows and hydrate lightweight models from them.
+        $itemRows = Cache::remember('home.menu_items', 300, fn () => MenuItem::query()->where('available', true)->orderBy('sort_order')->getQuery()->get()
+            ->map(fn (object $row) => (array) $row)
+            ->all());
+        $items = $this->hydrate(MenuItem::class, $itemRows);
+
+        $promoRow = Cache::remember('home.promo', 300, function () {
+            $row = Promo::query()->visible()->orderBy('sort_order')->getQuery()->first();
+
+            return $row ? (array) $row : null;
+        });
+        $promo = $promoRow ? $this->hydrate(Promo::class, [$promoRow])->first() : null;
+
+        $testimonialRows = Cache::remember('home.testimonials', 300, fn () => Testimonial::query()->visible()->orderBy('sort_order')->orderBy('id')->getQuery()->get()
+            ->map(fn (object $row) => (array) $row)
+            ->all());
+        $testimonials = $this->hydrate(Testimonial::class, $testimonialRows);
 
         return view('home', [
             'highlights' => $items->take(4),
-            'promo' => Promo::query()->visible()->orderBy('sort_order')->first(),
-            'testimonials' => Testimonial::query()->visible()->orderBy('sort_order')->orderBy('id')->get(),
+            'promo' => $promo,
+            'testimonials' => $testimonials,
         ]);
+    }
+
+    /**
+     * Rebuild model instances from cached raw rows. The resolved default
+     * connection name is pinned so the instances compare equal (Model::is)
+     * to models created through factories/queries in the same app run.
+     *
+     * @param  class-string<Model>  $model
+     * @param  array<int, array<string, mixed>>  $rows
+     */
+    private function hydrate(string $model, array $rows): Collection
+    {
+        return collect($rows)->map(function (array $row) use ($model): Model {
+            $instance = new $model;
+            $instance->setConnection($instance->getConnection()->getName());
+
+            return $instance->newFromBuilder($row);
+        });
     }
 
     public function menu(): View
@@ -67,7 +109,21 @@ final class PageController extends Controller
                 'date' => ['required', 'date', 'after_or_equal:today'],
                 'time' => ['required', 'date_format:H:i'],
                 'notes' => ['nullable', 'string', 'max:500'],
+                // Honeypot: a real human never fills this hidden field.
+                'website' => ['prohibited'],
             ]);
+
+            // The honeypot field must not be persisted.
+            unset($validated['website']);
+
+            // Same-day bookings must be for a time still in the future.
+            $reservationDateTime = Carbon::parse($validated['date'].' '.$validated['time']);
+
+            if ($reservationDateTime->isToday() && $reservationDateTime->isPast()) {
+                return back()
+                    ->withErrors(['time' => __('reservation.form.past_time')])
+                    ->withInput();
+            }
 
             $reservation = Reservation::create($validated);
 

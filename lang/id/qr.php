@@ -6,6 +6,7 @@ return [
     'intro' => 'Pindai menu dari meja Anda, lalu pesan langsung ke kasir.',
     'table_name' => 'Meja :number',
     'open_full_menu' => 'Buka Menu Lengkap',
+    'empty' => 'Menu belum tersedia. Kembali lagi nanti ya!',
 
     'nav_label' => 'Kode QR Meja',
     'admin_title' => 'Kode QR Meja',

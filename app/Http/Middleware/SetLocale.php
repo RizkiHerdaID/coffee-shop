@@ -13,11 +13,19 @@ class SetLocale
 
     public function handle(Request $request, Closure $next): Response
     {
-        $locale = $request->query('lang', $request->session()->get('locale', config('app.locale')));
+        // Validate the query param first so an invalid `?lang=xx` can never
+        // shadow the session locale; then fall back to session, then config.
+        $locale = $request->query('lang');
 
-        if (in_array($locale, self::SUPPORTED_LOCALES, true)) {
-            App::setLocale($locale);
+        if (! in_array($locale, self::SUPPORTED_LOCALES, true)) {
+            $locale = $request->session()->get('locale');
         }
+
+        if (! in_array($locale, self::SUPPORTED_LOCALES, true)) {
+            $locale = config('app.locale');
+        }
+
+        App::setLocale($locale);
 
         return $next($request);
     }

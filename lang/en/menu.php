@@ -17,6 +17,8 @@ return [
 
     'sold_out' => 'Sold out',
     'empty' => 'No menu items in this category.',
+    'empty_heading' => 'No menu items yet',
+    'empty_description' => 'Our menu is being prepared. Check back soon!',
 
     'badges' => [
         'label' => 'Menu labels',

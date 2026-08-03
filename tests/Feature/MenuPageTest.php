@@ -153,4 +153,60 @@ class MenuPageTest extends TestCase
         $enResponse->assertSee(__('menu.badges.gluten_free'));
         $enResponse->assertSee(__('menu.badges.vegan'));
     }
+
+    public function test_menu_page_json_ld_price_is_raw_integer(): void
+    {
+        $this->seed(MenuSeeder::class);
+
+        $response = $this->get('/menu');
+
+        $response->assertOk();
+        $response->assertSee('"price": 25000', false);
+        $response->assertDontSee('"price": "25.000"', false);
+        $response->assertSee('Rp 25.000');
+
+        preg_match_all('/<script type="application\/ld\+json">(.*?)<\/script>/s', $response->getContent(), $matches);
+
+        $this->assertNotEmpty($matches[1], 'No JSON-LD blocks found');
+
+        $itemListIndex = collect($matches[1])->search(fn (string $json): bool => str_contains($json, '"ItemList"'));
+
+        $this->assertNotFalse($itemListIndex, 'Menu ItemList JSON-LD block not found');
+        $this->assertStringNotContainsString('25.000', $matches[1][$itemListIndex]);
+
+        $itemList = json_decode($matches[1][$itemListIndex], true);
+        $espresso = collect($itemList['itemListElement'])->firstWhere('name', 'Espresso');
+
+        $this->assertNotNull($espresso);
+        $this->assertSame(25000, $espresso['offers']['price']);
+        $this->assertSame('IDR', $espresso['offers']['priceCurrency']);
+    }
+
+    public function test_menu_page_shows_localized_empty_state_when_no_items(): void
+    {
+        $response = $this->get('/menu');
+
+        $response->assertOk();
+        $response->assertSee(__('menu.empty_heading'));
+        $response->assertSee(__('menu.empty_description'));
+    }
+
+    public function test_menu_page_escapes_quotes_in_category_attributes(): void
+    {
+        $this->seed(MenuSeeder::class);
+
+        MenuItem::create([
+            'name' => 'Kopi Istimewa',
+            'price' => 25000,
+            'category' => 'Coffee "Special"',
+            'sort_order' => 99,
+            'available' => true,
+        ]);
+
+        $response = $this->get('/menu');
+
+        $response->assertOk();
+        $response->assertSee('data-category="Coffee &quot;Special&quot;"', false);
+        $response->assertDontSee('data-category="Coffee "Special""', false);
+    }
 }

@@ -17,6 +17,8 @@ return [
 
     'sold_out' => 'Habis',
     'empty' => 'Tidak ada menu dalam kategori ini.',
+    'empty_heading' => 'Belum ada menu',
+    'empty_description' => 'Menu sedang dipersiapkan. Kembali lagi nanti ya!',
 
     'badges' => [
         'label' => 'Label menu',

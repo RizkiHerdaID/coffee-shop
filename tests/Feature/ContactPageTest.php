@@ -63,4 +63,19 @@ class ContactPageTest extends TestCase
         $response->assertSee('https://www.google.com/maps/dir/?api=1&destination='.urlencode(config('shop.address')));
         $response->assertSee(__('contact.directions_button'));
     }
+
+    public function test_contact_page_renders_localized_strings_for_both_locales(): void
+    {
+        $id = $this->get('/contact');
+
+        $id->assertOk();
+        $id->assertSee(__('contact.heading'));
+
+        app()->setLocale('en');
+
+        $en = $this->get('/contact?lang=en');
+
+        $en->assertOk();
+        $en->assertSee(__('contact.heading'));
+    }
 }

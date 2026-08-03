@@ -3,19 +3,29 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    @php
+        $canonicalUrl = url()->current();
+        $query = request()->query();
+
+        if (array_key_exists('lang', $query)) {
+            unset($query['lang']);
+            $canonicalUrl .= $query ? '?'.http_build_query($query) : '';
+        }
+    @endphp
     <meta name="description" content="@yield('description', __('site.meta.default_description', ['shop' => config('shop.name')]))">
     <title>@yield('title', __('site.brand'))</title>
 
     <meta property="og:title" content="@yield('title', __('site.brand'))">
     <meta property="og:description" content="@yield('description', __('site.meta.default_description', ['shop' => config('shop.name')]))">
     <meta property="og:type" content="website">
-    <meta property="og:url" content="{{ url()->current() }}">
+    <meta property="og:url" content="{{ $canonicalUrl }}">
     <meta property="og:image" content="{{ url('/images/og-image.png') }}">
     <meta property="og:site_name" content="{{ config('shop.name') }}">
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:title" content="@yield('title', __('site.brand'))">
     <meta name="twitter:description" content="@yield('description', __('site.meta.default_description', ['shop' => config('shop.name')]))">
     <meta name="twitter:image" content="{{ url('/images/og-image.png') }}">
+    <link rel="canonical" href="{{ $canonicalUrl }}">
 
     @php
         $days = [
@@ -84,7 +94,7 @@
         <nav class="mx-auto flex max-w-6xl items-center justify-between px-4 py-4 sm:px-6">
             <a href="{{ route('home') }}" class="flex items-center gap-2 text-lg font-bold tracking-tight text-amber-500">
                 <span class="text-2xl">&#9749;</span>
-                Coffee Shop
+                {{ config('shop.name') }}
             </a>
             <div class="hidden items-center gap-8 text-sm font-medium text-stone-300 sm:flex">
                 <a href="{{ route('home') }}" class="transition hover:text-amber-400">{{ __('site.nav.home') }}</a>

@@ -34,7 +34,7 @@
         </button>
         @foreach ($categories as $category)
         <button type="button" data-filter="{{ $category }}" class="category-filter-btn rounded-full border border-stone-700 px-5 py-2 text-sm font-semibold text-stone-300 transition hover:border-amber-500 hover:text-amber-400">
-            {{ __("menu.categories.$category") }}
+            {{ \Illuminate\Support\Facades\Lang::has("menu.categories.$category") ? __("menu.categories.$category") : $category }}
         </button>
         @endforeach
     </div>
@@ -79,7 +79,11 @@
         @endforeach
     </div>
 
-    <p class="mt-10 rounded-2xl border border-stone-800 bg-stone-950 p-8 text-center text-stone-400 {{ $menu->isEmpty() ? '' : 'hidden' }}" id="menu-empty">{{ __('menu.empty') }}</p>
+    <div class="mt-10 rounded-2xl border border-stone-800 bg-stone-950 p-12 text-center {{ $menu->isEmpty() ? '' : 'hidden' }}" id="menu-empty">
+        <p class="text-5xl" aria-hidden="true">&#9749;</p>
+        <h2 class="mt-4 text-xl font-semibold text-white">{{ __('menu.empty_heading') }}</h2>
+        <p class="mt-2 text-sm text-stone-400">{{ __('menu.empty_description') }}</p>
+    </div>
 </section>
 
 @include('partials.menu-schema')

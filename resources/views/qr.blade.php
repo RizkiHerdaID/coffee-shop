@@ -9,12 +9,17 @@
     <p class="mt-3 text-center text-sm text-stone-400">{{ __('qr.intro') }}</p>
 
     <div class="mt-8 divide-y divide-stone-800 rounded-2xl border border-stone-800 bg-stone-950">
-        @foreach ($menu as $item)
+        @forelse ($menu as $item)
         <div class="flex items-center justify-between gap-4 px-5 py-4">
             <h2 class="font-semibold text-white">{{ $item->name }}</h2>
             <p class="shrink-0 font-semibold text-amber-500">Rp {{ number_format($item->price, 0, ",", ".") }}</p>
         </div>
-        @endforeach
+        @empty
+        <div class="px-5 py-10 text-center">
+            <p class="text-4xl" aria-hidden="true">&#9749;</p>
+            <p class="mt-4 text-sm text-stone-400">{{ __('qr.empty') }}</p>
+        </div>
+        @endforelse
     </div>
 
     <a href="{{ route('menu') }}" class="mt-8 block rounded-full bg-amber-500 py-3 text-center font-semibold text-stone-950 transition hover:bg-amber-400">

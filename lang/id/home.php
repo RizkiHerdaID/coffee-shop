@@ -35,7 +35,10 @@ return [
         'eyebrow' => 'Favorit Pengunjung',
         'heading' => 'Menu Andalan',
         'full_menu' => 'Menu Lengkap',
+        'empty' => 'Belum ada menu. Kembali lagi nanti ya!',
     ],
+
+    'order_online' => 'Pesan online',
 
     'cta' => [
         'heading' => 'Meja Anda sudah menanti.',

@@ -69,7 +69,7 @@
             <a href="{{ route('menu') }}" class="font-semibold text-amber-500 transition hover:text-amber-400">{{ __('home.favorites.full_menu') }} &rarr;</a>
         </div>
         <div class="grid gap-6 sm:grid-cols-2">
-            @foreach ($highlights as $item)
+            @forelse ($highlights as $item)
             <div class="flex items-start justify-between gap-4 rounded-2xl border border-stone-800 bg-stone-950 p-6">
                 <div>
                     <h3 class="font-semibold text-white">{{ $item->name }}</h3>
@@ -83,7 +83,12 @@
                     @endif
                 </div>
             </div>
-            @endforeach
+            @empty
+            <div class="rounded-2xl border border-stone-800 bg-stone-950 p-10 text-center sm:col-span-2">
+                <p class="text-4xl" aria-hidden="true">&#9749;</p>
+                <p class="mt-4 text-sm text-stone-400">{{ __('home.favorites.empty') }}</p>
+            </div>
+            @endforelse
         </div>
     </div>
 </section>
@@ -121,14 +126,14 @@
         </a>
         <span class="mt-6 inline-flex items-center gap-2 rounded-full border border-stone-700 bg-stone-900/60 px-4 py-1.5 text-xs font-semibold uppercase tracking-widest text-stone-300">
             <svg class="h-3.5 w-3.5 text-amber-500" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="3" y="3" width="8" height="8" rx="1"/><rect x="13" y="3" width="8" height="8" rx="1"/><rect x="3" y="13" width="8" height="8" rx="1"/><rect x="13" y="13" width="3.5" height="3.5" rx="0.5"/><rect x="17.5" y="13" width="3.5" height="3.5" rx="0.5"/><rect x="13" y="17.5" width="3.5" height="3.5" rx="0.5"/><rect x="17.5" y="17.5" width="3.5" height="3.5" rx="0.5"/></svg>
-            Terima QRIS
+            {{ __('home.cards.qris.title') }}
         </span>
     </div>
 </section>
 
 <section class="border-t border-stone-800 bg-stone-950/50">
     <div class="mx-auto flex max-w-6xl flex-wrap items-center justify-center gap-3 px-4 py-8 sm:px-6">
-        <span class="mr-2 text-sm font-semibold uppercase tracking-widest text-stone-500">Order online</span>
+        <span class="mr-2 text-sm font-semibold uppercase tracking-widest text-stone-500">{{ __('home.order_online') }}</span>
         <a href="{{ config('shop.gofood_url') }}" target="_blank" rel="noopener" class="rounded-full bg-red-500 px-6 py-2.5 text-sm font-semibold text-white transition hover:bg-red-400">GoFood</a>
         <a href="{{ config('shop.grab_url') }}" target="_blank" rel="noopener" class="rounded-full bg-green-600 px-6 py-2.5 text-sm font-semibold text-white transition hover:bg-green-500">GrabFood</a>
     </div>

@@ -12,7 +12,7 @@ return [
     'available_free' => 'Minuman Gratis Tersedia',
     'redeemed_label' => 'Sudah Ditebus',
     'progress_label' => 'Menuju Minuman Gratis Berikutnya',
-    'progress_count' => ':collected dari 10 stempel',
+    'progress_count' => ':collected dari :total stempel',
     'progress_remaining' => 'Sisa :count stempel lagi',
     'not_found' => 'Nomor HP belum terdaftar. Stempel bertambah otomatis setiap pesanan Anda lunas di kasir.',
 ];

@@ -6,6 +6,7 @@ return [
     'intro' => 'Browse the menu from your table, then order at the counter.',
     'table_name' => 'Table :number',
     'open_full_menu' => 'Open Full Menu',
+    'empty' => 'No menu available yet. Check back soon!',
 
     'nav_label' => 'Table QR Codes',
     'admin_title' => 'Table QR Codes',

@@ -50,4 +50,24 @@ class QrMenuTest extends TestCase
 
         $response->assertNotFound();
     }
+
+    public function test_qr_menu_page_shows_localized_empty_state_when_no_items(): void
+    {
+        $response = $this->get('/qr/1');
+
+        $response->assertOk();
+        $response->assertSee(__('qr.empty'));
+    }
+
+    public function test_qr_menu_page_renders_localized_copy(): void
+    {
+        $this->seed(MenuSeeder::class);
+
+        $response = $this->get('/qr/1?lang=en');
+
+        app()->setLocale('en');
+        $response->assertOk();
+        $response->assertSee(__('qr.table_name', ['number' => 1]));
+        $response->assertSee(__('qr.open_full_menu'));
+    }
 }

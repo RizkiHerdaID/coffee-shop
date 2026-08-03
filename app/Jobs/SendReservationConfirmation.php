@@ -28,7 +28,9 @@ class SendReservationConfirmation implements ShouldQueue
         return __('whatsapp.reservation', [
             'name' => $this->reservation->name,
             'shop' => config('shop.name'),
-            'date' => Carbon::parse($this->reservation->date)->translatedFormat('d M Y'),
+            'date' => Carbon::parse($this->reservation->date)
+                ->locale(app()->getLocale())
+                ->translatedFormat('d M Y'),
             'time' => Carbon::parse($this->reservation->time)->format('H:i'),
             'party_size' => $this->reservation->party_size,
             'phone' => config('shop.phone'),

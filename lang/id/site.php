@@ -5,6 +5,8 @@ return [
 
     'lang' => [
         'label' => 'Bahasa',
+        'to_id' => 'Ganti bahasa ke Bahasa Indonesia',
+        'to_en' => 'Ganti bahasa ke English',
     ],
 
     'nav' => [

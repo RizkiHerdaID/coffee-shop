@@ -12,7 +12,7 @@ return [
     'available_free' => 'Free Drinks Available',
     'redeemed_label' => 'Redeemed',
     'progress_label' => 'Next Free Drink',
-    'progress_count' => ':collected of 10 stamps',
+    'progress_count' => ':collected of :total stamps',
     'progress_remaining' => ':count stamps to go',
     'not_found' => 'This phone number is not registered yet. Stamps are added automatically every time your order is paid at the counter.',
 ];
