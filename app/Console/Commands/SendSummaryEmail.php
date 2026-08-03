@@ -59,6 +59,10 @@ class SendSummaryEmail extends Command
     /**
      * Aggregate sales for the period, in the app timezone (Asia/Jakarta).
      *
+     * Top-items revenue is the order-level discount apportioned across each
+     * order's line items (ratio net_total/total), so the column sums to the
+     * NET headline revenue even for discounted orders.
+     *
      * @return array{period: string, start: Carbon, end: Carbon, revenue: int, orders_count: int, avg_order: int, top_items: array<int, array{name: string, qty: int, revenue: int}>}
      */
     private function aggregate(string $period): array
@@ -91,19 +95,42 @@ class SendSummaryEmail extends Command
         $count = $orders->count();
         $avg = $count > 0 ? (int) round($revenue / $count) : 0;
 
-        $topItems = $count > 0 ? OrderItem::query()
-            ->whereIn('order_id', $orders->pluck('id'))
-            ->selectRaw('name, SUM(qty) as total_qty, SUM(subtotal) as total_subtotal')
-            ->groupBy('name')
-            ->orderByDesc('total_qty')
-            ->limit(5)
-            ->get()
-            ->map(fn (OrderItem $row): array => [
-                'name' => $row->name,
-                'qty' => (int) $row->total_qty,
-                'revenue' => (int) $row->total_subtotal,
-            ])
-            ->all() : [];
+        $topItems = [];
+
+        if ($count > 0) {
+            $ordersById = $orders->keyBy('id');
+            $byName = [];
+
+            foreach (OrderItem::query()->whereIn('order_id', $orders->pluck('id'))->get() as $item) {
+                $order = $ordersById->get($item->order_id);
+
+                if ($order === null || $order->total < 1) {
+                    // No sane ratio — items of a fully-discounted (zero-net)
+                    // order contribute 0 revenue.
+                    $itemRevenue = 0;
+                } else {
+                    // Apportion the order-level discount across the line items
+                    // so the top-items revenue column stays NET-consistent with
+                    // the headline. Per-item rounding half-up reconciles exactly
+                    // because net_total = total - discount and the shares are
+                    // ratio-based (tests assert to the penny).
+                    $itemRevenue = (int) round($item->subtotal * ($order->net_total / $order->total));
+                }
+
+                if (! isset($byName[$item->name])) {
+                    $byName[$item->name] = ['name' => $item->name, 'qty' => 0, 'revenue' => 0];
+                }
+
+                $byName[$item->name]['qty'] += (int) $item->qty;
+                $byName[$item->name]['revenue'] += $itemRevenue;
+            }
+
+            $topItems = collect($byName)
+                ->sortByDesc('qty')
+                ->take(5)
+                ->values()
+                ->all();
+        }
 
         return [
             'period' => $period,

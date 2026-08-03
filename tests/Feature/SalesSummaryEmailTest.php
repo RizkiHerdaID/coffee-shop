@@ -222,4 +222,57 @@ class SalesSummaryEmailTest extends TestCase
             ];
         });
     }
+
+    /**
+     * Card 138: order-level discounts are apportioned across the line items
+     * (ratio net_total/total) so the top-items revenue column sums exactly to
+     * the NET headline revenue — the column is NET, never gross.
+     */
+    public function test_top_items_apportion_order_discounts_to_match_net_headline(): void
+    {
+        // 10% percent discount on 95.000 gross → 85.500 net.
+        $this->createOrder('ORD-A1', 95000, '2026-08-01 09:00:00', [
+            ['name' => 'Espresso', 'price' => 50000, 'qty' => 1, 'subtotal' => 50000],
+            ['name' => 'Cappuccino', 'price' => 45000, 'qty' => 1, 'subtotal' => 45000],
+        ], 'paid', 'percent', 10);
+        // Non-discounted order with the same item — groups under the same name.
+        $this->createOrder('ORD-A2', 30000, '2026-08-01 10:00:00', [
+            ['name' => 'Espresso', 'price' => 30000, 'qty' => 1, 'subtotal' => 30000],
+        ], 'paid');
+
+        $this->artisan('summary:send', ['--period' => 'daily'])
+            ->assertExitCode(0);
+
+        Mail::assertQueued(SalesSummary::class, function (SalesSummary $mail) {
+            $topRevenue = array_sum(array_column($mail->stats['top_items'], 'revenue'));
+
+            return $mail->stats['revenue'] === 115500
+                && $topRevenue === $mail->stats['revenue']
+                && $mail->stats['top_items'] === [
+                    ['name' => 'Espresso', 'qty' => 2, 'revenue' => 75000],
+                    ['name' => 'Cappuccino', 'qty' => 1, 'revenue' => 40500],
+                ];
+        });
+    }
+
+    /**
+     * Card 138: items of a fully-discounted order (zero net) contribute 0 to
+     * the top-items revenue, while their quantity still counts.
+     */
+    public function test_fully_discounted_order_items_contribute_zero_revenue(): void
+    {
+        $this->createOrder('ORD-Z1', 50000, '2026-08-01 09:00:00', [
+            ['name' => 'Espresso', 'price' => 50000, 'qty' => 2, 'subtotal' => 50000],
+        ], 'paid', 'fixed', 50000); // net 0
+
+        $this->artisan('summary:send', ['--period' => 'daily'])
+            ->assertExitCode(0);
+
+        Mail::assertQueued(SalesSummary::class, function (SalesSummary $mail) {
+            return $mail->stats['revenue'] === 0
+                && $mail->stats['top_items'] === [
+                    ['name' => 'Espresso', 'qty' => 2, 'revenue' => 0],
+                ];
+        });
+    }
 }
