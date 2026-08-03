@@ -226,6 +226,30 @@ class InventoryTest extends TestCase
         ]);
     }
 
+    public function test_stock_in_action_rejects_zero_quantity_without_movement_or_toast(): void
+    {
+        $admin = Admin::factory()->create();
+        $item = StockItem::create([
+            'name' => 'Biji Kopi',
+            'unit' => 'gram',
+            'quantity' => 1000,
+            'min_threshold' => 500,
+        ]);
+
+        $this->actingAs($admin, 'admin');
+
+        Livewire::test(ListStockItems::class)
+            ->callTableAction('stockIn', $item, data: [
+                'quantity' => '0',
+                'note' => 'Tidak jadi',
+            ])
+            ->assertHasTableActionErrors(['quantity'])
+            ->assertNotNotified(__('stock.notifications.stock_in_success'));
+
+        $this->assertSame(1000, $item->fresh()->quantity);
+        $this->assertDatabaseCount('stock_movements', 0);
+    }
+
     public function test_stock_out_action_stores_raw_integer_from_formatted_input(): void
     {
         $admin = Admin::factory()->create();

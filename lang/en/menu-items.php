@@ -9,6 +9,8 @@ return [
         'photo' => 'Photo',
         'category' => 'Category',
         'available' => 'Available',
+        'created_at' => 'Created At',
+        'updated_at' => 'Updated At',
     ],
 
     'available' => 'Available',

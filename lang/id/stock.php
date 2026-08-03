@@ -46,6 +46,7 @@ return [
 
     'notifications' => [
         'stock_in_success' => 'Stok masuk dicatat.',
+        'stock_in_failed' => 'Stok masuk gagal dicatat.',
         'stock_out_success' => 'Stok keluar dicatat.',
         'stock_out_failed' => 'Stok tidak mencukupi.',
     ],

@@ -10,6 +10,14 @@ return [
     'notes' => 'Notes',
     'shift_closed_edit_blocked' => 'Shift is closed — this order can no longer be edited.',
 
+    'fields' => [
+        'order_number' => 'Order Number',
+        'shift_id' => 'Shift',
+        'created_by' => 'Created by',
+        'created_at' => 'Created At',
+        'updated_at' => 'Updated At',
+    ],
+
     'exports' => [
         'completed' => 'Orders export completed: :count rows.',
         'failed' => ':failed_count rows failed.',

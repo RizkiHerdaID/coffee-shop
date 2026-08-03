@@ -213,10 +213,14 @@ class DemandForecastTest extends TestCase
 
         $data = $this->widgetData('month_revenue');
 
+        // The widget formats with the app locale explicitly (never via the
+        // global Carbon locale), so mirror that here.
         $expectedLabels = [];
         for ($i = 2; $i >= 0; $i--) {
             $key = now()->subMonths($i)->startOfMonth()->format('Y-m');
-            $expectedLabels[] = Carbon::createFromFormat('Y-m', $key)->translatedFormat('M Y');
+            $expectedLabels[] = Carbon::createFromFormat('Y-m', $key)
+                ->locale(app()->getLocale())
+                ->translatedFormat('M Y');
         }
 
         $this->assertSame($expectedLabels, $data['labels']);
@@ -256,6 +260,25 @@ class DemandForecastTest extends TestCase
             ['weekday_revenue', 'weekday_count', 'month_revenue', 'month_count'],
             array_keys($filters),
         );
+    }
+
+    /**
+     * Card 160: the widget must not leak its Carbon locale preference into
+     * the global Carbon locale — a fixed app locale must not override a
+     * caller-set locale for the rest of the request lifecycle.
+     */
+    public function test_widget_restores_the_global_carbon_locale(): void
+    {
+        Carbon::setLocale('de');
+
+        try {
+            $this->widgetData('weekday_revenue');
+            $this->widgetData('month_revenue');
+
+            $this->assertSame('de', Carbon::getLocale());
+        } finally {
+            Carbon::setLocale(app()->getLocale());
+        }
     }
 
     public function test_widget_is_a_bar_chart(): void

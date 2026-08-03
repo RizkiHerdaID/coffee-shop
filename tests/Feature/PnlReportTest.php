@@ -320,6 +320,20 @@ class PnlReportTest extends TestCase
         $this->assertSame('Profit & Loss Report', __('pnl.title'));
     }
 
+    /**
+     * Card 152: the sidebar navigation label resolves the translated
+     * pnl.navigation key in the current locale (a raw 'pnl.navigation'
+     * literal must never surface in the admin nav).
+     */
+    public function test_navigation_label_resolves_to_the_translated_value(): void
+    {
+        app()->setLocale('id');
+        $this->assertSame(__('pnl.navigation'), PnlReport::getNavigationLabel());
+
+        app()->setLocale('en');
+        $this->assertSame(__('pnl.navigation'), PnlReport::getNavigationLabel());
+    }
+
     public function test_pnl_lang_files_share_the_same_key_structure(): void
     {
         $id = require lang_path('id/pnl.php');

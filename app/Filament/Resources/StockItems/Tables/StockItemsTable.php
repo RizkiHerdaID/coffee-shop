@@ -71,14 +71,17 @@ class StockItemsTable
                         TextInput::make('quantity')
                             ->label(__('stock.fields.quantity'))
                             ->mask(RawJs::make('$money($input, \',\', \'.\', 0)'))
-                            ->rule('regex:/^(\d{1,3}(\.\d{3})*|\d+)$/')
+                            ->rule('regex:/^([1-9]\d{0,2}(\.\d{3})*|[1-9]\d*)$/')
+                            ->minValue(1)
                             ->dehydrateStateUsing(fn ($state) => (int) str_replace('.', '', (string) $state))
                             ->required(),
                         TextInput::make('note')
                             ->label(__('stock.fields.note')),
                     ])
                     ->action(function (array $data, StockItem $record): void {
-                        $record->stockIn((int) $data['quantity'], $data['note'] ?? null);
+                        if (! $record->stockIn((int) $data['quantity'], $data['note'] ?? null)) {
+                            throw new \Exception(__('stock.notifications.stock_in_failed'));
+                        }
                     }),
                 Action::make('stockOut')
                     ->label(__('stock.actions.stock_out'))

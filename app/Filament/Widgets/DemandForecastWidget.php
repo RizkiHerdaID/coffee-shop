@@ -41,7 +41,6 @@ class DemandForecastWidget extends ChartWidget
     {
         $mode = $this->filter ?? 'weekday_revenue';
         $service = new DemandForecastService;
-        Carbon::setLocale(app()->getLocale());
 
         if (str_starts_with($mode, 'month')) {
             $rows = $service->monthAggregate();
@@ -57,8 +56,12 @@ class DemandForecastWidget extends ChartWidget
                         ),
                     ],
                 ],
+                // Instance-level locale only — never Carbon::setLocale(), which
+                // would mutate the global translator for every later render.
                 'labels' => array_map(
-                    fn (string $key): string => Carbon::createFromFormat('Y-m', $key)->translatedFormat('M Y'),
+                    fn (string $key): string => Carbon::createFromFormat('Y-m', $key)
+                        ->locale(app()->getLocale())
+                        ->translatedFormat('M Y'),
                     array_keys($rows),
                 ),
             ];

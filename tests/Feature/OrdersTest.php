@@ -34,7 +34,6 @@ class OrdersTest extends TestCase
         Livewire::actingAs($admin, 'admin')
             ->test(CreateOrder::class)
             ->fillForm([
-                'order_number' => 'TOTAL-001',
                 'customer_phone' => '081234567890',
                 'status' => OrderStatus::Pending,
                 'total' => '25.000',
@@ -44,14 +43,13 @@ class OrdersTest extends TestCase
             ->assertHasNoFormErrors();
 
         $this->assertDatabaseHas('orders', [
-            'order_number' => 'TOTAL-001',
+            'customer_phone' => '081234567890',
             'total' => 25000,
         ]);
 
         Livewire::actingAs($admin, 'admin')
             ->test(CreateOrder::class)
             ->fillForm([
-                'order_number' => 'TOTAL-002',
                 'status' => OrderStatus::Pending,
                 'total' => '1.500.000',
                 'created_by' => $admin->id,
@@ -60,9 +58,42 @@ class OrdersTest extends TestCase
             ->assertHasNoFormErrors();
 
         $this->assertDatabaseHas('orders', [
-            'order_number' => 'TOTAL-002',
             'total' => 1500000,
         ]);
+    }
+
+    public function test_create_form_auto_generates_a_unique_order_number(): void
+    {
+        $admin = Admin::factory()->create();
+
+        Livewire::actingAs($admin, 'admin')
+            ->test(CreateOrder::class)
+            ->fillForm([
+                'status' => OrderStatus::Pending,
+                'total' => '30.000',
+                'created_by' => $admin->id,
+            ])
+            ->call('create')
+            ->assertHasNoFormErrors();
+
+        $first = Order::firstOrFail();
+
+        $this->assertMatchesRegularExpression('/^ORD-\d{8}-\d{4}$/', $first->order_number);
+
+        Livewire::actingAs($admin, 'admin')
+            ->test(CreateOrder::class)
+            ->fillForm([
+                'status' => OrderStatus::Pending,
+                'total' => '31.000',
+                'created_by' => $admin->id,
+            ])
+            ->call('create')
+            ->assertHasNoFormErrors();
+
+        $numbers = Order::pluck('order_number')->all();
+
+        $this->assertCount(2, $numbers);
+        $this->assertCount(2, array_unique($numbers));
     }
 
     public function test_edit_form_displays_total_with_indonesian_separators(): void
@@ -78,6 +109,59 @@ class OrdersTest extends TestCase
         Livewire::actingAs($admin, 'admin')
             ->test(EditOrder::class, ['record' => $order->getRouteKey()])
             ->assertFormSet(['total' => '1.500.000']);
+    }
+
+    // ---------------------------------------------------------------------
+    // Resource hardening (Vikunja 160): zero totals are not storable, and
+    // every previously-unlabeled field shows its localized label.
+    // ---------------------------------------------------------------------
+
+    public function test_create_form_rejects_zero_total(): void
+    {
+        $admin = Admin::factory()->create();
+
+        Livewire::actingAs($admin, 'admin')
+            ->test(CreateOrder::class)
+            ->fillForm([
+                'status' => OrderStatus::Pending,
+                'total' => '0',
+                'created_by' => $admin->id,
+            ])
+            ->call('create')
+            ->assertHasFormErrors(['total']);
+
+        $this->assertDatabaseCount('orders', 0);
+    }
+
+    public function test_create_form_renders_localized_labels_for_previously_unlabeled_fields(): void
+    {
+        $admin = Admin::factory()->create();
+
+        Livewire::actingAs($admin, 'admin')
+            ->test(CreateOrder::class)
+            ->assertSee(__('orders.fields.order_number'))
+            ->assertSee(__('orders.status'))
+            ->assertSee(__('orders.fields.shift_id'))
+            ->assertSee(__('orders.fields.created_by'));
+    }
+
+    public function test_orders_table_renders_localized_column_labels(): void
+    {
+        $admin = Admin::factory()->create();
+        $this->createOrder([], $admin);
+
+        $component = Livewire::actingAs($admin, 'admin')->test(ListOrders::class);
+
+        $expected = [
+            'order_number' => __('orders.fields.order_number'),
+            'status' => __('orders.status'),
+            'created_at' => __('orders.fields.created_at'),
+            'updated_at' => __('orders.fields.updated_at'),
+        ];
+
+        foreach ($expected as $column => $label) {
+            $this->assertSame($label, $component->instance()->getTable()->getColumn($column)->getLabel());
+        }
     }
 
     // ---------------------------------------------------------------------

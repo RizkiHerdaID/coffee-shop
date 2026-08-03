@@ -10,6 +10,7 @@ return [
         'badge' => 'Badge',
         'cta_text' => 'Button Text',
         'cta_url' => 'Button URL',
+        'cta_url_placeholder' => 'https://example.com/promo',
         'starts_at' => 'Starts At',
         'ends_at' => 'Ends At',
         'active' => 'Active',

@@ -4,6 +4,8 @@ namespace Tests\Feature;
 
 use App\Filament\Resources\MenuItems\Pages\CreateMenuItem;
 use App\Filament\Resources\MenuItems\Pages\EditMenuItem;
+use App\Filament\Resources\MenuItems\Pages\ListMenuItems;
+use App\Models\Admin;
 use App\Models\MenuItem;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
@@ -21,6 +23,7 @@ class MenuItemFormTest extends TestCase
                 'name' => 'Kopi Susu',
                 'price' => '25.000',
                 'note' => 'Manisnya pas',
+                'category' => 'coffee',
                 'sort_order' => 1,
             ])
             ->call('create')
@@ -100,6 +103,7 @@ class MenuItemFormTest extends TestCase
             ->fillForm([
                 'name' => 'Kopi Susu',
                 'price' => '25.000',
+                'category' => 'coffee',
                 'badges' => ['vegan', 'spicy'],
             ])
             ->call('create')
@@ -133,6 +137,7 @@ class MenuItemFormTest extends TestCase
             ->fillForm([
                 'name' => 'Espresso',
                 'price' => '25.000',
+                'category' => 'coffee',
                 'badges' => [],
             ])
             ->call('create')
@@ -141,5 +146,45 @@ class MenuItemFormTest extends TestCase
         $item = MenuItem::where('name', 'Espresso')->firstOrFail();
 
         $this->assertEmpty($item->badges ?? []);
+    }
+
+    // ---------------------------------------------------------------------
+    // Resource hardening (Vikunja 160): category is required, and every
+    // menu-item table column shows its localized label.
+    // ---------------------------------------------------------------------
+
+    public function test_create_form_requires_category(): void
+    {
+        Livewire::test(CreateMenuItem::class)
+            ->fillForm([
+                'name' => 'Teh Tarik',
+                'price' => '15.000',
+                'sort_order' => 1,
+            ])
+            ->call('create')
+            ->assertHasFormErrors(['category']);
+
+        $this->assertDatabaseCount('menu_items', 0);
+    }
+
+    public function test_menu_items_table_renders_localized_column_labels(): void
+    {
+        $admin = Admin::factory()->create();
+        MenuItem::create(['name' => 'Cappuccino', 'price' => 25000]);
+
+        $component = Livewire::actingAs($admin, 'admin')->test(ListMenuItems::class);
+
+        $expected = [
+            'name' => __('menu-items.fields.name'),
+            'price' => __('menu-items.fields.price'),
+            'note' => __('menu-items.fields.note'),
+            'sort_order' => __('menu-items.fields.sort_order'),
+            'created_at' => __('menu-items.fields.created_at'),
+            'updated_at' => __('menu-items.fields.updated_at'),
+        ];
+
+        foreach ($expected as $column => $label) {
+            $this->assertSame($label, $component->instance()->getTable()->getColumn($column)->getLabel());
+        }
     }
 }
