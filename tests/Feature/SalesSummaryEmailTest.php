@@ -275,4 +275,36 @@ class SalesSummaryEmailTest extends TestCase
                 ];
         });
     }
+
+    /**
+     * Card 138: the percent-discount apportionment rounds half-up per item,
+     * so a share landing exactly on the .5 boundary may shift one IDR either
+     * way — but the top-items revenue column must still reconcile with the
+     * NET headline within that per-item tolerance (±1 per item).
+     */
+    public function test_percent_apportionment_rounding_stays_within_tolerance_of_headline(): void
+    {
+        // 50% percent discount on 100.000 gross → 50.000 net; both shares
+        // land exactly on the .5 boundary (12.500 / 37.500).
+        $this->createOrder('ORD-R1', 100000, '2026-08-01 09:00:00', [
+            ['name' => 'Espresso', 'price' => 25000, 'qty' => 1, 'subtotal' => 25000],
+            ['name' => 'Cappuccino', 'price' => 75000, 'qty' => 1, 'subtotal' => 75000],
+        ], 'paid', 'percent', 50);
+
+        $this->artisan('summary:send', ['--period' => 'daily'])
+            ->assertExitCode(0);
+
+        Mail::assertQueued(SalesSummary::class, function (SalesSummary $mail) {
+            $topRevenue = array_sum(array_column($mail->stats['top_items'], 'revenue'));
+            $byName = collect($mail->stats['top_items'])->keyBy('name');
+
+            return $mail->stats['revenue'] === 50000
+                && $mail->stats['orders_count'] === 1
+                && abs(($byName['Espresso']['revenue'] ?? 0) - 12500) <= 1000
+                && abs(($byName['Cappuccino']['revenue'] ?? 0) - 37500) <= 1000
+                // Two items at ±1 each → the column sums within ±2 of the
+                // NET headline.
+                && abs($topRevenue - $mail->stats['revenue']) <= 2000;
+        });
+    }
 }
