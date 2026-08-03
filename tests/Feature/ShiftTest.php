@@ -1103,12 +1103,16 @@ class ShiftTest extends TestCase
         $shift = $this->openShift($admin, 100000);
 
         $order = $this->paidOrder($shift, $admin, 65000, OrderStatus::Paid, 'fixed', 10000);
-        $this->cashPayment($order, $admin, 60000); // tendered over the 55.000 net
+
+        // The cashier applies only the net 55.000 and hands back 5.000
+        // change from a 60.000 tender — the payment row stores the APPLIED
+        // amount, never the tendered one (cap-at-remaining).
+        $this->cashPayment($order, $admin, 55000, change: 5000);
 
         $this->assertSame(55000, $order->netTotal);
         $this->assertSame(55000, $shift->salesTotal());
-        $this->assertSame(60000, $shift->cashPaid());
-        $this->assertSame(160000, $shift->expectedCash());
-        $this->assertSame(['cash' => 60000, 'qris' => 0, 'ewallet' => 0], $shift->paymentsByMethod());
+        $this->assertSame(55000, $shift->cashPaid());
+        $this->assertSame(155000, $shift->expectedCash());
+        $this->assertSame(['cash' => 55000, 'qris' => 0, 'ewallet' => 0], $shift->paymentsByMethod());
     }
 }

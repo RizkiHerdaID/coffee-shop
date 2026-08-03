@@ -5,12 +5,20 @@ namespace Tests\Feature;
 use App\Models\MenuItem;
 use Database\Seeders\MenuSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
 use Tests\TestCase;
 
 class SeoTest extends TestCase
 {
     use RefreshDatabase;
+
+    protected function tearDown(): void
+    {
+        Carbon::setTestNow();
+
+        parent::tearDown();
+    }
 
     public function test_home_page_renders_json_ld_local_business_schema(): void
     {
@@ -78,10 +86,15 @@ class SeoTest extends TestCase
 
     public function test_sitemap_includes_lastmod_for_each_url(): void
     {
+        // Pin the clock so the sitemap's generated <lastmod> and the
+        // assertion can never straddle midnight (reset in tearDown).
+        // The route reads the clock via now(), so the pin is effective.
+        Carbon::setTestNow('2026-08-04 12:00:00');
+
         $response = $this->get('/sitemap.xml');
 
         $response->assertOk();
-        $response->assertSee('<lastmod>'.date('Y-m-d').'</lastmod>', false);
+        $response->assertSee('<lastmod>2026-08-04</lastmod>', false);
     }
 
     public function test_sitemap_includes_points_and_qr_table_urls(): void

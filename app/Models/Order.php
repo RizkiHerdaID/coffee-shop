@@ -7,7 +7,9 @@ use App\Enums\PaymentMethod;
 use App\Jobs\PrintKitchenTicket;
 use App\Jobs\PrintReceipt;
 use App\Jobs\SendOrderConfirmation;
+use Database\Factories\OrderFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -16,6 +18,9 @@ use Illuminate\Support\Facades\DB;
 #[Fillable(['order_number', 'customer_phone', 'notes', 'status', 'total', 'discount_type', 'discount_amount', 'shift_id', 'created_by'])]
 class Order extends Model
 {
+    /** @use HasFactory<OrderFactory> */
+    use HasFactory;
+
     protected static function booted(): void
     {
         static::created(function (Order $order) {

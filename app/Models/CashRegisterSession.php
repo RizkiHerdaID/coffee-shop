@@ -4,13 +4,18 @@ namespace App\Models;
 
 use App\Enums\CashRegisterStatus;
 use App\Enums\OrderStatus;
+use Database\Factories\CashRegisterSessionFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 #[Fillable(['opened_at', 'closed_at', 'opening_float', 'expected_amount', 'counted_amount', 'discrepancy', 'status', 'admin_id'])]
 class CashRegisterSession extends Model
 {
+    /** @use HasFactory<CashRegisterSessionFactory> */
+    use HasFactory;
+
     /**
      * Get the attributes that should be cast.
      *

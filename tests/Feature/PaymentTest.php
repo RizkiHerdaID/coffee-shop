@@ -16,6 +16,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Str;
 use Livewire\Livewire;
 use Tests\TestCase;
 
@@ -445,7 +446,7 @@ class PaymentTest extends TestCase
     private function makeOrder(Admin $admin, int $total, ?Shift $shift = null): Order
     {
         return Order::withoutEvents(fn () => Order::create([
-            'order_number' => 'ORD-'.now()->format('Ymd').'-'.str_pad((string) random_int(1, 9999), 4, '0', STR_PAD_LEFT),
+            'order_number' => 'ORD-TEST-'.Str::upper(Str::random(8)),
             'status' => OrderStatus::Pending,
             'total' => $total,
             'shift_id' => $shift?->id,

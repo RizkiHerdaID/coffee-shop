@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use Illuminate\Support\Str;
 use Tests\TestCase;
 
 class ContactPageTest extends TestCase
@@ -20,7 +21,7 @@ class ContactPageTest extends TestCase
         $response->assertSee(config('shop.name'));
         $response->assertSee(config('shop.phone_display'));
         $response->assertSee(config('shop.email'));
-        $response->assertSee('Jl. Contoh Raya No. 123');
+        $response->assertSee(Str::before(config('shop.address'), "\n"));
     }
 
     public function test_contact_page_shows_opening_hours(): void

@@ -3,12 +3,17 @@
 namespace App\Models;
 
 use App\Enums\ExpenseCategory;
+use Database\Factories\ExpenseFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 #[Fillable(['category', 'description', 'amount', 'spent_at', 'note'])]
 class Expense extends Model
 {
+    /** @use HasFactory<ExpenseFactory> */
+    use HasFactory;
+
     /**
      * Get the attributes that should be cast.
      *

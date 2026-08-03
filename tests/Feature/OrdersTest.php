@@ -123,7 +123,6 @@ class OrdersTest extends TestCase
             $shift->update([
                 'closed_at' => $closedAt,
                 'closing_cash' => 100000,
-                'expected_total' => 0,
             ]);
         }
 

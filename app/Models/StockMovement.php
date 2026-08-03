@@ -2,13 +2,18 @@
 
 namespace App\Models;
 
+use Database\Factories\StockMovementFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 #[Fillable(['stock_item_id', 'order_item_id', 'type', 'quantity', 'note'])]
 class StockMovement extends Model
 {
+    /** @use HasFactory<StockMovementFactory> */
+    use HasFactory;
+
     /**
      * Get the attributes that should be cast.
      *

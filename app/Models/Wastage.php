@@ -3,13 +3,18 @@
 namespace App\Models;
 
 use App\Enums\WasteReason;
+use Database\Factories\WastageFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 #[Fillable(['stock_item_id', 'quantity', 'reason', 'note', 'admin_id', 'recorded_at'])]
 class Wastage extends Model
 {
+    /** @use HasFactory<WastageFactory> */
+    use HasFactory;
+
     /**
      * Get the attributes that should be cast.
      *

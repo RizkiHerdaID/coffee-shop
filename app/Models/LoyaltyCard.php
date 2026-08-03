@@ -3,7 +3,9 @@
 namespace App\Models;
 
 use App\Support\Phone;
+use Database\Factories\LoyaltyCardFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
 
@@ -27,6 +29,9 @@ use Illuminate\Support\Facades\DB;
 #[Fillable(['phone', 'stamps', 'redeemed'])]
 class LoyaltyCard extends Model
 {
+    /** @use HasFactory<LoyaltyCardFactory> */
+    use HasFactory;
+
     /**
      * Get the attributes that should be cast.
      *

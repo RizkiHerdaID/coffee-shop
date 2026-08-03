@@ -2,8 +2,10 @@
 
 namespace App\Models;
 
+use Database\Factories\StockItemFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Facades\DB;
@@ -11,6 +13,9 @@ use Illuminate\Support\Facades\DB;
 #[Fillable(['name', 'unit', 'cost', 'quantity', 'min_threshold', 'note'])]
 class StockItem extends Model
 {
+    /** @use HasFactory<StockItemFactory> */
+    use HasFactory;
+
     protected static function booted(): void
     {
         // Deleting a stock item would cascade-destroy its movements (the

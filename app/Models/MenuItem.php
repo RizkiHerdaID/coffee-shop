@@ -2,13 +2,18 @@
 
 namespace App\Models;
 
+use Database\Factories\MenuItemFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 #[Fillable(['name', 'price', 'note', 'badges', 'sort_order', 'photo', 'category', 'available'])]
 class MenuItem extends Model
 {
+    /** @use HasFactory<MenuItemFactory> */
+    use HasFactory;
+
     /**
      * Get the attributes that should be cast.
      *
