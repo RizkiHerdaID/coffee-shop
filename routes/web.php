@@ -3,6 +3,7 @@
 use App\Http\Controllers\PageController;
 use App\Http\Controllers\PosReceiptController;
 use App\Http\Controllers\PosZReportController;
+use App\Http\Controllers\RobotsController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', [PageController::class, 'home'])->name('home');
@@ -53,7 +54,4 @@ Route::get('/sitemap.xml', function () {
     return response($xml)->header('Content-Type', 'text/xml; charset=UTF-8');
 })->name('sitemap');
 
-Route::get('/robots.txt', function () {
-    return response("User-agent: *\nAllow: /\n\nSitemap: ".url('/sitemap.xml')."\n")
-        ->header('Content-Type', 'text/plain; charset=UTF-8');
-})->name('robots');
+Route::get('/robots.txt', RobotsController::class)->name('robots');

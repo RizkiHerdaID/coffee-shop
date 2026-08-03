@@ -11,6 +11,7 @@ See `README.md` at the repo root for setup and feature overviews.
 | --- | --- | --- |
 | `laravel.test` | Laravel app (`php artisan serve` via supervisord) | `APP_PORT` (default `80`) |
 | `queue` | `php artisan queue:work --sleep=3 --tries=3` | — |
+| `scheduler` | `php artisan schedule:work` (runs scheduled commands every minute) | — |
 | `pgsql` | PostgreSQL 18 database | `FORWARD_DB_PORT` (default `5432`) |
 | `redis` | Redis 7.4 cache/session store | `FORWARD_REDIS_PORT` (default `6379`) |
 | `minio` | S3-compatible object storage | `9000` / console `8900` |
@@ -28,10 +29,14 @@ A dedicated `queue` container runs `php artisan queue:work` continuously, so job
 ./vendor/bin/sail restart
 ```
 
+### Scheduler
+
+A dedicated `scheduler` container runs `php artisan schedule:work`, so the scheduled commands (`summary:send` daily/weekly, `stock:alert-low`, `pulse:check`) run automatically on time without host cron. It comes up with `sail up -d` like the other services; no host cron entry is needed. Note that unlike the containerized scheduler, the heartbeat (`UPTIME_HEARTBEAT_URL`) still guards against a silently *stuck* scheduler — see "Scheduler heartbeat" below.
+
 ## Production notes
 
 - **Secrets** — generate a real `APP_KEY`, use a strong `DB_PASSWORD`, and set real `ADMIN_*` credentials. Never reuse the defaults from `.env.example`.
-- **Storage** — `FILESYSTEM_DISK=s3` points at MinIO. In production, replace `AWS_ENDPOINT_URL` with your S3 provider endpoint (or switch to `FILESYSTEM_DISK=local`) and use real `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` values instead of the `MINIO_ROOT_*` references.
+- **Storage** — `FILESYSTEM_DISK=s3` points at MinIO. In production, replace `AWS_ENDPOINT_URL` with your S3 provider endpoint (or switch to `FILESYSTEM_DISK=local`) and use real `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` values instead of the `MINIO_ROOT_*` references. The entrypoint runs `storage:link --relative --force` on every container start, so `public/storage` always points at `storage/app/public` (relative target — valid from both host and container).
 - **Mail** — point `MAIL_HOST` / `MAIL_PORT` at a real SMTP provider and configure `MAIL_USERNAME`, `MAIL_PASSWORD`, and `MAIL_ENCRYPTION` accordingly.
 - The template defaults to `APP_ENV=production` with `APP_DEBUG=false`. For local development, set `APP_ENV=local` and `APP_DEBUG=true` (see the comment in `.env.example`).
 

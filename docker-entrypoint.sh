@@ -20,4 +20,12 @@ done
 php artisan optimize --no-interaction
 php artisan view:cache --no-interaction
 
+# Public storage symlink (public/storage -> storage/app/public); --force
+# recreates it so it also heals a broken link after a clean checkout, and
+# --relative keeps the target valid from both host and container. All app
+# containers (laravel.test, queue, scheduler) boot this entrypoint
+# concurrently, so tolerate a race where another boot already created the
+# link — the outcome is identical whichever container wins.
+php artisan storage:link --relative --force --no-interaction || true
+
 exec "$@"
