@@ -209,6 +209,62 @@ class ReservationTest extends TestCase
         $this->assertDatabaseCount('reservations', 0);
     }
 
+    // ---------------------------------------------------------------------
+    // Resource hardening (Vikunja 160): the admin form mirrors the
+    // public-site rule — same-day bookings must be for a future time.
+    // Time is frozen so the tests are deterministic at any wall-clock hour.
+    // ---------------------------------------------------------------------
+
+    public function test_admin_reservation_form_rejects_same_day_past_time(): void
+    {
+        $this->travelTo('2026-08-04 14:00:00');
+
+        try {
+            Livewire::test(CreateReservation::class)
+                ->fillForm([
+                    'name' => 'Budi Santoso',
+                    'phone' => '081234567890',
+                    'party_size' => 2,
+                    'date' => '2026-08-04',
+                    'time' => '13:00',
+                ])
+                ->call('create')
+                ->assertHasFormErrors(['time']);
+        } finally {
+            $this->travelBack();
+        }
+
+        $this->assertDatabaseCount('reservations', 0);
+    }
+
+    public function test_admin_reservation_form_accepts_same_day_future_time(): void
+    {
+        $this->travelTo('2026-08-04 14:00:00');
+
+        try {
+            Livewire::test(CreateReservation::class)
+                ->fillForm([
+                    'name' => 'Budi Santoso',
+                    'phone' => '081234567890',
+                    'party_size' => 2,
+                    'date' => '2026-08-04',
+                    'time' => '15:00',
+                ])
+                ->call('create')
+                ->assertHasNoFormErrors();
+        } finally {
+            $this->travelBack();
+        }
+
+        $this->assertDatabaseHas('reservations', [
+            'name' => 'Budi Santoso',
+            'date' => '2026-08-04',
+            // The admin TimePicker dehydrates 'H:i:s' (the model's
+            // datetime:H:i cast re-reads it as 15:00 for display).
+            'time' => '15:00:00',
+        ]);
+    }
+
     public function test_reservation_form_rejects_time_outside_opening_hours(): void
     {
         $response = $this->post(url('/reservasi'), [

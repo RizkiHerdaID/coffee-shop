@@ -106,6 +106,7 @@ class MenuItemForm
                     ->image(),
                 Select::make('category')
                     ->label(__('menu-items.fields.category'))
+                    ->required()
                     ->options([
                         'coffee' => __('menu.categories.coffee'),
                         'non-coffee' => __('menu.categories.non-coffee'),

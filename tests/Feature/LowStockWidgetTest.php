@@ -54,7 +54,8 @@ class LowStockWidgetTest extends TestCase
                 'quantity' => '2.000',
                 'note' => 'Restock dari gudang',
             ])
-            ->assertHasNoTableActionErrors();
+            ->assertHasNoTableActionErrors()
+            ->assertNotified(__('stock.notifications.stock_in_success'));
 
         $this->assertSame(2000, $item->fresh()->quantity);
         $this->assertDatabaseHas('stock_movements', [
@@ -63,6 +64,24 @@ class LowStockWidgetTest extends TestCase
             'quantity' => 2000,
             'note' => 'Restock dari gudang',
         ]);
+    }
+
+    public function test_stock_in_action_from_widget_rejects_zero_quantity(): void
+    {
+        $item = StockItem::create(['name' => 'Gelas', 'unit' => 'pcs', 'quantity' => 0, 'min_threshold' => 50]);
+
+        $this->actingAs($this->admin, 'admin');
+
+        Livewire::test(LowStockWidget::class)
+            ->callTableAction('stockIn', $item, data: [
+                'quantity' => '0',
+                'note' => 'Stok kosong',
+            ])
+            ->assertHasTableActionErrors(['quantity'])
+            ->assertNotNotified(__('stock.notifications.stock_in_success'));
+
+        $this->assertSame(0, $item->fresh()->quantity);
+        $this->assertDatabaseCount('stock_movements', 0);
     }
 
     public function test_heading_is_localized(): void

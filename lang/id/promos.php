@@ -10,6 +10,7 @@ return [
         'badge' => 'Label',
         'cta_text' => 'Teks Tombol',
         'cta_url' => 'URL Tombol',
+        'cta_url_placeholder' => 'https://contoh.com/promo',
         'starts_at' => 'Mulai',
         'ends_at' => 'Berakhir',
         'active' => 'Aktif',

@@ -8,6 +8,8 @@ use App\Filament\Resources\LoyaltyCards\Pages\ListLoyaltyCards;
 use App\Models\Admin;
 use App\Models\LoyaltyCard;
 use App\Models\Order;
+use Filament\Actions\Action;
+use Filament\Notifications\Notification;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -514,6 +516,63 @@ class LoyaltyTest extends TestCase
         $card = LoyaltyCard::where('phone', self::PHONE)->firstOrFail();
         $this->assertSame(0, $card->stamps);
         $this->assertSame(1, $card->redeemed);
+    }
+
+    // ---------------------------------------------------------------------
+    // Redeem table action (Vikunja 160): a concurrent redeem that loses the
+    // race must surface as a danger notification — never an exception.
+    // ---------------------------------------------------------------------
+
+    public function test_redeem_action_success_sends_success_notification(): void
+    {
+        $admin = Admin::factory()->create();
+        LoyaltyCard::credit('081234567890', 10);
+        $card = LoyaltyCard::where('phone', self::PHONE)->firstOrFail();
+
+        Livewire::actingAs($admin, 'admin')
+            ->test(ListLoyaltyCards::class)
+            ->callTableAction('redeem', $card)
+            ->assertNotified(Notification::make()
+                ->title(__('loyalty.notifications.redeemed'))
+                ->success());
+
+        $this->assertSame(0, $card->fresh()->stamps);
+        $this->assertSame(1, $card->fresh()->redeemed);
+    }
+
+    public function test_redeem_action_failure_sends_danger_notification_instead_of_throwing(): void
+    {
+        $admin = Admin::factory()->create();
+        LoyaltyCard::credit('081234567890', 10);
+        $card = LoyaltyCard::where('phone', self::PHONE)->firstOrFail();
+
+        // A concurrent redeemer wins the race before the admin's redeem
+        // runs: the card's stamps are already spent under the row lock.
+        $this->assertTrue(LoyaltyCard::redeem(self::PHONE));
+        $this->assertFalse(LoyaltyCard::redeem(self::PHONE));
+        $this->assertSame(0, $card->fresh()->stamps);
+
+        // The stale-modal Livewire flow (mount → concurrent redeem → call)
+        // consumes notifications inside the request cycle, so invoke the
+        // action's closure directly — same record injection and status
+        // handling Filament performs.
+        $component = Livewire::actingAs($admin, 'admin')->test(ListLoyaltyCards::class);
+
+        $redeem = collect($component->instance()->getTable()->getRecordActions())
+            ->first(fn (Action $action): bool => $action->getName() === 'redeem');
+
+        $this->assertNotNull($redeem);
+
+        $redeem->record($card)->call();
+
+        Notification::assertNotified(Notification::make()
+            ->title(__('loyalty.notifications.redeem_failed'))
+            ->danger());
+
+        // The failed redeem must not have re-credited or mutated the card.
+        $fresh = $card->fresh();
+        $this->assertSame(0, $fresh->stamps);
+        $this->assertSame(1, $fresh->redeemed);
     }
 
     // ---------------------------------------------------------------------

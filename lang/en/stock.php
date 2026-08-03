@@ -46,6 +46,7 @@ return [
 
     'notifications' => [
         'stock_in_success' => 'Stock in recorded.',
+        'stock_in_failed' => 'Failed to record stock in.',
         'stock_out_success' => 'Stock out recorded.',
         'stock_out_failed' => 'Insufficient stock.',
     ],

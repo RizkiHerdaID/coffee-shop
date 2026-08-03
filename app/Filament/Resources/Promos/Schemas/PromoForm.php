@@ -77,13 +77,14 @@ class PromoForm
                 TextInput::make('cta_url')
                     ->label(__('promos.fields.cta_url'))
                     ->url()
-                    ->placeholder('https://…'),
+                    ->placeholder(__('promos.fields.cta_url_placeholder')),
                 DateTimePicker::make('starts_at')
                     ->label(__('promos.fields.starts_at'))
                     ->default(now())
                     ->required(),
                 DateTimePicker::make('ends_at')
-                    ->label(__('promos.fields.ends_at')),
+                    ->label(__('promos.fields.ends_at'))
+                    ->afterOrEqual('starts_at'),
                 Toggle::make('active')
                     ->label(__('promos.fields.active'))
                     ->default(true),

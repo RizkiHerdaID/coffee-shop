@@ -23,7 +23,10 @@ class PnlReport extends Page
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedDocumentChartBar;
 
-    protected static ?string $navigationLabel = 'pnl.navigation';
+    public static function getNavigationLabel(): string
+    {
+        return __('pnl.navigation');
+    }
 
     protected static ?int $navigationSort = 3;
 

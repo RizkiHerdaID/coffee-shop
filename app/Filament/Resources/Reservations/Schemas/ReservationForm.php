@@ -3,12 +3,14 @@
 namespace App\Filament\Resources\Reservations\Schemas;
 
 use App\Enums\ReservationStatus;
+use Closure;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\TimePicker;
 use Filament\Schemas\Schema;
+use Illuminate\Support\Carbon;
 
 class ReservationForm
 {
@@ -38,7 +40,24 @@ class ReservationForm
                     ->minDate(today()),
                 TimePicker::make('time')
                     ->label(__('reservation.fields.time'))
-                    ->required(),
+                    ->required()
+                    ->rule(function (TimePicker $component): Closure {
+                        return function (string $attribute, mixed $value, Closure $fail) use ($component): void {
+                            // Mirror the public booking form: same-day
+                            // reservations must be for a time still ahead.
+                            $date = $component->getContainer()->getComponent('date')?->getState();
+
+                            if (blank($date) || blank($value)) {
+                                return;
+                            }
+
+                            $reservationDateTime = Carbon::parse($date.' '.$value);
+
+                            if ($reservationDateTime->isToday() && $reservationDateTime->isPast()) {
+                                $fail(__('reservation.form.past_time'));
+                            }
+                        };
+                    }),
                 Textarea::make('notes')
                     ->label(__('reservation.fields.notes'))
                     ->rows(3)

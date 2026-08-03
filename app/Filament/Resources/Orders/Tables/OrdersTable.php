@@ -29,12 +29,14 @@ class OrdersTable
             ->modifyQueryUsing(fn (Builder $query): Builder => $query->with('shift'))
             ->columns([
                 TextColumn::make('order_number')
+                    ->label(__('orders.fields.order_number'))
                     ->searchable(),
                 TextColumn::make('customer_phone')
                     ->label(__('orders.customer_phone'))
                     ->searchable()
                     ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('status')
+                    ->label(__('orders.status'))
                     ->badge()
                     ->color(fn (OrderStatus $state): string => match ($state) {
                         OrderStatus::Pending => 'gray',
@@ -59,9 +61,11 @@ class OrdersTable
                     ->searchable()
                     ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('created_at')
+                    ->label(__('orders.fields.created_at'))
                     ->dateTime()
                     ->sortable(),
                 TextColumn::make('updated_at')
+                    ->label(__('orders.fields.updated_at'))
                     ->dateTime()
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),

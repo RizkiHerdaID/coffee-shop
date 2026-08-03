@@ -4,6 +4,7 @@ namespace App\Filament\Resources\Orders\Schemas;
 
 use App\Enums\OrderStatus;
 use App\Models\Order;
+use App\Support\OrderNumber;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Schemas\Schema;
@@ -17,13 +18,18 @@ class OrderForm
         return $schema
             ->components([
                 TextInput::make('order_number')
+                    ->label(__('orders.fields.order_number'))
                     ->required()
-                    ->unique(ignoreRecord: true),
+                    ->unique(ignoreRecord: true)
+                    ->disabled()
+                    ->dehydrated()
+                    ->default(fn (): string => OrderNumber::generate()),
                 TextInput::make('customer_phone')
                     ->label(__('orders.customer_phone'))
                     ->tel()
                     ->placeholder(__('orders.customer_phone_placeholder')),
                 Select::make('status')
+                    ->label(__('orders.status'))
                     ->required()
                     ->options(OrderStatus::class)
                     ->default(OrderStatus::Pending),
@@ -31,11 +37,13 @@ class OrderForm
                     ->label(__('orders.total'))
                     ->required()
                     ->prefix('Rp')
+                    ->minValue(1)
                     ->mask(RawJs::make('$money($input, \',\', \'.\', 0)'))
                     ->formatStateUsing(fn ($state) => self::formatTotal($state))
                     ->dehydrateStateUsing(fn (?string $state): ?int => $state === null ? null : (int) str_replace('.', '', $state))
-                    ->rule('regex:/^(\d{1,3}(\.\d{3})*|\d+)$/'),
+                    ->rule('regex:/^([1-9]\d{0,2}(\.\d{3})*|[1-9]\d*)$/'),
                 Select::make('shift_id')
+                    ->label(__('orders.fields.shift_id'))
                     ->relationship('shift', 'id', function (Select $component, Builder $query): Builder {
                         $query->open();
 
@@ -51,6 +59,7 @@ class OrderForm
                     })
                     ->nullable(),
                 Select::make('created_by')
+                    ->label(__('orders.fields.created_by'))
                     ->relationship('admin', 'name')
                     ->required(),
             ]);

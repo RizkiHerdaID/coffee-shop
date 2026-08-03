@@ -9,6 +9,8 @@ return [
         'photo' => 'Foto',
         'category' => 'Kategori',
         'available' => 'Tersedia',
+        'created_at' => 'Dibuat',
+        'updated_at' => 'Diperbarui',
     ],
 
     'available' => 'Tersedia',

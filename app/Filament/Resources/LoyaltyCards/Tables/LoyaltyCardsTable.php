@@ -7,6 +7,7 @@ use Filament\Actions\Action;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Forms\Components\TextInput;
+use Filament\Notifications\Notification;
 use Filament\Support\RawJs;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
@@ -58,14 +59,25 @@ class LoyaltyCardsTable
                     ->modalSubmitActionLabel(__('loyalty.actions.redeem_submit'))
                     ->modalDescription(__('loyalty.actions.redeem_confirm'))
                     ->successNotificationTitle(__('loyalty.notifications.redeemed'))
+                    ->failureNotification(null)
                     ->visible(fn (LoyaltyCard $record): bool => $record->freeDrinksAvailable() > 0)
                     ->requiresConfirmation()
-                    ->action(function (LoyaltyCard $record): void {
-                        if (! LoyaltyCard::redeem($record->phone)) {
-                            throw new \Exception(__('loyalty.notifications.redeem_failed'));
+                    ->action(function (Action $action, LoyaltyCard $record): void {
+                        if (LoyaltyCard::redeem($record->phone)) {
+                            $record->refresh();
+
+                            return;
                         }
 
-                        $record->refresh();
+                        // A concurrent redeemer won the race: mark the action
+                        // as failed (so no success toast fires) and surface
+                        // the danger notification instead of throwing.
+                        $action->failure();
+
+                        Notification::make()
+                            ->title(__('loyalty.notifications.redeem_failed'))
+                            ->danger()
+                            ->send();
                     }),
                 Action::make('adjustStamps')
                     ->label(__('loyalty.actions.adjust'))
