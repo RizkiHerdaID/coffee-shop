@@ -17,7 +17,7 @@ return [
     'wa_button' => 'Chat on WhatsApp',
 
     'qris' => [
-        'title' => 'Terima QRIS',
+        'title' => 'Pay with QRIS',
         'body' => 'Pay with any QRIS wallet — scan, pay, done. No cash? No problem.',
     ],
 

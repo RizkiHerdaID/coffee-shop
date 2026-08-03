@@ -3,8 +3,10 @@
 namespace Tests\Feature;
 
 use App\Models\MenuItem;
+use App\Models\Promo;
 use Database\Seeders\MenuSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Lang;
 use Tests\TestCase;
 
 class HomePageTest extends TestCase
@@ -124,5 +126,35 @@ class HomePageTest extends TestCase
         $response->assertOk();
         $response->assertDontSee('Order online');
         $response->assertDontSee('Change language to English');
+    }
+
+    public function test_home_page_delivery_labels_come_from_translation_keys(): void
+    {
+        Lang::addLines([
+            'home.cards.delivery.gofood' => 'GoFood-XYZ',
+            'home.cards.delivery.grabfood' => 'GrabFood-XYZ',
+        ], 'id');
+
+        $response = $this->get('/');
+
+        $response->assertOk();
+        $response->assertSee('GoFood-XYZ');
+        $response->assertSee('GrabFood-XYZ');
+    }
+
+    public function test_home_page_promo_cta_with_backslash_url_degrades_to_hash(): void
+    {
+        Promo::factory()->create([
+            'title' => 'Promo Backslash Test',
+            'cta_text' => 'Klaim Sekarang',
+            'cta_url' => '/\\evil',
+            'starts_at' => now()->subDay(),
+        ]);
+
+        $response = $this->get('/');
+
+        $response->assertOk();
+        $response->assertSee('Promo Backslash Test');
+        $response->assertDontSee('href="/\\evil"', false);
     }
 }

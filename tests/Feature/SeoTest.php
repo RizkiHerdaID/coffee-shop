@@ -168,6 +168,17 @@ class SeoTest extends TestCase
         $response->assertDontSee($payload, false);
     }
 
+    public function test_local_business_json_ld_handles_hours_without_separator(): void
+    {
+        config()->set('shop.hours.mon_fri', '07:00');
+
+        $response = $this->get('/');
+
+        $response->assertOk();
+        $response->assertSee('"opens":"07:00"', false);
+        $response->assertDontSee('"opens":"07:00","closes":"07:00"', false);
+    }
+
     public function test_home_page_does_not_break_out_of_script_blocks_for_malicious_item_name(): void
     {
         $this->seed(MenuSeeder::class);

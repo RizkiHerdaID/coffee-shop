@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Enums\ReservationStatus;
 use App\Filament\Resources\Reservations\Pages\CreateReservation;
 use App\Models\Reservation;
+use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 use Tests\TestCase;
@@ -46,7 +47,7 @@ class ReservationTest extends TestCase
             'phone' => '081234567890',
             'party_size' => 4,
             'date' => now()->addDay()->format('Y-m-d'),
-            'time' => '19:30',
+            'time' => '12:00',
             'notes' => 'Meja dekat jendela',
         ];
 
@@ -57,10 +58,10 @@ class ReservationTest extends TestCase
 
         $this->assertDatabaseHas('reservations', [
             'name' => 'Budi Santoso',
-            'phone' => '081234567890',
+            'phone' => '6281234567890',
             'party_size' => 4,
             'date' => now()->addDay()->format('Y-m-d'),
-            'time' => '19:30',
+            'time' => '12:00',
             'notes' => 'Meja dekat jendela',
         ]);
     }
@@ -72,7 +73,7 @@ class ReservationTest extends TestCase
             'phone' => '081234567890',
             'party_size' => 2,
             'date' => now()->addDay()->format('Y-m-d'),
-            'time' => '19:30',
+            'time' => '12:00',
         ]);
 
         $response->assertSessionHasErrors(['name']);
@@ -86,7 +87,7 @@ class ReservationTest extends TestCase
             'phone' => 'not-a-phone',
             'party_size' => 2,
             'date' => now()->addDay()->format('Y-m-d'),
-            'time' => '19:30',
+            'time' => '12:00',
         ]);
 
         $response->assertSessionHasErrors(['phone']);
@@ -100,7 +101,7 @@ class ReservationTest extends TestCase
             'phone' => '081234567890',
             'party_size' => 0,
             'date' => now()->addDay()->format('Y-m-d'),
-            'time' => '19:30',
+            'time' => '12:00',
         ]);
 
         $response->assertSessionHasErrors(['party_size']);
@@ -150,7 +151,14 @@ class ReservationTest extends TestCase
 
     public function test_reservation_form_accepts_future_time_on_today(): void
     {
-        $proposed = now()->addMinutes(90);
+        // Noon is inside every configured opening window (mon_fri 07:00-18:00,
+        // sat 08:00-20:00, sun 08:00-16:00). When the suite runs after noon a
+        // future same-day booking cannot be constructed, so skip the case.
+        $proposed = now()->copy()->setTime(12, 0);
+
+        if ($proposed->isPast()) {
+            $this->markTestSkipped('A future same-day booking cannot be constructed after noon.');
+        }
 
         $response = $this->post(url('/reservasi'), [
             ...$this->validPayload(),
@@ -201,6 +209,112 @@ class ReservationTest extends TestCase
         $this->assertDatabaseCount('reservations', 0);
     }
 
+    public function test_reservation_form_rejects_time_outside_opening_hours(): void
+    {
+        $response = $this->post(url('/reservasi'), [
+            ...$this->validPayload(),
+            'date' => now()->addDays(3)->format('Y-m-d'),
+            'time' => '03:00',
+        ]);
+
+        $response->assertSessionHasErrors(['time' => __('reservation.form.closed')]);
+        $this->assertDatabaseCount('reservations', 0);
+    }
+
+    public function test_reservation_form_rejects_sunday_before_opening_hours(): void
+    {
+        $sunday = now()->next(Carbon::SUNDAY);
+
+        $response = $this->post(url('/reservasi'), [
+            ...$this->validPayload(),
+            'date' => $sunday->format('Y-m-d'),
+            'time' => '07:00',
+        ]);
+
+        $response->assertSessionHasErrors(['time' => __('reservation.form.closed')]);
+        $this->assertDatabaseCount('reservations', 0);
+    }
+
+    public function test_reservation_form_rejects_date_beyond_ninety_day_horizon(): void
+    {
+        $response = $this->post(url('/reservasi'), [
+            ...$this->validPayload(),
+            'date' => now()->addMonths(6)->format('Y-m-d'),
+            'time' => '12:00',
+        ]);
+
+        $response->assertSessionHasErrors(['date' => __('reservation.form.too_far')]);
+        $this->assertDatabaseCount('reservations', 0);
+    }
+
+    public function test_reservation_form_accepts_time_within_opening_hours(): void
+    {
+        $response = $this->post(url('/reservasi'), [
+            ...$this->validPayload(),
+            'date' => now()->addDays(3)->format('Y-m-d'),
+            'time' => '12:00',
+        ]);
+
+        $response->assertRedirect(url('/reservasi'));
+        $response->assertSessionHas('success');
+        $this->assertDatabaseCount('reservations', 1);
+    }
+
+    public function test_reservation_form_accepts_dashed_phone_and_stores_normalized(): void
+    {
+        $response = $this->post(url('/reservasi'), [
+            ...$this->validPayload(),
+            'phone' => '0812-3456-7890',
+        ]);
+
+        $response->assertRedirect(url('/reservasi'));
+        $this->assertDatabaseHas('reservations', ['phone' => '6281234567890']);
+        $this->assertDatabaseMissing('reservations', ['phone' => '0812-3456-7890']);
+    }
+
+    public function test_reservation_form_rejects_junk_phone_with_localized_message(): void
+    {
+        $response = $this->post(url('/reservasi'), [
+            ...$this->validPayload(),
+            'phone' => 'not-a-phone',
+        ]);
+
+        $response->assertSessionHasErrors(['phone' => __('reservation.form.invalid_phone')]);
+        $this->assertDatabaseCount('reservations', 0);
+    }
+
+    public function test_reservation_form_rejects_phone_that_fails_normalized_check(): void
+    {
+        $response = $this->post(url('/reservasi'), [
+            ...$this->validPayload(),
+            'phone' => '08123',
+        ]);
+
+        $response->assertSessionHasErrors(['phone' => __('reservation.form.invalid_phone')]);
+        $this->assertDatabaseCount('reservations', 0);
+    }
+
+    public function test_reservation_success_redirect_preserves_lang_query(): void
+    {
+        $response = $this->post(url('/reservasi').'?lang=en', $this->validPayload());
+
+        $response->assertRedirect(url('/reservasi?lang=en'));
+        $response->assertSessionHas('success');
+    }
+
+    public function test_reservation_flash_message_varies_with_whatsapp_config(): void
+    {
+        config()->set('whatsapp.enabled', false);
+
+        $this->post(url('/reservasi'), $this->validPayload())
+            ->assertSessionHas('success', __('reservation.flash.success_no_wa'));
+
+        config()->set('whatsapp.enabled', true);
+
+        $this->post(url('/reservasi'), $this->validPayload())
+            ->assertSessionHas('success', __('reservation.flash.success'));
+    }
+
     protected function validPayload(array $overrides = []): array
     {
         return [
@@ -208,7 +322,7 @@ class ReservationTest extends TestCase
             'phone' => '081234567890',
             'party_size' => 4,
             'date' => now()->addDay()->format('Y-m-d'),
-            'time' => '19:30',
+            'time' => '12:00',
             'notes' => 'Meja dekat jendela',
             ...$overrides,
         ];

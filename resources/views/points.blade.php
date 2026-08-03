@@ -9,6 +9,10 @@
     <p class="mt-4 max-w-lg text-sm leading-relaxed text-stone-400">{{ __('points.subheading') }}</p>
 
     <form method="GET" action="{{ route('points') }}" class="mt-12 flex flex-col gap-4 rounded-2xl border border-stone-800 bg-stone-900/60 p-8 sm:flex-row sm:items-end">
+        {{-- The locale is always echoed back so a ?lang= visitor does not bounce
+             to the default locale on submit. Always rendering is harmless: the
+             SetLocale middleware validates the value before applying it. --}}
+        <input type="hidden" name="lang" value="{{ app()->getLocale() }}">
         <div class="flex-1">
             <label for="phone" class="block text-sm font-medium text-stone-300">{{ __('points.phone_label') }}</label>
             <input type="tel" id="phone" name="phone" value="{{ $phone }}" inputmode="tel" autocomplete="tel" placeholder="{{ __('points.phone_placeholder') }}"
