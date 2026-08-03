@@ -36,6 +36,7 @@ A dedicated `scheduler` container runs `php artisan schedule:work`, so the sched
 ## Production notes
 
 - **Secrets** — generate a real `APP_KEY`, use a strong `DB_PASSWORD`, and set real `ADMIN_*` credentials. Never reuse the defaults from `.env.example`.
+- **robots.txt** — served by `RobotsController` (route, absolute `Sitemap:` URL); the static `public/robots.txt` was deleted 2026-08-03. Never add a static file back — it shadows the route in production.
 - **Storage** — `FILESYSTEM_DISK=s3` points at MinIO. In production, replace `AWS_ENDPOINT_URL` with your S3 provider endpoint (or switch to `FILESYSTEM_DISK=local`) and use real `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` values instead of the `MINIO_ROOT_*` references. The entrypoint runs `storage:link --relative --force` on every container start, so `public/storage` always points at `storage/app/public` (relative target — valid from both host and container).
 - **Mail** — point `MAIL_HOST` / `MAIL_PORT` at a real SMTP provider and configure `MAIL_USERNAME`, `MAIL_PASSWORD`, and `MAIL_ENCRYPTION` accordingly.
 - The template defaults to `APP_ENV=production` with `APP_DEBUG=false`. For local development, set `APP_ENV=local` and `APP_DEBUG=true` (see the comment in `.env.example`).

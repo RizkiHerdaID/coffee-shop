@@ -3,7 +3,7 @@
 > Run a specialty coffee shop from one self-hosted app: a bilingual public website, a full point-of-sale with shift reconciliation and Z-reports, and owner tools for inventory, suppliers, and P&L — built on Laravel 13 + Filament 5, running anywhere Docker does.
 
 [![CI](https://github.com/RizkiHerdaID/coffee-shop/actions/workflows/tests.yml/badge.svg)](https://github.com/RizkiHerdaID/coffee-shop/actions/workflows/tests.yml)
-[![tests](https://img.shields.io/badge/tests-429_passing-brightgreen)](https://github.com/RizkiHerdaID/coffee-shop/actions/workflows/tests.yml)
+[![tests](https://img.shields.io/badge/tests-575_passing-brightgreen)](https://github.com/RizkiHerdaID/coffee-shop/actions/workflows/tests.yml)
 [![PHP](https://img.shields.io/badge/PHP-8.4-777BB4?logo=php&logoColor=white)](https://www.php.net/)
 [![Laravel](https://img.shields.io/badge/Laravel-13-FF2D20?logo=laravel&logoColor=white)](https://laravel.com)
 [![Filament](https://img.shields.io/badge/Filament-5-f43f5e)](https://filamentphp.com)
@@ -34,7 +34,7 @@ Coffee Shop is a complete platform for a single-store coffee shop. Instead of a 
 - **No POS subscription.** The research compared Pawoon, Digipos, Moka, Majoo, Square and more — and rejected them all in favor of an in-house POS inside the Filament panel. Software cost for the counter: Rp0/month, with the POS hardware cost unchanged.
 - **WhatsApp-first ordering.** Customers build a pickup cart on the menu page and send it as a `wa.me` message; the shop sends order confirmations and low-stock alerts through the same channel (Fonnte).
 - **Inventory that moves itself.** Recipes link menu items to stock items, so every sale deducts ingredients automatically — and a low-stock WhatsApp alert fires before the weekend rush runs you dry.
-- **Serious about quality.** 429 feature tests across 41 classes, gated by CI: the test workflow (Paratest + Pint) must pass before anything deploys.
+- **Serious about quality.** 575 feature tests across 52 classes, gated by CI: the test workflow (Paratest + Pint) must pass before anything deploys.
 - **One command to start developing.** Laravel Sail spins up the app, PostgreSQL, Redis, MinIO, and Mailpit — no local PHP or Node installation required.
 - **A live production deployment.** The repo ships a real deploy workflow: tests gate an SSH deploy to the production VPS, and operations tooling (backups, restore drills, uptime checks, scheduler heartbeats) is part of the codebase, not an afterthought.
 
@@ -70,7 +70,7 @@ Coffee Shop is a complete platform for a single-store coffee shop. Instead of a 
 
 ### Quality engineering — under the hood
 
-- **429 feature tests, 41 classes** — the POS (shifts, refunds, split payments, discounts), the site (SEO, localization, pickup cart), inventory, and every resource are covered; tests run on in-memory SQLite, so CI needs no database service.
+- **575 feature tests, 52 classes** — the POS (shifts, refunds, split payments, discounts, over-tender/change tracking, concurrency), the site (SEO, localization, pickup cart, points, robots), inventory, and every resource are covered; tests run on in-memory SQLite, so CI needs no database service.
 - **CI/CD** — `.github/workflows/tests.yml` (PHP 8.4, real Vite build, Paratest × 4 processes, Pint) gates `.github/workflows/deploy.yml`, which triggers the production deploy via SSH; Dependabot watches composer, npm, and GitHub Actions weekly.
 - **Operations built in** — automated `pg_dump` backups (14 daily + 8 weekly, optional S3 copy), a restore-drill script that verifies restorability, a `/up` health endpoint, and scheduler heartbeats that catch a silently dead cron. See [Operations](docs/ops.md).
 - **Observability** — Laravel Pulse is installed and gated to the admin guard; queued jobs write structured logs.
@@ -137,7 +137,7 @@ After changing views or Tailwind classes, rebuild assets:
 ## Testing
 
 ```bash
-./vendor/bin/sail artisan test                     # full suite, 429 tests
+./vendor/bin/sail artisan test                     # full suite, 575 tests
 ./vendor/bin/sail paratest --no-coverage --processes 8   # same suite, ~4.5× faster
 ```
 
@@ -164,7 +164,7 @@ lang/{id,en}/             # all user-facing copy — Indonesian-first
 resources/views/          # Blade public site + Filament views
 routes/web.php            # all public + POS routes
 scripts/                  # db-backup.sh, restore-drill.sh
-tests/Feature/            # 429 tests across 41 classes
+tests/Feature/            # 575 tests across 52 classes
 ```
 
 ## Documentation

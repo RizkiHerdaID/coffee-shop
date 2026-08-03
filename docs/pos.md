@@ -49,14 +49,17 @@ Milestones M1–M3 are implemented and merged to `main`:
 
 ### Schema
 
-Built by migrations `2026_08_02_000002`–`000006` (plus `000012` and `000013`):
+Built by migrations `2026_08_02_000002`–`000006` (plus `000012`–`000015`) and the
+2026-08-03 audit-freeze set (`add_change_to_payments`, `add_loyalty_credited_at_to_orders`,
+single-open-shift unique index, `drop_expected_total_from_shifts`, `order_counters`,
+report indexes, UNIQUE names on seeded tables):
 
 | Table | Columns |
 | --- | --- |
-| `shifts` | `opened_at`, `closed_at` (nullable), `opening_cash` (unsigned int, default 0), `closing_cash` (nullable), `expected_total` (nullable, set at close), `admin_id` → `admins` |
-| `orders` | `order_number` (unique, format `ORD-YYYYMMDD-NNNN`), `status` (default `pending`), `total` (unsigned int), `customer_phone` (nullable, WhatsApp confirmation), `shift_id` (nullable, `nullOnDelete`), `created_by` → `admins` |
+| `shifts` | `opened_at`, `closed_at` (nullable), `opening_cash` (unsigned int, default 0), `closing_cash` (nullable), `admin_id` → `admins`; partial UNIQUE index enforces **one open shift** (`2026_08_03_000002`); `expected_total` was **dropped 2026-08-03** — expected cash/discrepancy are computed live from payment rows + cash movements |
+| `orders` | `order_number` (unique, format `ORD-YYYYMMDD-NNNN` from the `order_counters` daily sequence), `status` (default `pending`), `total` (unsigned int), `discount_type`/`discount_amount` (fixed/percent), `loyalty_credited_at` (nullable, exactly-once stamp guard), `customer_phone` (nullable, WhatsApp confirmation), `shift_id` (nullable, `nullOnDelete`), `created_by` → `admins`; **deletes are blocked** by a model guard (audit freeze) |
 | `order_items` | `order_id` → `orders` (cascade), `menu_item_id` (nullable, `nullOnDelete`), **snapshot** `name` + `price` (history survives menu edits/deletes), `qty`, `subtotal` |
-| `payments` | `order_id` → `orders` (cascade), `method` (default `cash`), `amount` (**signed** int — refunds are negative rows, migration `000013`), `reference` (nullable: QRIS/e-wallet ref or refund reason), `paid_at` (nullable), `admin_id` → `admins` |
+| `payments` | `order_id` → `orders` (cascade), `method` (default `cash`), `amount` (**signed** int — refunds are negative rows, migration `000013`), `change` (2026-08-03 — cash over-tender surplus, applied amount capped at the remaining balance), `reference` (nullable: QRIS/e-wallet ref or refund reason), `paid_at` (nullable), `admin_id` → `admins` |
 
 `menu_items` additions for the POS: `photo`, `category`, `available` (bool,
 default true) — see migration `2026_08_02_000009`. Note the research proposed
@@ -87,16 +90,25 @@ default true) — see migration `2026_08_02_000009`. Note the research proposed
    e-wallet: settle the **exact remaining** amount (static QRIS image from
    `config('pos.qris.image')`, placeholder box when unconfigured; e-wallet
    reference optional). **Partial payments are allowed** — the order stays
-   `pending` until `paid_total` ≥ `total`.
-5. **Auto-paid transition** — `Order::markPaidIfCovered()` (`Order.php:70`)
+   `pending` until `paid_total` ≥ `total`. Since 2026-08-03 the capture stores
+   the **APPLIED amount** (capped at the remaining balance) plus the surplus as
+   `change` on the `payments` row (`Cashier.php:467-472`) — the drawer only
+   ever accounts for what was applied; the cashier sees change due = Σ
+   `payments.change`.
+5. **Auto-paid transition** — `Order::markPaidIfCovered()` (`Order.php:119`)
    flips `pending → paid` when covered and dispatches `PrintReceipt` +
-   `PrintKitchenTicket` **exactly once, on the transition**.
-6. **Serve** (`markServed()`, `Cashier.php:319`) — `paid → served`.
+   `PrintKitchenTicket` **exactly once, on the transition** — the row is
+   locked (`lockForUpdate`) inside a transaction so concurrent callers
+   serialize (cashier flow vs admin table action), and the dispatches run in
+   `DB::afterCommit`.
+6. **Serve** (`markServed()`, `Cashier.php:554`) — `paid → served`.
 
-Order confirmation via WhatsApp: `Order::created` dispatches
-`SendOrderConfirmation` (`Order.php:20-24`) when `config('whatsapp.enabled')`
-and the order has a `customer_phone`; message keys in `lang/{id,en}/whatsapp.php`
-(`confirmation`, `confirmation_with_items`).
+Order confirmation via WhatsApp: `Order::booted()` (`Order.php:19-31`) `created`
+hook dispatches `SendOrderConfirmation` when `config('whatsapp.enabled')` and the
+order has a `customer_phone` (phone normalized via `App\Support\Phone`), wrapped
+in `DB::afterCommit` so a sync queue never sends before the row is visible.
+The same hook blocks **order deletes** (immutable audit records — a hard delete
+would cascade order_items/payments and orphan stock movements).
 
 ### Printing
 
@@ -115,21 +127,28 @@ and the order has a `customer_phone`; message keys in `lang/{id,en}/whatsapp.php
 
 - Open: `ManageShift::openShift()` (`ManageShift.php:119`) requires opening
   cash (`Rp` formatted, `isValidAmount()`/`parseAmount()`), creates a `shift`
-  with `opened_at`; **only one shift can be open** (`Shift::active()`
-  = latest shift with `closed_at IS NULL`).
-- Close: `closeShift()` (`ManageShift.php:157`) requires counted closing cash,
-  sets `closed_at`, `closing_cash`, `expected_total = salesTotal()`, then
-  redirects to the Z-report page. `ManageShift` also lists the 10 most recent
-  closed shifts with per-method totals and discrepancy.
+  with `opened_at`; **only one shift can be open** (partial unique index on
+  `shifts` — a concurrent open is rejected at the DB level).
+- Close: `closeShift()` (`ManageShift.php:270`) requires counted closing cash
+  (required + Indonesian-format validated), then runs a **conditional update** —
+  `whereNull('closed_at')` setting only `closed_at` + `closing_cash`. If a
+  concurrent request already closed the shift the affected-row count is 0 and
+  the close is rejected instead of overwritten. No `expected_total` is stored
+  (column dropped 2026-08-03); the report computes expected cash and
+  discrepancy live from payment rows + cash movements. Redirects to the
+  Z-report page. `ManageShift` also lists the 10 most recent closed shifts
+  with per-method totals and discrepancy.
 - Shift math on `app/Models/Shift.php`:
-  - `paidOrders()` (`Shift.php:54`) — orders whose status is **not**
+  - `paidOrders()` (`Shift.php:53`) — orders whose status is **not**
     pending/refunded/cancelled (paid + served count toward reports).
-  - `salesTotal()` / `paidOrdersCount()` — sum/count of paid orders.
-  - `paymentsByMethod()` (`Shift.php:89`) — `['cash' => int, 'qris' => int,
-    'ewallet' => int]` from payment rows of paid orders.
-  - `expectedCash()` (`Shift.php:133`) — `opening_cash + cashPaid() +
-    cashRefunds()` (cash refunds are negative rows).
-  - `discrepancy()` (`Shift.php:141`) — `closing_cash − expectedCash()`,
+  - `salesTotal()` / `paidOrdersCount()` — sum of **NET** totals
+    (`net_total` = gross − discount) / count of paid orders.
+  - `paymentsByMethod()` (`Shift.php:111`) — `['cash' => int, 'qris' => int,
+    'ewallet' => int]` from payment rows of paid orders (positive rows only;
+    refunds are reported separately).
+  - `expectedCash()` (`Shift.php:157`) — `opening_cash + cashPaid() +
+    cashRefunds() + deposits() − pettyOut()`.
+  - `discrepancy()` (`Shift.php:165`) — `closing_cash − expectedCash()`,
     **0 while the shift is still open**.
 - Z-report content (`z-report.blade.php`): shift number/period/closed-by,
   order count, total sales, payment breakdown by method, cash check
@@ -140,13 +159,13 @@ and the order has a `customer_phone`; message keys in `lang/{id,en}/whatsapp.php
 
 Implemented in `Order.php` with row actions in `OrdersTable.php`:
 
-- **Refund** (`Order::refund()`, `Order.php:103`) — allowed when status is
+- **Refund** (`Order::refund()`, `Order.php:169`) — allowed when status is
   paid/served **and** the order's shift is still open or unattached
-  (`canBeRefunded()`, `Order.php:88` — closed shifts keep the Z-report
+  (`canBeRefunded()`, `Order.php:153` — closed shifts keep the Z-report
   stable). Records a **negative** `payments` row (method + reason as
   reference); when net paid drops to zero the status flips to `refunded`.
   Amount is validated (must be > 0 and ≤ paid total).
-- **Void** (`Order::void()`, `Order.php:145`) — allowed only for `pending`
+- **Void** (`Order::void()`, `Order.php:215`) — allowed only for `pending`
   orders with an open/unattached shift; flips status to `cancelled`.
 - Shift-safe totals: `Shift::paidOrders()` excludes `refunded`/`cancelled`
   orders, and partial refunds net within `paymentsByMethod()`/`cashPaid()`.
@@ -189,9 +208,10 @@ Browser (cashier tablet)                 Filament panel (guard: admin)
   |                                                    `-> browser-print fallback: /pos/receipt/{order}
   |   markServed(): paid -> served
   |
-  |   shift lifecycle: /admin/shift (open: opening_cash) ... (close: closing_cash,
-  |   expected_total, redirect) -> /admin/shift-report/{record} (panel) +
-  |   printable /pos/z-report/{shift} (auth:admin)
+  |   shift lifecycle: /admin/shift (open: opening_cash) ... (close: closing_cash
+  |   counted, conditional update, redirect) -> /admin/shift-report/{record} (panel) +
+  |   printable /pos/z-report/{shift} (auth:admin) — expected cash & discrepancy
+  |   computed live from payments + cash movements (no stored expected_total)
   |
   |   dashboard widgets: TodayStats, RevenueChart, TopItemsChart,
   |   BestSellersChart, PeakHoursChart, PaymentSplitChart (all exclude

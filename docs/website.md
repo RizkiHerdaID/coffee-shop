@@ -15,7 +15,8 @@ The public site is a small set of Blade views rendered by `App\Http\Controllers\
 | `GET /qr/{table}` | `qr()` | Compact table menu for QR codes (`{table}` must be 1..`config('shop.tables')`, else 404) |
 | `GET /contact` | `contact()` | NAP/hours from `config('shop.*')`, keyless Maps embed, QRIS section, WhatsApp button |
 | `GET /lang/{locale}` | closure | Switch locale (`id`/`en`), persists to session, redirects back |
-| `GET /sitemap.xml`, `GET /robots.txt` | closures | `routes/web.php:32-49` |
+| `GET /sitemap.xml` | closure | `routes/web.php:59` |
+| `GET /robots.txt` | `RobotsController` | `routes/web.php:79` — route-served, no static file (see below) |
 
 All routes are in `routes/web.php`. All user-facing copy comes from `lang/{id,en}/` (`site.php`, `home.php`, `menu.php`, `contact.php`, `qr.php`, `menu-items.php`); the default locale is `id`, switched via `app/Http/Middleware/SetLocale.php`.
 
@@ -27,7 +28,13 @@ All routes are in `routes/web.php`. All user-facing copy comes from `lang/{id,en
 - **OG/meta tags**: `og:title`, `og:description`, `og:type`, `og:url`, `og:image` (favicon), `og:site_name`, `twitter:card` (`layouts/app.blade.php:9-15`); meta description localized via `site.meta.default_description`.
 - **Webfont loading**: `@fonts('instrument-sans')` (Laravel 13 Fonts via the Bunny CDN `fonts` plugin in `vite.config.js`) plus a hero woff2 `<link rel="preload">` resolved from the Vite-generated `public/build/fonts-manifest.json` (`layouts/app.blade.php:54-62`). Added in commit `03759ad` (Web Vitals pass).
 
-Routes for SEO: `/sitemap.xml` (home/menu/contact, `changefreq=weekly`) and `/robots.txt` (`Sitemap:` pointing at the sitemap) are closures in `routes/web.php:32-49`. Note: a **static `public/robots.txt` also exists** and shadows the route in production (static files take precedence over routes) — it points at the relative `/sitemap.xml`, so it works under any domain; switch it to an absolute URL only if a crawler requires one.
+Routes for SEO: `/sitemap.xml` (home/menu/contact/reservasi/cek-poin + every QR
+table URL, `changefreq=weekly`) is a closure in `routes/web.php:59`, and
+`/robots.txt` is served by `app/Http/Controllers/RobotsController.php`
+(`routes/web.php:79`) — it emits an **absolute** `Sitemap:` URL via `url()` so it
+stays correct behind the production proxy. The static `public/robots.txt` that
+used to shadow the route was **deleted 2026-08-03** (`1728a9c`); do not add a
+static file back or it will shadow the route again.
 
 ### Menu model & admin — `app/Models/MenuItem.php`
 
@@ -106,7 +113,7 @@ Still open:
 | Page-speed re-audit | S-M | `layouts/app.blade.php`, Vite | Web Vitals pass landed (`03759ad`); re-check at pagespeed.web.dev after big changes |
 | Loyalty/stamp card (10th cup free via WhatsApp) + `LoyaltyProgram` schema | M | New model + Filament resource + partial | P2 |
 | Real digital ordering + payment via dynamic QRIS (Xendit/Midtrans) | L | New routes/controllers | Planned as POS M4 (see `docs/pos.md`); the POS already captures in-store QRIS payments, this is the online/auto-QRIS variant — wait for order volume to justify fees |
-| `robots.txt` static/route sync | S | `public/robots.txt` vs `routes/web.php` | Static file shadows the route in prod; keep sitemap URL in sync |
+| `robots.txt` static/route sync | — | DONE 2026-08-03 | Static file deleted (`1728a9c`); `RobotsController` serves an absolute `Sitemap:` URL — never add a static `public/robots.txt` back |
 
 ## Performance baseline (2026-08-02, worktree localhost — reference only)
 
