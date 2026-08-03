@@ -10,6 +10,17 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 #[Fillable(['name', 'contact_person', 'phone', 'email', 'address', 'note'])]
 class Supplier extends Model
 {
+    protected static function booted(): void
+    {
+        // Deleting a supplier would cascade-destroy its purchase orders and
+        // the stock-in audit trail they carry.
+        static::deleting(function (Supplier $supplier) {
+            if ($supplier->purchaseOrders()->exists()) {
+                throw new \RuntimeException('Suppliers with purchase orders cannot be deleted: the purchase order audit trail would be destroyed.');
+            }
+        });
+    }
+
     public function purchaseOrders(): HasMany
     {
         return $this->hasMany(PurchaseOrder::class);

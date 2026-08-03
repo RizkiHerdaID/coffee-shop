@@ -14,6 +14,7 @@ use App\Models\PurchaseOrderItem;
 use App\Models\StockItem;
 use App\Models\StockMovement;
 use App\Models\Supplier;
+use Filament\Actions\DeleteAction;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 use Tests\TestCase;
@@ -411,4 +412,159 @@ class PurchaseOrdersTest extends TestCase
             ->assertSee('Gelas Kertas 12oz')
             ->assertDontSee($healthy->name);
     }
+
+    private function makeReceivedPo(Supplier $supplier): PurchaseOrder
+    {
+        return PurchaseOrder::create([
+            'supplier_id' => $supplier->id,
+            'status' => PurchaseOrderStatus::Received,
+            'total' => 500000,
+            'received_at' => now(),
+        ]);
+    }
+
+    public function test_received_purchase_order_cannot_be_deleted(): void
+    {
+        $supplier = $this->makeSupplier();
+        $po = $this->makeReceivedPo($supplier);
+
+        $this->assertThrows(
+            fn () => $po->delete(),
+            \RuntimeException::class,
+        );
+
+        $this->assertDatabaseHas('purchase_orders', ['id' => $po->id]);
+    }
+
+    public function test_pending_purchase_order_is_deletable(): void
+    {
+        $supplier = $this->makeSupplier();
+        $po = PurchaseOrder::create([
+            'supplier_id' => $supplier->id,
+            'status' => PurchaseOrderStatus::Pending,
+            'total' => 250000,
+        ]);
+
+        $po->delete();
+
+        $this->assertDatabaseMissing('purchase_orders', ['id' => $po->id]);
+    }
+
+    public function test_delete_action_hidden_on_received_po_edit_page(): void
+    {
+        $admin = Admin::factory()->create();
+        $supplier = $this->makeSupplier();
+        $received = $this->makeReceivedPo($supplier);
+        $pending = PurchaseOrder::create([
+            'supplier_id' => $supplier->id,
+            'status' => PurchaseOrderStatus::Pending,
+            'total' => 250000,
+        ]);
+
+        Livewire::actingAs($admin, 'admin')
+            ->test(EditPurchaseOrder::class, ['record' => $received->getKey()])
+            ->assertActionHidden(DeleteAction::class);
+
+        Livewire::actingAs($admin, 'admin')
+            ->test(EditPurchaseOrder::class, ['record' => $pending->getKey()])
+            ->assertActionVisible(DeleteAction::class);
+    }
+
+    public function test_bulk_delete_hidden_when_selected_pos_are_received(): void
+    {
+        $admin = Admin::factory()->create();
+        $supplier = $this->makeSupplier();
+        $received = $this->makeReceivedPo($supplier);
+        $pending = PurchaseOrder::create([
+            'supplier_id' => $supplier->id,
+            'status' => PurchaseOrderStatus::Pending,
+            'total' => 250000,
+        ]);
+
+        Livewire::actingAs($admin, 'admin')
+            ->test(ListPurchaseOrders::class)
+            ->selectTableRecords([$received])
+            ->assertTableBulkActionHidden('delete')
+            ->selectTableRecords([$pending])
+            ->assertTableBulkActionVisible('delete');
+    }
+
+    public function test_received_po_edit_form_fields_are_disabled(): void
+    {
+        $admin = Admin::factory()->create();
+        $supplier = $this->makeSupplier();
+        $received = $this->makeReceivedPo($supplier);
+        $pending = PurchaseOrder::create([
+            'supplier_id' => $supplier->id,
+            'status' => PurchaseOrderStatus::Pending,
+            'total' => 250000,
+        ]);
+
+        Livewire::actingAs($admin, 'admin')
+            ->test(EditPurchaseOrder::class, ['record' => $received->getKey()])
+            ->assertFormFieldDisabled('supplier_id')
+            ->assertFormFieldDisabled('ordered_at')
+            ->assertFormFieldDisabled('expected_at')
+            ->assertFormFieldDisabled('status')
+            ->assertFormFieldDisabled('total')
+            ->assertFormFieldDisabled('note');
+
+        Livewire::actingAs($admin, 'admin')
+            ->test(EditPurchaseOrder::class, ['record' => $pending->getKey()])
+            ->assertFormFieldEnabled('supplier_id')
+            ->assertFormFieldEnabled('total');
+    }
+
+    public function test_saving_a_received_po_is_a_noop(): void
+    {
+        $admin = Admin::factory()->create();
+        $supplier = $this->makeSupplier();
+        // Itemless fixture: afterSave() recalculates the total from line
+        // items, so an itemless received PO proves the save mutated nothing.
+        $received = $this->makeReceivedPo($supplier);
+
+        Livewire::actingAs($admin, 'admin')
+            ->test(EditPurchaseOrder::class, ['record' => $received->getKey()])
+            ->fillForm(['note' => 'Nota yang tidak boleh tersimpan'])
+            ->call('save')
+            ->assertHasNoFormErrors();
+
+        $this->assertDatabaseHas('purchase_orders', [
+            'id' => $received->id,
+            'status' => PurchaseOrderStatus::Received->value,
+            'total' => 500000,
+            'note' => null,
+        ]);
+    }
+
+    public function test_received_po_relation_manager_hides_create_action(): void
+    {
+        $admin = Admin::factory()->create();
+        $supplier = $this->makeSupplier();
+        $received = $this->makeReceivedPo($supplier);
+        $pending = PurchaseOrder::create([
+            'supplier_id' => $supplier->id,
+            'status' => PurchaseOrderStatus::Pending,
+            'total' => 250000,
+        ]);
+
+        Livewire::actingAs($admin, 'admin')
+            ->test(PurchaseOrderItemsRelationManager::class, [
+                'ownerRecord' => $received,
+                'pageClass' => EditPurchaseOrder::class,
+            ])
+            ->assertTableActionHidden('create');
+
+        Livewire::actingAs($admin, 'admin')
+            ->test(PurchaseOrderItemsRelationManager::class, [
+                'ownerRecord' => $pending,
+                'pageClass' => EditPurchaseOrder::class,
+            ])
+            ->assertTableActionVisible('create');
+    }
 }
+
+    // ---------------------------------------------------------------------
+    // Delete protection + edit freeze (Vikunja 141): a received PO is an
+    // audit record — its stock was already moved in, so it must not be
+    // deletable or editable anymore. Unreceived POs stay fully manageable.

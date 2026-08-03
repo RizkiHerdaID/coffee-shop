@@ -11,6 +11,18 @@ use Illuminate\Support\Facades\DB;
 #[Fillable(['name', 'unit', 'cost', 'quantity', 'min_threshold', 'note'])]
 class StockItem extends Model
 {
+    protected static function booted(): void
+    {
+        // Deleting a stock item would cascade-destroy its movements (the
+        // inventory audit trail) or silently orphan a non-zero quantity.
+        // Only a zero-quantity item that was never moved is deletable.
+        static::deleting(function (StockItem $stockItem) {
+            if ($stockItem->movements()->exists() || (int) $stockItem->quantity !== 0) {
+                throw new \RuntimeException('Stock items with movements or a non-zero quantity cannot be deleted: the inventory audit trail would be destroyed.');
+            }
+        });
+    }
+
     /**
      * Get the attributes that should be cast.
      *

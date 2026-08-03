@@ -9,6 +9,10 @@ class StockSeeder extends Seeder
 {
     /**
      * Seed the application's stock items.
+     *
+     * Idempotent via firstOrCreate on the unique name. Re-seeding must never
+     * clobber live stock levels: existing rows only refresh the static
+     * fields (unit, note) while quantity/min_threshold are left untouched.
      */
     public function run(): void
     {
@@ -20,7 +24,7 @@ class StockSeeder extends Seeder
         ];
 
         foreach ($items as $item) {
-            StockItem::query()->updateOrCreate(
+            $stockItem = StockItem::query()->firstOrCreate(
                 ['name' => $item['name']],
                 [
                     'unit' => $item['unit'],
@@ -29,6 +33,15 @@ class StockSeeder extends Seeder
                     'note' => $item['note'],
                 ],
             );
+
+            if ($stockItem->wasRecentlyCreated) {
+                continue;
+            }
+
+            $stockItem->update([
+                'unit' => $item['unit'],
+                'note' => $item['note'],
+            ]);
         }
     }
 }

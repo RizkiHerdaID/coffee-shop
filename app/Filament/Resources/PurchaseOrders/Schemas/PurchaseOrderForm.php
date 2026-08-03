@@ -9,9 +9,19 @@ use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Schemas\Schema;
 use Filament\Support\RawJs;
+use Illuminate\Database\Eloquent\Model;
 
 class PurchaseOrderForm
 {
+    /**
+     * Whether the form must be read-only: received purchase orders are
+     * immutable stock-in records.
+     */
+    private static function isReceived(?Model $record): bool
+    {
+        return $record !== null && $record->received_at !== null;
+    }
+
     public static function configure(Schema $schema): Schema
     {
         return $schema
@@ -21,17 +31,21 @@ class PurchaseOrderForm
                     ->relationship('supplier', 'name')
                     ->searchable()
                     ->preload()
-                    ->required(),
+                    ->required()
+                    ->disabled(fn (?Model $record): bool => self::isReceived($record)),
                 DatePicker::make('ordered_at')
-                    ->label(__('purchase-orders.fields.ordered_at')),
+                    ->label(__('purchase-orders.fields.ordered_at'))
+                    ->disabled(fn (?Model $record): bool => self::isReceived($record)),
                 DatePicker::make('expected_at')
-                    ->label(__('purchase-orders.fields.expected_at')),
+                    ->label(__('purchase-orders.fields.expected_at'))
+                    ->disabled(fn (?Model $record): bool => self::isReceived($record)),
                 Select::make('status')
                     ->label(__('purchase-orders.fields.status'))
                     ->options(fn (): array => collect(PurchaseOrderStatus::cases())
                         ->mapWithKeys(fn ($case) => [$case->value => __("purchase-orders.statuses.$case->value")])
                         ->all())
-                    ->default(PurchaseOrderStatus::Pending->value),
+                    ->default(PurchaseOrderStatus::Pending->value)
+                    ->disabled(fn (?Model $record): bool => self::isReceived($record)),
                 TextInput::make('total')
                     ->label(__('purchase-orders.fields.total'))
                     ->prefix('Rp')
@@ -52,9 +66,11 @@ class PurchaseOrderForm
                         $cleaned = str_replace('.', '', (string) $state);
 
                         return $cleaned === '' ? null : (int) $cleaned;
-                    }),
+                    })
+                    ->disabled(fn (?Model $record): bool => self::isReceived($record)),
                 Textarea::make('note')
-                    ->label(__('purchase-orders.fields.note')),
+                    ->label(__('purchase-orders.fields.note'))
+                    ->disabled(fn (?Model $record): bool => self::isReceived($record)),
             ]);
     }
 }

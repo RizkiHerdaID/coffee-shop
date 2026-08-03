@@ -13,6 +13,7 @@ use Filament\Forms\Components\TextInput;
 use Filament\Support\RawJs;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
+use Illuminate\Support\Collection;
 
 class StockItemsTable
 {
@@ -105,7 +106,8 @@ class StockItemsTable
             ])
             ->toolbarActions([
                 BulkActionGroup::make([
-                    DeleteBulkAction::make(),
+                    DeleteBulkAction::make()
+                        ->visible(fn (Collection $records): bool => $records->isEmpty() || $records->contains(fn (StockItem $record): bool => $record->quantity === 0 && ! $record->movements()->exists())),
                 ]),
                 ExportAction::make()
                     ->label(__('stock.actions.export'))

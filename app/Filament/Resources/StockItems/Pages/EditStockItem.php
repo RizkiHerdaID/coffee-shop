@@ -13,7 +13,8 @@ class EditStockItem extends EditRecord
     protected function getHeaderActions(): array
     {
         return [
-            DeleteAction::make(),
+            DeleteAction::make()
+                ->visible(fn (): bool => $this->record->quantity === 0 && ! $this->record->movements()->exists()),
         ];
     }
 }

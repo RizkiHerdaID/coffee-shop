@@ -14,6 +14,7 @@ use Filament\Notifications\Notification;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
+use Illuminate\Support\Collection;
 
 class PurchaseOrdersTable
 {
@@ -105,7 +106,8 @@ class PurchaseOrdersTable
             ])
             ->toolbarActions([
                 BulkActionGroup::make([
-                    DeleteBulkAction::make(),
+                    DeleteBulkAction::make()
+                        ->visible(fn (Collection $records): bool => $records->isEmpty() || $records->contains(fn (PurchaseOrder $record): bool => $record->received_at === null)),
                 ]),
                 ExportAction::make()
                     ->label(__('purchase-orders.actions.export'))

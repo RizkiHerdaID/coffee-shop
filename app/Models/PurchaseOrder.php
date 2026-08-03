@@ -12,6 +12,17 @@ use Illuminate\Support\Facades\DB;
 #[Fillable(['supplier_id', 'ordered_at', 'expected_at', 'received_at', 'status', 'total', 'note'])]
 class PurchaseOrder extends Model
 {
+    protected static function booted(): void
+    {
+        // Received purchase orders are immutable stock-in records: the
+        // movements they produced are part of the inventory audit trail.
+        static::deleting(function (PurchaseOrder $purchaseOrder) {
+            if ($purchaseOrder->received_at !== null) {
+                throw new \RuntimeException('Received purchase orders cannot be deleted: they are immutable stock-in records.');
+            }
+        });
+    }
+
     /**
      * Get the attributes that should be cast.
      *

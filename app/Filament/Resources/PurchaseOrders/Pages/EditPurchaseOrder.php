@@ -52,7 +52,8 @@ class EditPurchaseOrder extends EditRecord
 
                     $this->redirect(PurchaseOrderResource::getUrl('index'));
                 }),
-            DeleteAction::make(),
+            DeleteAction::make()
+                ->visible(fn (): bool => $this->record->received_at === null),
         ];
     }
 

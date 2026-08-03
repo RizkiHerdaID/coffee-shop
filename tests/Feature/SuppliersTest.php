@@ -383,4 +383,42 @@ class SuppliersTest extends TestCase
             ->assertSee('2,3 '.__('suppliers.scorecard.days'))
             ->assertSee('67%');
     }
+
+    public function test_supplier_with_purchase_orders_cannot_be_deleted(): void
+    {
+        $supplier = $this->makeSupplier();
+        $this->makePo($supplier, ['status' => PurchaseOrderStatus::Pending, 'total' => 250000]);
+
+        $this->assertThrows(
+            fn () => $supplier->delete(),
+            \RuntimeException::class,
+        );
+
+        $this->assertDatabaseHas('suppliers', ['id' => $supplier->id]);
+        $this->assertDatabaseCount('purchase_orders', 1);
+    }
+
+    public function test_supplier_without_purchase_orders_is_deletable(): void
+    {
+        $supplier = $this->makeSupplier();
+
+        $supplier->delete();
+
+        $this->assertDatabaseMissing('suppliers', ['id' => $supplier->id]);
+    }
+
+    public function test_bulk_delete_hidden_when_selected_suppliers_have_purchase_orders(): void
+    {
+        $admin = Admin::factory()->create();
+        $withPo = $this->makeSupplier();
+        $this->makePo($withPo, ['status' => PurchaseOrderStatus::Pending, 'total' => 250000]);
+        $deletable = $this->makeSupplier();
+
+        Livewire::actingAs($admin, 'admin')
+            ->test(ListSuppliers::class)
+            ->selectTableRecords([$withPo])
+            ->assertTableBulkActionHidden('delete')
+            ->selectTableRecords([$deletable])
+            ->assertTableBulkActionVisible('delete');
+    }
 }

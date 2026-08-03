@@ -108,7 +108,8 @@ class PurchaseOrderItemsRelationManager extends RelationManager
                     ->money('IDR'),
             ])
             ->toolbarActions([
-                CreateAction::make(),
+                CreateAction::make()
+                    ->visible(fn (): bool => $this->ownerRecord->received_at === null),
             ]);
     }
 }

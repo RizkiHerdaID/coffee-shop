@@ -12,6 +12,7 @@ use App\Models\StockItem;
 use App\Models\Wastage;
 use Filament\Actions\DeleteAction;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Livewire\Livewire;
 use Tests\TestCase;
 
@@ -402,7 +403,11 @@ class WastageTest extends TestCase
 
         $wastage = $this->createWastageViaForm($admin, $item, '250');
 
-        $item->delete();
+        // Deleting a stock item with movements is now guarded at the model
+        // and DB level (Vikunja 141), so the only way the item is gone while
+        // its wastage row survives is an out-of-band purge — simulate that.
+        DB::table('stock_movements')->where('stock_item_id', $item->id)->delete();
+        DB::table('stock_items')->where('id', $item->id)->delete();
 
         Livewire::actingAs($admin, 'admin')
             ->test(EditWastage::class, ['record' => $wastage->getRouteKey()])

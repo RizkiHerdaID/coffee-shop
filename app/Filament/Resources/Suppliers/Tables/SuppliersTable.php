@@ -8,6 +8,7 @@ use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
+use Illuminate\Support\Collection;
 
 class SuppliersTable
 {
@@ -64,7 +65,8 @@ class SuppliersTable
             ])
             ->toolbarActions([
                 BulkActionGroup::make([
-                    DeleteBulkAction::make(),
+                    DeleteBulkAction::make()
+                        ->visible(fn (Collection $records): bool => $records->isEmpty() || $records->contains(fn (Supplier $record): bool => ! $record->purchaseOrders()->exists())),
                 ]),
             ]);
     }

@@ -11,6 +11,7 @@ use App\Filament\Resources\StockItems\StockItemResource;
 use App\Filament\Resources\Wastages\Pages\CreateWastage;
 use App\Models\Admin;
 use App\Models\StockItem;
+use Filament\Actions\DeleteAction;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 use Tests\TestCase;
@@ -270,5 +271,132 @@ class InventoryTest extends TestCase
                 'quantity' => '5.000',
                 'min_threshold' => '500',
             ]);
+    }
+
+    public function test_stock_item_with_movements_cannot_be_deleted(): void
+    {
+        $item = StockItem::create([
+            'name' => 'Biji Kopi',
+            'unit' => 'gram',
+            'quantity' => 0,
+            'min_threshold' => 500,
+        ]);
+        $item->stockIn(10, 'Pembelian dari supplier');
+
+        $this->assertThrows(
+            fn () => $item->delete(),
+            \RuntimeException::class,
+        );
+
+        $this->assertDatabaseHas('stock_items', ['id' => $item->id]);
+        $this->assertDatabaseCount('stock_movements', 1);
+    }
+
+    public function test_stock_item_with_non_zero_quantity_cannot_be_deleted(): void
+    {
+        $item = StockItem::create([
+            'name' => 'Biji Kopi',
+            'unit' => 'gram',
+            'quantity' => 5,
+            'min_threshold' => 500,
+        ]);
+
+        $this->assertThrows(
+            fn () => $item->delete(),
+            \RuntimeException::class,
+        );
+
+        $this->assertDatabaseHas('stock_items', ['id' => $item->id]);
+    }
+
+    public function test_zero_quantity_stock_item_without_movements_is_deletable(): void
+    {
+        $item = StockItem::create([
+            'name' => 'Biji Kopi',
+            'unit' => 'gram',
+            'quantity' => 0,
+            'min_threshold' => 500,
+        ]);
+
+        $item->delete();
+
+        $this->assertDatabaseMissing('stock_items', ['id' => $item->id]);
+    }
+
+    public function test_delete_action_hidden_for_stock_item_with_movements_or_quantity(): void
+    {
+        $admin = Admin::factory()->create();
+        $withMovements = StockItem::create([
+            'name' => 'Biji Kopi',
+            'unit' => 'gram',
+            'quantity' => 0,
+            'min_threshold' => 500,
+        ]);
+        $withMovements->stockIn(10, 'Pembelian dari supplier');
+
+        $withQuantity = StockItem::create([
+            'name' => 'Susu',
+            'unit' => 'liter',
+            'quantity' => 10,
+            'min_threshold' => 2,
+        ]);
+
+        $deletable = StockItem::create([
+            'name' => 'Gelas',
+            'unit' => 'pcs',
+            'quantity' => 0,
+            'min_threshold' => 50,
+        ]);
+
+        Livewire::actingAs($admin, 'admin')
+            ->test(EditStockItem::class, ['record' => $withMovements->getRouteKey()])
+            ->assertActionHidden(DeleteAction::class);
+
+        Livewire::actingAs($admin, 'admin')
+            ->test(EditStockItem::class, ['record' => $withQuantity->getRouteKey()])
+            ->assertActionHidden(DeleteAction::class);
+
+        Livewire::actingAs($admin, 'admin')
+            ->test(EditStockItem::class, ['record' => $deletable->getRouteKey()])
+            ->assertActionVisible(DeleteAction::class);
+    }
+
+    public function test_bulk_delete_hidden_when_all_selected_stock_items_are_protected(): void
+    {
+        $admin = Admin::factory()->create();
+        $withMovements = StockItem::create([
+            'name' => 'Biji Kopi',
+            'unit' => 'gram',
+            'quantity' => 0,
+            'min_threshold' => 500,
+        ]);
+        $withMovements->stockIn(10, 'Pembelian dari supplier');
+
+        $withQuantity = StockItem::create([
+            'name' => 'Susu',
+            'unit' => 'liter',
+            'quantity' => 10,
+            'min_threshold' => 2,
+        ]);
+
+        $deletable = StockItem::create([
+            'name' => 'Gelas',
+            'unit' => 'pcs',
+            'quantity' => 0,
+            'min_threshold' => 50,
+        ]);
+
+        Livewire::actingAs($admin, 'admin')
+            ->test(ListStockItems::class)
+            ->selectTableRecords([$withMovements])
+            ->assertTableBulkActionHidden('delete')
+            ->selectTableRecords([$withQuantity])
+            ->assertTableBulkActionHidden('delete')
+            ->selectTableRecords([$deletable])
+            ->assertTableBulkActionVisible('delete');
+
+        Livewire::actingAs($admin, 'admin')
+            ->test(ListStockItems::class)
+            ->assertTableBulkActionVisible('delete');
     }
 }
