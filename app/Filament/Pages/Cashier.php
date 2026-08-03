@@ -218,6 +218,10 @@ class Cashier extends Page
 
     public function createOrder(): void
     {
+        // A failed run leaves skipped ingredient names behind; clear them up
+        // front so a stale warning can never leak into the next order.
+        $this->skippedStockIngredients = [];
+
         $this->validate([
             'cart' => ['required', 'array', $this->cartQuantityRule()],
             'customerPhone' => ['nullable', 'string', 'max:255'],
@@ -272,7 +276,7 @@ class Cashier extends Page
             }
 
             return $order;
-        });
+        }, attempts: 5);
 
         $this->cart = [];
         $this->cartNotes = [];
@@ -436,6 +440,10 @@ class Cashier extends Page
             throw ValidationException::withMessages(['selectedOrderId' => __('pos.payment.already_paid')]);
         }
 
+        if ($order->shift?->closed_at !== null) {
+            throw ValidationException::withMessages(['selectedOrderId' => __('pos.payment.shift_closed')]);
+        }
+
         $this->validate([
             'paymentMethod' => ['required', Rule::in(array_column(PaymentMethod::cases(), 'value'))],
             'paymentAmount' => ['nullable', 'regex:/^(\d{1,3}(\.\d{3})*|\d+)$/'],
@@ -460,8 +468,16 @@ class Cashier extends Page
             // remaining balance are re-read under the lock.
             $fresh = Order::query()->whereKey($order->id)->lockForUpdate()->first();
 
-            if ($fresh === null || $fresh->status !== OrderStatus::Pending) {
+            if ($fresh === null) {
                 throw ValidationException::withMessages(['selectedOrderId' => __('pos.payment.already_paid')]);
+            }
+
+            if ($fresh->status !== OrderStatus::Pending) {
+                throw ValidationException::withMessages(['selectedOrderId' => __('pos.payment.already_paid')]);
+            }
+
+            if ($fresh->shift?->closed_at !== null) {
+                throw ValidationException::withMessages(['selectedOrderId' => __('pos.payment.shift_closed')]);
             }
 
             [$applied, $change] = $this->resolveAppliedAmount($fresh, $method);
@@ -476,7 +492,7 @@ class Cashier extends Page
             ]);
 
             $fresh->markPaidIfCovered();
-        });
+        }, attempts: 5);
 
         $order->refresh();
         $this->changeDue = (int) $order->payments()->sum('change');
@@ -563,7 +579,12 @@ class Cashier extends Page
             throw ValidationException::withMessages(['selectedOrderId' => __('pos.payment.not_paid_yet')]);
         }
 
-        $order->update(['status' => OrderStatus::Served]);
+        // Atomic claim: the status/shift are re-read under the row lock, so
+        // a stale render can never serve a refunded/cancelled order or one
+        // whose shift closed in between.
+        if (! $order->markServedIfPaid()) {
+            throw ValidationException::withMessages(['selectedOrderId' => __('pos.payment.not_paid_yet')]);
+        }
 
         Notification::make()
             ->title(__('pos.actions.marked_served', ['order_number' => $order->order_number]))

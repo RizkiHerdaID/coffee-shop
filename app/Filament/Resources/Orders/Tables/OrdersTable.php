@@ -99,8 +99,23 @@ class OrdersTable
                     ->color('info')
                     ->visible(fn (Order $record): bool => $record->status === OrderStatus::Paid && $record->shift?->closed_at === null)
                     ->authorize(fn (Order $record): bool => auth('admin')->check() && $record->status === OrderStatus::Paid && $record->shift?->closed_at === null)
-                    ->action(fn (Order $record) => $record->update(['status' => OrderStatus::Served]))
-                    ->successNotificationTitle(fn (Order $record) => __('pos.actions.marked_served', ['order_number' => $record->order_number])),
+                    ->action(function (Action $action, Order $record): void {
+                        if (! $record->markServedIfPaid()) {
+                            Notification::make()
+                                ->title(__('pos.actions.mark_served_failed'))
+                                ->danger()
+                                ->send();
+
+                            $action->cancel();
+
+                            return;
+                        }
+
+                        Notification::make()
+                            ->title(__('pos.actions.marked_served', ['order_number' => $record->order_number]))
+                            ->success()
+                            ->send();
+                    }),
                 Action::make('refund')
                     ->label(__('pos.actions.refund'))
                     ->icon(Heroicon::OutlinedArrowUturnLeft)

@@ -80,6 +80,7 @@ return [
         'invalid_amount' => 'Nominal tidak valid.',
         'note_max' => 'Catatan maksimal :max karakter.',
         'no_active_shift' => 'Belum ada shift yang dibuka.',
+        'shift_closed' => 'Shift sudah ditutup — pergerakan kas tidak dapat dicatat pada shift yang ditutup.',
         'deposits_total' => 'Setoran',
         'petty_out_total' => 'Pengambilan Kas',
     ],

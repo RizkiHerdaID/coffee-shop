@@ -14,6 +14,7 @@ use App\Models\Payment;
 use App\Models\Shift;
 use App\Models\ShiftCashMovement;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use Livewire\Livewire;
@@ -970,6 +971,96 @@ class ShiftTest extends TestCase
 
         $this->assertNotNull($recent);
         $this->assertSame(450000, $recent['expected_cash']);
+    }
+
+    // ---------------------------------------------------------------------
+    // Vikunja 137: a movement must never land on a shift that closed between
+    // the page read and the insert (recordMovement re-reads under the lock).
+    // ---------------------------------------------------------------------
+
+    /**
+     * Simulates the exact race: the page reads the shift as open, then a
+     * concurrent close happens before the movement insert. The re-read under
+     * the row lock must reject the deposit with the shift_closed error and
+     * write nothing.
+     */
+    public function test_recording_a_movement_on_a_shift_that_closed_mid_request_is_rejected(): void
+    {
+        $admin = $this->admin();
+        $shift = $this->openShift($admin, 100000);
+
+        $component = Livewire::actingAs($admin, 'admin')
+            ->test(ManageShift::class)
+            ->set('movementAmount', '100.000');
+
+        // Close the shift the moment the page re-reads the active shift for
+        // the recordDeposit call — the insert re-check then sees it closed.
+        $closed = false;
+        DB::listen(function ($query) use (&$closed, $shift): void {
+            if (! $closed
+                && str_contains($query->sql, 'from "shifts"')
+                && str_contains($query->sql, '"closed_at" is null')
+                && str_contains($query->sql, 'order by "id" desc limit 1')) {
+                $closed = true;
+                Shift::query()->whereKey($shift->id)->update([
+                    'closed_at' => now(),
+                    'closing_cash' => 100000,
+                ]);
+            }
+        });
+
+        $component
+            ->call('recordDeposit')
+            ->assertHasErrors(['movementAmount' => __('dashboard.cash_movements.shift_closed')]);
+
+        $this->assertTrue($closed);
+        $this->assertDatabaseCount('shift_cash_movements', 0);
+    }
+
+    // ---------------------------------------------------------------------
+    // Vikunja 144: a qris/ewallet refund (negative payment row) must never
+    // be netted into the recent-shifts intake figure for that method.
+    // ---------------------------------------------------------------------
+
+    public function test_recent_shifts_qris_and_ewallet_intake_excludes_refund_rows(): void
+    {
+        $admin = $this->admin();
+        $shift = $this->openShift($admin, 500000);
+
+        $this->actingAs($admin, 'admin');
+
+        $qrisOrder = $this->paidOrder($shift, $admin, 50000);
+        $qrisOrder->payments()->create([
+            'method' => PaymentMethod::Qris,
+            'amount' => 50000,
+            'paid_at' => now(),
+            'admin_id' => $admin->id,
+        ]);
+        $this->assertTrue($qrisOrder->refund(20000, PaymentMethod::Qris, 'Salah pesanan'));
+
+        $ewalletOrder = $this->paidOrder($shift, $admin, 30000);
+        $ewalletOrder->payments()->create([
+            'method' => PaymentMethod::Ewallet,
+            'amount' => 30000,
+            'paid_at' => now(),
+            'admin_id' => $admin->id,
+        ]);
+        $this->assertTrue($ewalletOrder->refund(10000, PaymentMethod::Ewallet, 'Pelanggan batal'));
+
+        $shift->update([
+            'closed_at' => now(),
+            'closing_cash' => 600000,
+        ]);
+
+        $component = Livewire::actingAs($admin, 'admin')->test(ManageShift::class);
+
+        $recent = collect($component->get('recentShifts'))->firstWhere(
+            fn (array $row) => $row['shift']->is($shift)
+        );
+
+        $this->assertNotNull($recent);
+        $this->assertSame(50000, $recent['totals_by_method']['qris']);
+        $this->assertSame(30000, $recent['totals_by_method']['ewallet']);
     }
 
     /**

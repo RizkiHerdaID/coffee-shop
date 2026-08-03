@@ -122,10 +122,18 @@ class Order extends Model
             return false;
         }
 
+        if ($this->shift_id !== null && $this->shift?->closed_at !== null) {
+            return false;
+        }
+
         DB::transaction(function (): void {
             $locked = static::query()->whereKey($this->getKey())->lockForUpdate()->first();
 
             if ($locked === null || $locked->status !== OrderStatus::Pending || $locked->paid_total < $locked->net_total) {
+                return;
+            }
+
+            if ($locked->shift_id !== null && $locked->shift?->closed_at !== null) {
                 return;
             }
 
@@ -147,6 +155,42 @@ class Order extends Model
     }
 
     /**
+     * Transition paid → served. Atomic: the row is locked inside the
+     * transaction and the status/shift are re-read under the lock, so a
+     * stale caller (rendered while the order was still paid) can never
+     * resurrect a refunded/cancelled order or mutate one on a closed shift.
+     * Returns false when the order is not paid, or its shift has closed.
+     */
+    public function markServedIfPaid(): bool
+    {
+        if ($this->status !== OrderStatus::Paid) {
+            return false;
+        }
+
+        if ($this->shift_id !== null && $this->shift?->closed_at !== null) {
+            return false;
+        }
+
+        DB::transaction(function (): void {
+            $locked = static::query()->whereKey($this->getKey())->lockForUpdate()->first();
+
+            if ($locked === null || $locked->status !== OrderStatus::Paid) {
+                return;
+            }
+
+            if ($locked->shift_id !== null && $locked->shift?->closed_at !== null) {
+                return;
+            }
+
+            $locked->update(['status' => OrderStatus::Served]);
+
+            $this->setRawAttributes($locked->getAttributes(), true);
+        });
+
+        return $this->status === OrderStatus::Served;
+    }
+
+    /**
      * Whether the order can be refunded: paid or served, and its shift is
      * still open (or unattached). Closed shifts keep the Z-report stable.
      */
@@ -165,6 +209,12 @@ class Order extends Model
      * current status. Returns false when the order is not refundable or the
      * amount is invalid (zero, negative, or above the net paid). Invalid
      * method strings are rejected instead of throwing a ValueError.
+     *
+     * The refund is claimed atomically: the order row is locked inside the
+     * transaction and the paid total is re-summed under the lock, so two
+     * concurrent refunds cannot both pass the amount check and push the
+     * paid total below zero. attempts: 5 retries deadlocks from the row
+     * lock contending with concurrent captures or shifts.
      */
     public function refund(int $amount, PaymentMethod|string $method = PaymentMethod::Cash, ?string $reason = null): bool
     {
@@ -180,19 +230,29 @@ class Order extends Model
             return false;
         }
 
-        $this->payments()->create([
-            'method' => $method,
-            'amount' => -$amount,
-            'reference' => $reason,
-            'paid_at' => now(),
-            'admin_id' => auth('admin')->id(),
-        ]);
+        return DB::transaction(function () use ($amount, $method, $reason): bool {
+            $locked = static::query()->whereKey($this->getKey())->lockForUpdate()->first();
 
-        if ($this->paid_total <= 0) {
-            $this->update(['status' => OrderStatus::Refunded]);
-        }
+            if ($locked === null || ! $locked->canBeRefunded() || $amount > $locked->paid_total) {
+                return false;
+            }
 
-        return true;
+            $locked->payments()->create([
+                'method' => $method,
+                'amount' => -$amount,
+                'reference' => $reason,
+                'paid_at' => now(),
+                'admin_id' => auth('admin')->id(),
+            ]);
+
+            if ($locked->paid_total <= 0) {
+                $locked->update(['status' => OrderStatus::Refunded]);
+            }
+
+            $this->setRawAttributes($locked->getAttributes(), true);
+
+            return true;
+        }, attempts: 5);
     }
 
     /**

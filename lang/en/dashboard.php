@@ -80,6 +80,7 @@ return [
         'invalid_amount' => 'Invalid amount.',
         'note_max' => 'Note may not exceed :max characters.',
         'no_active_shift' => 'No shift is currently open.',
+        'shift_closed' => 'The shift is closed — cash movements cannot be recorded on a closed shift.',
         'deposits_total' => 'Deposits',
         'petty_out_total' => 'Petty Cash Out',
     ],

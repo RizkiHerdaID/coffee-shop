@@ -10,6 +10,7 @@ use App\Jobs\PrintReceipt;
 use App\Models\Admin;
 use App\Models\MenuItem;
 use App\Models\Order;
+use App\Models\Shift;
 use Database\Seeders\MenuSeeder;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -441,14 +442,182 @@ class PaymentTest extends TestCase
     /**
      * Create a pending order directly (no booted-hook side effects).
      */
-    private function makeOrder(Admin $admin, int $total): Order
+    private function makeOrder(Admin $admin, int $total, ?Shift $shift = null): Order
     {
         return Order::withoutEvents(fn () => Order::create([
             'order_number' => 'ORD-'.now()->format('Ymd').'-'.str_pad((string) random_int(1, 9999), 4, '0', STR_PAD_LEFT),
             'status' => OrderStatus::Pending,
             'total' => $total,
+            'shift_id' => $shift?->id,
             'created_by' => $admin->id,
         ]));
+    }
+
+    // ---------------------------------------------------------------------
+    // Closed-shift freeze on payment capture (Vikunja 135)
+    // ---------------------------------------------------------------------
+
+    /**
+     * A pending order on a CLOSED shift must not receive payments: the
+     * capture would retroactively mutate the printed Z-report (salesTotal /
+     * expectedCash / paymentsByMethod of the closed shift would change).
+     */
+    public function test_capture_payment_on_order_with_closed_shift_is_rejected(): void
+    {
+        $admin = Admin::factory()->create();
+        $shift = Shift::create([
+            'opened_at' => now()->subHours(2),
+            'opening_cash' => 500000,
+            'admin_id' => $admin->id,
+        ]);
+        $order = $this->makeOrder($admin, 65000, $shift);
+        $shift->update(['closed_at' => now(), 'closing_cash' => 600000]);
+
+        Livewire::actingAs($admin, 'admin')
+            ->test(Cashier::class)
+            ->call('selectOrder', $order->id)
+            ->set('paymentMethod', 'cash')
+            ->set('paymentAmount', '65.000')
+            ->call('capturePayment')
+            ->assertHasErrors(['selectedOrderId' => __('pos.payment.shift_closed')]);
+
+        $this->assertSame(OrderStatus::Pending, $order->fresh()->status);
+        $this->assertDatabaseCount('payments', 0);
+    }
+
+    /**
+     * Defense in depth: even with full payment coverage already recorded, the
+     * model's markPaidIfCovered must refuse to flip a closed-shift order to
+     * paid (the Orders-table markPaid action and any future caller).
+     */
+    public function test_mark_paid_if_covered_returns_false_on_order_with_closed_shift(): void
+    {
+        $admin = Admin::factory()->create();
+        $shift = Shift::create([
+            'opened_at' => now()->subHours(2),
+            'opening_cash' => 500000,
+            'admin_id' => $admin->id,
+        ]);
+        $order = $this->makeOrder($admin, 65000, $shift);
+        $order->payments()->create([
+            'method' => PaymentMethod::Cash,
+            'amount' => 65000,
+            'paid_at' => now(),
+            'admin_id' => $admin->id,
+        ]);
+        $shift->update(['closed_at' => now(), 'closing_cash' => 600000]);
+
+        $this->assertFalse($order->markPaidIfCovered());
+
+        $this->assertSame(OrderStatus::Pending, $order->fresh()->status);
+        $this->assertDatabaseCount('payments', 1);
+    }
+
+    /**
+     * The rejection attempt must leave the closed shift's Z-report math
+     * exactly as printed: sales total, expected cash, payment split and
+     * discrepancy are all read fresh from the DB after the failed capture.
+     */
+    public function test_rejected_capture_on_closed_shift_leaves_z_report_math_untouched(): void
+    {
+        $admin = Admin::factory()->create();
+        $shift = Shift::create([
+            'opened_at' => now()->subHours(2),
+            'opening_cash' => 500000,
+            'admin_id' => $admin->id,
+        ]);
+
+        $paid = $this->makeOrder($admin, 50000, $shift);
+        $paid->payments()->create([
+            'method' => PaymentMethod::Cash,
+            'amount' => 50000,
+            'paid_at' => now(),
+            'admin_id' => $admin->id,
+        ]);
+        $paid->update(['status' => OrderStatus::Paid]);
+
+        $pending = $this->makeOrder($admin, 65000, $shift);
+        $shift->update(['closed_at' => now(), 'closing_cash' => 600000]);
+
+        $salesBefore = $shift->salesTotal();
+        $expectedBefore = $shift->expectedCash();
+        $byMethodBefore = $shift->paymentsByMethod();
+        $discrepancyBefore = $shift->discrepancy();
+
+        Livewire::actingAs($admin, 'admin')
+            ->test(Cashier::class)
+            ->call('selectOrder', $pending->id)
+            ->set('paymentMethod', 'cash')
+            ->set('paymentAmount', '65.000')
+            ->call('capturePayment')
+            ->assertHasErrors(['selectedOrderId' => __('pos.payment.shift_closed')]);
+
+        $this->assertSame($salesBefore, $shift->refresh()->salesTotal());
+        $this->assertSame($expectedBefore, $shift->expectedCash());
+        $this->assertSame($byMethodBefore, $shift->paymentsByMethod());
+        $this->assertSame($discrepancyBefore, $shift->discrepancy());
+        $this->assertSame(OrderStatus::Pending, $pending->fresh()->status);
+        $this->assertDatabaseCount('payments', 1);
+    }
+
+    // ---------------------------------------------------------------------
+    // Closed-shift / stale-state guard on markServed (Vikunja 149)
+    // ---------------------------------------------------------------------
+
+    /**
+     * The cashier page must reject marking served an order whose shift
+     * closed since the page rendered (markServedIfPaid claim fails).
+     */
+    public function test_marking_served_on_order_with_closed_shift_is_rejected(): void
+    {
+        $admin = Admin::factory()->create();
+        $shift = Shift::create([
+            'opened_at' => now()->subHours(2),
+            'opening_cash' => 500000,
+            'admin_id' => $admin->id,
+        ]);
+        $order = $this->makeOrder($admin, 65000, $shift);
+        $order->payments()->create([
+            'method' => PaymentMethod::Cash,
+            'amount' => 65000,
+            'paid_at' => now(),
+            'admin_id' => $admin->id,
+        ]);
+        $order->update(['status' => OrderStatus::Paid]);
+        $shift->update(['closed_at' => now(), 'closing_cash' => 600000]);
+
+        Livewire::actingAs($admin, 'admin')
+            ->test(Cashier::class)
+            ->call('markServed', $order->id)
+            ->assertHasErrors(['selectedOrderId']);
+
+        $this->assertSame(OrderStatus::Paid, $order->fresh()->status);
+    }
+
+    /**
+     * Happy path for the model claim used by the cashier page and the Orders
+     * table: paid order on an open shift transitions paid -> served once.
+     */
+    public function test_mark_served_if_paid_transitions_a_paid_order_on_an_open_shift(): void
+    {
+        $admin = Admin::factory()->create();
+        $shift = Shift::create([
+            'opened_at' => now()->subHours(2),
+            'opening_cash' => 500000,
+            'admin_id' => $admin->id,
+        ]);
+        $order = $this->makeOrder($admin, 65000, $shift);
+        $order->payments()->create([
+            'method' => PaymentMethod::Cash,
+            'amount' => 65000,
+            'paid_at' => now(),
+            'admin_id' => $admin->id,
+        ]);
+        $order->update(['status' => OrderStatus::Paid]);
+
+        $this->assertTrue($order->markServedIfPaid());
+
+        $this->assertSame(OrderStatus::Served, $order->fresh()->status);
     }
 
     /**

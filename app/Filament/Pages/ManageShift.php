@@ -13,6 +13,7 @@ use Filament\Pages\Page;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 class ManageShift extends Page
@@ -102,8 +103,8 @@ class ManageShift extends Page
             ->selectRaw('orders.shift_id')
             ->selectRaw("SUM(CASE WHEN payments.method = 'cash' AND payments.amount > 0 THEN payments.amount ELSE 0 END) as cash")
             ->selectRaw("SUM(CASE WHEN payments.method = 'cash' AND payments.amount < 0 THEN payments.amount ELSE 0 END) as cash_refunds")
-            ->selectRaw("SUM(CASE WHEN payments.method = 'qris' THEN payments.amount ELSE 0 END) as qris")
-            ->selectRaw("SUM(CASE WHEN payments.method = 'ewallet' THEN payments.amount ELSE 0 END) as ewallet")
+            ->selectRaw("SUM(CASE WHEN payments.method = 'qris' AND payments.amount > 0 THEN payments.amount ELSE 0 END) as qris")
+            ->selectRaw("SUM(CASE WHEN payments.method = 'ewallet' AND payments.amount > 0 THEN payments.amount ELSE 0 END) as ewallet")
             ->whereIn('orders.shift_id', $ids)
             ->whereNotIn('orders.status', [OrderStatus::Pending, OrderStatus::Refunded, OrderStatus::Cancelled])
             ->groupBy('orders.shift_id')
@@ -206,13 +207,27 @@ class ManageShift extends Page
             throw ValidationException::withMessages(['movementNote' => __('dashboard.cash_movements.note_max', ['max' => 255])]);
         }
 
-        ShiftCashMovement::create([
-            'shift_id' => $this->activeShift->id,
-            'type' => $type,
-            'amount' => $amount,
-            'note' => blank($this->movementNote) ? null : $this->movementNote,
-            'admin_id' => auth('admin')->id(),
-        ]);
+        $shiftId = $this->activeShift->id;
+
+        // The movement lands on the shift only while it is still open: the
+        // row is locked and re-checked inside the transaction so a shift
+        // closed concurrently (between the check above and the insert)
+        // rejects the movement instead of mutating the Z-report.
+        DB::transaction(function () use ($shiftId, $type, $amount): void {
+            $shift = Shift::query()->whereKey($shiftId)->lockForUpdate()->first();
+
+            if ($shift === null || $shift->closed_at !== null) {
+                throw ValidationException::withMessages(['movementAmount' => __('dashboard.cash_movements.shift_closed')]);
+            }
+
+            ShiftCashMovement::create([
+                'shift_id' => $shift->id,
+                'type' => $type,
+                'amount' => $amount,
+                'note' => blank($this->movementNote) ? null : $this->movementNote,
+                'admin_id' => auth('admin')->id(),
+            ]);
+        });
 
         $this->movementAmount = '';
         $this->movementNote = '';

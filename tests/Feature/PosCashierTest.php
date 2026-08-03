@@ -8,9 +8,12 @@ use App\Jobs\PrintKitchenTicket;
 use App\Models\Admin;
 use App\Models\MenuItem;
 use App\Models\Order;
+use App\Models\StockItem;
 use Database\Seeders\MenuSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Livewire\Livewire;
 use Tests\TestCase;
 
@@ -1216,5 +1219,67 @@ class PosCashierTest extends TestCase
             'qty' => 99,
             'subtotal' => 99 * 20000,
         ]);
+    }
+
+    // ---------------------------------------------------------------------
+    // Vikunja 150: a failed createOrder must not leak skipped-ingredient
+    // names into the warning of the NEXT order on the same page.
+    // ---------------------------------------------------------------------
+
+    /**
+     * Forces a DB exception mid-transaction AFTER one ingredient was already
+     * skipped for insufficient stock, then creates a clean order on the same
+     * component: the stale "Susu" name must not resurface in the warning.
+     */
+    public function test_failed_create_order_does_not_leak_skipped_ingredients_into_the_next_order(): void
+    {
+        Log::spy();
+
+        $admin = Admin::factory()->create();
+        $latte = MenuItem::create(['name' => 'Latte', 'price' => 25000]);
+        $milk = StockItem::create(['name' => 'Susu', 'unit' => 'ml', 'quantity' => 100]);
+        $latte->ingredients()->attach($milk->id, ['quantity' => 250]);
+
+        $espresso = MenuItem::create(['name' => 'Espresso', 'price' => 20000]);
+        $beans = StockItem::create(['name' => 'Biji Kopi', 'unit' => 'gram', 'quantity' => 1000]);
+        $espresso->ingredients()->attach($beans->id, ['quantity' => 18]);
+
+        $component = Livewire::actingAs($admin, 'admin')->test(Cashier::class);
+        $component->call('addToCart', $latte->id);
+        $component->call('addToCart', $espresso->id);
+
+        // Abort the transaction on the first stock movement insert — after
+        // the "Susu" skip was already collected — so the failed order rolls
+        // back while the in-memory skipped list survives.
+        $thrown = false;
+        DB::listen(function ($query) use (&$thrown): void {
+            if (! $thrown && str_contains($query->sql, 'insert into "stock_movements"')) {
+                $thrown = true;
+                throw new \RuntimeException('simulated stock failure');
+            }
+        });
+
+        try {
+            $component->call('createOrder');
+            $this->fail('Expected the simulated stock failure to abort createOrder.');
+        } catch (\RuntimeException $e) {
+            $this->assertStringContainsString('simulated stock failure', $e->getMessage());
+        }
+
+        // The transaction rolled back completely.
+        $this->assertTrue($thrown);
+        $this->assertDatabaseCount('orders', 0);
+        $this->assertSame(1000, $beans->fresh()->quantity);
+
+        // Same component, next order: no stale "Susu" warning may fire.
+        $component
+            ->call('clearCart')
+            ->call('addToCart', $espresso->id)
+            ->call('createOrder')
+            ->assertHasNoErrors();
+
+        $this->assertDatabaseCount('orders', 1);
+        $this->assertSame(982, $beans->fresh()->quantity);
+        Log::shouldNotHaveReceived('warning');
     }
 }
