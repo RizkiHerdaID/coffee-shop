@@ -33,6 +33,8 @@ class TestimonialForm
                 TextInput::make('sort_order')
                     ->label(__('testimonials.fields.sort_order'))
                     ->numeric()
+                    ->integer()
+                    ->minValue(0)
                     ->default(0),
             ]);
     }

@@ -328,6 +328,75 @@ class PurchaseOrdersTest extends TestCase
         $this->assertSame(1, $coffee->fresh()->movements()->count());
     }
 
+    public function test_receive_is_idempotent_when_called_repeatedly(): void
+    {
+        $supplier = $this->makeSupplier();
+        $po = PurchaseOrder::create([
+            'supplier_id' => $supplier->id,
+            'status' => PurchaseOrderStatus::Pending,
+            'total' => 500000,
+        ]);
+
+        $coffee = $this->makeStockItem('Biji Kopi Arabika', 1000, 500);
+        PurchaseOrderItem::create([
+            'purchase_order_id' => $po->id,
+            'description' => 'Biji Kopi Arabika',
+            'quantity' => 10,
+            'unit_price' => 50000,
+        ])->forceFill(['stock_item_id' => $coffee->id])->save();
+
+        $this->assertSame(1, $po->receive());
+        $this->assertSame(1010, $coffee->fresh()->quantity);
+        $this->assertSame(1, $coffee->fresh()->movements()->count());
+
+        $this->assertSame(0, $po->fresh()->receive());
+        $this->assertSame(1010, $coffee->fresh()->quantity);
+        $this->assertSame(1, $coffee->fresh()->movements()->count());
+        $this->assertSame(1, StockMovement::count());
+    }
+
+    public function test_receive_refuses_zero_total_order_at_model_level(): void
+    {
+        $supplier = $this->makeSupplier();
+        $po = PurchaseOrder::create([
+            'supplier_id' => $supplier->id,
+            'status' => PurchaseOrderStatus::Pending,
+            'total' => 0,
+        ]);
+
+        $this->assertSame(0, $po->receive());
+
+        $this->assertDatabaseHas('purchase_orders', [
+            'id' => $po->id,
+            'status' => PurchaseOrderStatus::Pending->value,
+            'total' => 0,
+        ]);
+        $this->assertDatabaseCount('stock_movements', 0);
+    }
+
+    public function test_receive_action_refuses_zero_total_order(): void
+    {
+        $admin = Admin::factory()->create();
+        $supplier = $this->makeSupplier();
+        $po = PurchaseOrder::create([
+            'supplier_id' => $supplier->id,
+            'status' => PurchaseOrderStatus::Pending,
+            'total' => 0,
+        ]);
+
+        Livewire::actingAs($admin, 'admin')
+            ->test(ListPurchaseOrders::class)
+            ->callTableAction('receive', $po)
+            ->assertHasNoTableActionErrors();
+
+        $this->assertDatabaseHas('purchase_orders', [
+            'id' => $po->id,
+            'status' => PurchaseOrderStatus::Pending->value,
+            'total' => 0,
+        ]);
+        $this->assertDatabaseCount('stock_movements', 0);
+    }
+
     public function test_restock_suggestions_page_lists_low_stock_items_only(): void
     {
         $admin = Admin::factory()->create();

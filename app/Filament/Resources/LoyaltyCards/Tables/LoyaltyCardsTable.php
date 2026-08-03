@@ -7,6 +7,7 @@ use Filament\Actions\Action;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Forms\Components\TextInput;
+use Filament\Support\RawJs;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 
@@ -76,7 +77,9 @@ class LoyaltyCardsTable
                     ->form([
                         TextInput::make('qty')
                             ->label(__('loyalty.actions.adjust_qty'))
-                            ->numeric()
+                            ->mask(RawJs::make('(String($input).startsWith(\'-\') ? \'-\' : \'\') + $money(String($input).replace(\'-\', \'\'), \',\', \'.\', 0)'))
+                            ->rule('regex:/^-?(\d{1,3}(\.\d{3})*|\d+)$/')
+                            ->dehydrateStateUsing(fn ($state) => (int) str_replace('.', '', (string) $state))
                             ->required()
                             ->helperText(__('loyalty.hints.adjust')),
                     ])

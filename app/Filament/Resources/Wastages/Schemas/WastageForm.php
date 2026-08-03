@@ -4,7 +4,6 @@ namespace App\Filament\Resources\Wastages\Schemas;
 
 use App\Enums\WasteReason;
 use Filament\Forms\Components\DateTimePicker;
-use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
@@ -25,7 +24,7 @@ class WastageForm
                 TextInput::make('quantity')
                     ->label(__('wastage.fields.quantity'))
                     ->mask(RawJs::make('$money($input, \',\', \'.\', 0)'))
-                    ->rule('regex:/^(\d{1,3}(\.\d{3})*|\d+)$/')
+                    ->rule('regex:/^([1-9]\d{0,2}(\.\d{3})*|[1-9]\d*)$/')
                     ->formatStateUsing(fn ($state) => self::formatQuantity($state))
                     ->dehydrateStateUsing(fn ($state) => self::rawQuantity($state))
                     ->required(),
@@ -39,8 +38,6 @@ class WastageForm
                     ->required(),
                 Textarea::make('note')
                     ->label(__('wastage.fields.note')),
-                Hidden::make('admin_id')
-                    ->default(auth('admin')->id()),
             ]);
     }
 

@@ -27,8 +27,13 @@ return [
         'create' => 'Record Wastage',
     ],
 
+    'validation' => [
+        'quantity_exceeds_stock' => 'Quantity exceeds available stock.',
+    ],
+
     'notifications' => [
         'created' => 'Wastage recorded.',
+        'movement_note' => 'Stock wastage #:id',
     ],
 
     'empty' => [

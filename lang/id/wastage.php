@@ -27,8 +27,13 @@ return [
         'create' => 'Catat Pembuangan',
     ],
 
+    'validation' => [
+        'quantity_exceeds_stock' => 'Jumlah melebihi stok yang tersedia.',
+    ],
+
     'notifications' => [
         'created' => 'Pembuangan dicatat.',
+        'movement_note' => 'Pembuangan stok #:id',
     ],
 
     'empty' => [

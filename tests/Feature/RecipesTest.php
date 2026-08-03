@@ -77,6 +77,30 @@ class RecipesTest extends TestCase
         ]);
     }
 
+    public function test_attach_action_stores_raw_quantity_from_formatted_input(): void
+    {
+        $admin = Admin::factory()->create();
+        $item = MenuItem::create(['name' => 'Kopi Susu', 'price' => 25000]);
+        $beans = StockItem::create(['name' => 'Biji Kopi', 'unit' => 'gram', 'cost' => 800, 'quantity' => 1000]);
+
+        Livewire::actingAs($admin, 'admin')
+            ->test(RecipesRelationManager::class, [
+                'ownerRecord' => $item,
+                'pageClass' => EditMenuItem::class,
+            ])
+            ->callTableAction('attach', data: [
+                'recordId' => $beans->id,
+                'quantity' => '1.500',
+            ])
+            ->assertHasNoTableActionErrors();
+
+        $this->assertDatabaseHas('menu_item_stock_item', [
+            'menu_item_id' => $item->id,
+            'stock_item_id' => $beans->id,
+            'quantity' => 1500,
+        ]);
+    }
+
     public function test_attach_action_requires_quantity(): void
     {
         $admin = Admin::factory()->create();

@@ -24,7 +24,7 @@ class WastageTest extends TestCase
         $item = StockItem::create([
             'name' => 'Susu UHT',
             'unit' => 'liter',
-            'quantity' => 50,
+            'quantity' => 50000,
             'cost' => 20000,
             'min_threshold' => 10,
         ]);
@@ -46,6 +46,115 @@ class WastageTest extends TestCase
             'reason' => 'spilled',
             'admin_id' => $admin->id,
         ]);
+
+        $this->assertSame(25000, $item->fresh()->quantity);
+    }
+
+    public function test_create_wastage_decrements_stock_and_records_out_movement(): void
+    {
+        $admin = Admin::factory()->create();
+        $item = StockItem::create([
+            'name' => 'Kopi Arabika',
+            'unit' => 'gram',
+            'quantity' => 1000,
+            'cost' => 50000,
+            'min_threshold' => 100,
+        ]);
+
+        Livewire::actingAs($admin, 'admin')
+            ->test(CreateWastage::class)
+            ->fillForm([
+                'stock_item_id' => $item->id,
+                'quantity' => '250',
+                'reason' => WasteReason::Spilled,
+                'recorded_at' => '2026-08-02 08:00:00',
+            ])
+            ->call('create')
+            ->assertHasNoFormErrors();
+
+        $this->assertSame(750, $item->fresh()->quantity);
+        $this->assertSame(1, $item->fresh()->movements()->count());
+        $this->assertDatabaseHas('stock_movements', [
+            'stock_item_id' => $item->id,
+            'type' => 'out',
+            'quantity' => 250,
+        ]);
+    }
+
+    public function test_create_wastage_rejects_zero_quantity(): void
+    {
+        $admin = Admin::factory()->create();
+        $item = StockItem::create([
+            'name' => 'Gula Aren',
+            'unit' => 'gram',
+            'quantity' => 1000,
+            'cost' => 20000,
+            'min_threshold' => 100,
+        ]);
+
+        Livewire::actingAs($admin, 'admin')
+            ->test(CreateWastage::class)
+            ->fillForm([
+                'stock_item_id' => $item->id,
+                'quantity' => '0',
+                'reason' => WasteReason::Spilled,
+                'recorded_at' => '2026-08-02 08:00:00',
+            ])
+            ->call('create')
+            ->assertHasFormErrors(['quantity']);
+    }
+
+    public function test_create_wastage_rejects_quantity_above_available_stock(): void
+    {
+        $admin = Admin::factory()->create();
+        $item = StockItem::create([
+            'name' => 'Susu Segar',
+            'unit' => 'liter',
+            'quantity' => 100,
+            'cost' => 15000,
+            'min_threshold' => 20,
+        ]);
+
+        Livewire::actingAs($admin, 'admin')
+            ->test(CreateWastage::class)
+            ->fillForm([
+                'stock_item_id' => $item->id,
+                'quantity' => '500',
+                'reason' => WasteReason::Expired,
+                'recorded_at' => '2026-08-02 08:00:00',
+            ])
+            ->call('create')
+            ->assertHasFormErrors(['quantity']);
+
+        $this->assertSame(100, $item->fresh()->quantity);
+        $this->assertDatabaseCount('wastages', 0);
+    }
+
+    public function test_create_wastage_sets_admin_id_from_auth_ignoring_form_value(): void
+    {
+        $admin = Admin::factory()->create();
+        $otherAdmin = Admin::factory()->create();
+        $item = StockItem::create([
+            'name' => 'Sirup Vanila',
+            'unit' => 'ml',
+            'quantity' => 1000,
+            'cost' => 30000,
+            'min_threshold' => 100,
+        ]);
+
+        Livewire::actingAs($admin, 'admin')
+            ->test(CreateWastage::class)
+            ->fillForm([
+                'stock_item_id' => $item->id,
+                'quantity' => '100',
+                'reason' => WasteReason::Damaged,
+                'admin_id' => $otherAdmin->id,
+                'recorded_at' => '2026-08-02 08:00:00',
+            ])
+            ->call('create')
+            ->assertHasNoFormErrors();
+
+        $this->assertSame($admin->id, Wastage::query()->firstOrFail()->admin_id);
     }
 
     public function test_create_form_persists_reason_as_enum_and_admin_is_set(): void

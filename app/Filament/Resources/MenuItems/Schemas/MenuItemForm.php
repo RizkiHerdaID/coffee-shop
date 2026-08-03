@@ -127,6 +127,8 @@ class MenuItemForm
                 TextInput::make('sort_order')
                     ->label(__('menu-items.fields.sort_order'))
                     ->numeric()
+                    ->integer()
+                    ->minValue(0)
                     ->default(0),
             ]);
     }

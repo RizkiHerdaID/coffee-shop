@@ -2,10 +2,13 @@
 
 namespace Tests\Feature;
 
+use App\Enums\WasteReason;
 use App\Filament\Resources\StockItems\Pages\CreateStockItem;
 use App\Filament\Resources\StockItems\Pages\EditStockItem;
 use App\Filament\Resources\StockItems\Pages\ListStockItems;
+use App\Filament\Resources\StockItems\RelationManagers\StockMovementsRelationManager;
 use App\Filament\Resources\StockItems\StockItemResource;
+use App\Filament\Resources\Wastages\Pages\CreateWastage;
 use App\Models\Admin;
 use App\Models\StockItem;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -67,6 +70,53 @@ class InventoryTest extends TestCase
         $this->assertFalse($result);
         $this->assertSame(5, $item->fresh()->quantity);
         $this->assertSame(0, $item->movements()->count());
+    }
+
+    public function test_stock_in_and_stock_out_refuse_zero_quantity(): void
+    {
+        $item = StockItem::create([
+            'name' => 'Biji Kopi',
+            'unit' => 'gram',
+            'quantity' => 10,
+            'min_threshold' => 0,
+        ]);
+
+        $this->assertFalse($item->stockIn(0));
+        $this->assertFalse($item->stockOut(0));
+        $this->assertFalse($item->stockIn(-5));
+        $this->assertFalse($item->stockOut(-5));
+        $this->assertSame(10, $item->fresh()->quantity);
+        $this->assertSame(0, $item->movements()->count());
+    }
+
+    public function test_wastage_out_movement_appears_in_stock_movements_relation_manager(): void
+    {
+        $admin = Admin::factory()->create();
+        $item = StockItem::create([
+            'name' => 'Kopi Arabika',
+            'unit' => 'gram',
+            'quantity' => 1000,
+            'min_threshold' => 100,
+        ]);
+
+        Livewire::actingAs($admin, 'admin')
+            ->test(CreateWastage::class)
+            ->fillForm([
+                'stock_item_id' => $item->id,
+                'quantity' => '250',
+                'reason' => WasteReason::Spilled,
+                'recorded_at' => '2026-08-02 08:00:00',
+            ])
+            ->call('create')
+            ->assertHasNoFormErrors();
+
+        Livewire::actingAs($admin, 'admin')
+            ->test(StockMovementsRelationManager::class, [
+                'ownerRecord' => $item,
+                'pageClass' => EditStockItem::class,
+            ])
+            ->assertSee(__('stock.movements.out'))
+            ->assertSee('250');
     }
 
     public function test_low_stock_scope_and_helper(): void

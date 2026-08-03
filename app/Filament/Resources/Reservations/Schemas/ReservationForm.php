@@ -28,6 +28,7 @@ class ReservationForm
                 TextInput::make('party_size')
                     ->label(__('reservation.fields.party_size'))
                     ->numeric()
+                    ->integer()
                     ->required()
                     ->minValue(1)
                     ->maxValue(100),
