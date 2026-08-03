@@ -11,6 +11,6 @@ enum CashRegisterStatus: string implements HasLabel
 
     public function getLabel(): string
     {
-        return __("expenses.status.{$this->value}");
+        return __("cash-register-sessions.status.{$this->value}");
     }
 }

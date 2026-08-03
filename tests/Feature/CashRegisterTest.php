@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Enums\CashRegisterStatus;
 use App\Enums\OrderStatus;
 use App\Filament\Resources\CashRegisterSessions\Pages\CreateCashRegisterSession;
 use App\Filament\Resources\CashRegisterSessions\Pages\EditCashRegisterSession;
@@ -12,6 +13,7 @@ use App\Models\CashRegisterSession;
 use App\Models\Order;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Lang;
 use Illuminate\Support\Str;
 use Livewire\Livewire;
 use Tests\TestCase;
@@ -196,6 +198,33 @@ class CashRegisterTest extends TestCase
     }
 
     /**
+     * Card 161: the sessions table renders the LIVE expected amount
+     * (opening_float + revenue within the session window) instead of the
+     * stored expected_amount column, which goes stale once orders are paid
+     * after the session row was written. A closed session is unchanged:
+     * orders paid after closed_at are outside its window.
+     */
+    public function test_table_expected_amount_renders_live_value(): void
+    {
+        $admin = Admin::factory()->create();
+
+        $open = $this->openSession($admin); // stored expected_amount = 100000
+        $closed = $this->openSession(
+            $admin,
+            Carbon::now()->subHours(3),
+            Carbon::now()->subHours(2),
+        );
+
+        $this->makeOrder($admin, 50000, Carbon::now()->subMinutes(30)); // in the open window
+        $this->makeOrder($admin, 70000, Carbon::now()->subMinutes(100)); // after the closed session, before the open one
+
+        Livewire::actingAs($admin, 'admin')
+            ->test(ListCashRegisterSessions::class)
+            ->assertTableColumnStateSet('expected_amount', 150000, $open)
+            ->assertTableColumnStateSet('expected_amount', 100000, $closed);
+    }
+
+    /**
      * Card 104: CashRegisterSession::revenue() mirrors Shift — paid/served
      * orders only, NET totals — so expectedAmount() can never include
      * pending/refunded/cancelled gross money.
@@ -245,5 +274,109 @@ class CashRegisterTest extends TestCase
             'opening_float' => 100000,
             'expected_amount' => 155000,
         ]);
+    }
+
+    /**
+     * Card 161: the sessions table renders the LIVE expectedAmount() —
+     * opening_float + revenue in the session window — NOT the stored
+     * expected_amount snapshot, which goes stale when a paid order lands
+     * after the session was opened. The stored column must stay 100000
+     * (legacy snapshot) while the table shows 150000.
+     */
+    public function test_table_renders_live_expected_amount_for_an_open_session(): void
+    {
+        $admin = Admin::factory()->create();
+        $session = $this->openSession($admin);
+        $this->makeOrder($admin, 50000, Carbon::now()->subMinutes(30));
+
+        $this->assertSame(100000, $session->fresh()->expected_amount);
+        $this->assertSame(150000, $session->fresh()->expectedAmount());
+
+        Livewire::actingAs($admin, 'admin')
+            ->test(ListCashRegisterSessions::class)
+            ->assertTableColumnStateSet('expected_amount', 150000, $session);
+    }
+
+    /**
+     * Card 161: the live value for a CLOSED session is frozen at the close
+     * — an order paid after closed_at must not inflate the table's
+     * expected_amount (the window is bounded by closed_at).
+     */
+    public function test_table_expected_amount_is_unchanged_for_a_closed_session(): void
+    {
+        $admin = Admin::factory()->create();
+        $session = $this->openSession($admin, Carbon::now()->subHours(4), Carbon::now()->subHours(2));
+        $this->makeOrder($admin, 50000, Carbon::now()->subHours(3));
+        $session->forceFill(['expected_amount' => 150000])->save();
+        $this->makeOrder($admin, 20000, Carbon::now()->subHour());
+
+        $this->assertSame(150000, $session->fresh()->expectedAmount());
+
+        Livewire::actingAs($admin, 'admin')
+            ->test(ListCashRegisterSessions::class)
+            ->assertTableColumnStateSet('expected_amount', 150000, $session);
+    }
+
+    /**
+     * Card 162: cash-register session UI labels resolve from the new
+     * cash-register-sessions lang namespace in BOTH locales — a raw
+     * 'cash-register-sessions.*' key must never surface. The key list
+     * mirrors exactly what the enum, form, and table use.
+     */
+    public function test_cash_register_labels_resolve_from_the_new_namespace(): void
+    {
+        foreach (['id', 'en'] as $locale) {
+            app()->setLocale($locale);
+
+            foreach ([
+                'status.open', 'status.closed',
+                'fields.opened_at', 'fields.closed_at', 'fields.opening_float',
+                'fields.expected_amount', 'fields.counted_amount', 'fields.discrepancy',
+                'fields.status', 'fields.admin', 'fields.created_at',
+                'hints.expected_formula',
+                'empty.sessions_heading', 'empty.sessions_description',
+            ] as $key) {
+                $this->assertTrue(
+                    Lang::has("cash-register-sessions.$key", $locale),
+                    "cash-register-sessions.$key must exist in the $locale locale",
+                );
+            }
+
+            $this->assertSame(__('cash-register-sessions.status.open'), CashRegisterStatus::Open->getLabel());
+            $this->assertSame(__('cash-register-sessions.status.closed'), CashRegisterStatus::Closed->getLabel());
+            $this->assertNotSame('cash-register-sessions.status.open', CashRegisterStatus::Open->getLabel());
+        }
+    }
+
+    public function test_cash_register_sessions_lang_files_share_the_same_key_structure(): void
+    {
+        $id = require lang_path('id/cash-register-sessions.php');
+        $en = require lang_path('en/cash-register-sessions.php');
+
+        $this->assertSame(
+            $this->flattenKeys($id),
+            $this->flattenKeys($en)
+        );
+    }
+
+    /**
+     * @param  array<mixed>  $array
+     * @return array<mixed>
+     */
+    private function flattenKeys(array $array): array
+    {
+        $keys = [];
+
+        foreach ($array as $key => $value) {
+            $keys[] = (string) $key;
+
+            if (is_array($value)) {
+                foreach ($this->flattenKeys($value) as $nested) {
+                    $keys[] = "$key.$nested";
+                }
+            }
+        }
+
+        return $keys;
     }
 }

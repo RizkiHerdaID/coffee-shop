@@ -20,7 +20,7 @@ class CashRegisterSessionForm
         return $schema
             ->components([
                 DateTimePicker::make('opened_at')
-                    ->label(__('expenses.fields.opened_at'))
+                    ->label(__('cash-register-sessions.fields.opened_at'))
                     ->default(now())
                     ->required()
                     ->live()
@@ -28,13 +28,13 @@ class CashRegisterSessionForm
                         self::recalculateExpected($set, $get);
                     }),
                 DateTimePicker::make('closed_at')
-                    ->label(__('expenses.fields.closed_at'))
+                    ->label(__('cash-register-sessions.fields.closed_at'))
                     ->live()
                     ->afterStateUpdated(function (Set $set, Get $get): void {
                         self::recalculateExpected($set, $get);
                     }),
                 TextInput::make('opening_float')
-                    ->label(__('expenses.fields.opening_float'))
+                    ->label(__('cash-register-sessions.fields.opening_float'))
                     ->prefix('Rp')
                     ->mask(RawJs::make('$money($input, \',\', \'.\', 0)'))
                     ->rule('regex:/^(\d{1,3}(\.\d{3})*|\d+)$/')
@@ -47,16 +47,16 @@ class CashRegisterSessionForm
                         self::recalculateExpected($set, $get);
                     }),
                 TextInput::make('expected_amount')
-                    ->label(__('expenses.fields.expected_amount'))
+                    ->label(__('cash-register-sessions.fields.expected_amount'))
                     ->disabled()
                     ->dehydrated()
                     ->default(0)
                     ->mask(RawJs::make('$money($input, \',\', \'.\', 0)'))
                     ->formatStateUsing(fn ($state) => self::formatMoney($state))
                     ->dehydrateStateUsing(fn ($state) => self::dehydrateMoney($state))
-                    ->hint(__('expenses.hints.expected_formula')),
+                    ->hint(__('cash-register-sessions.hints.expected_formula')),
                 TextInput::make('counted_amount')
-                    ->label(__('expenses.fields.counted_amount'))
+                    ->label(__('cash-register-sessions.fields.counted_amount'))
                     ->prefix('Rp')
                     ->mask(RawJs::make('$money($input, \',\', \'.\', 0)'))
                     ->rule('regex:/^(\d{1,3}(\.\d{3})*|\d+)$/')
@@ -70,19 +70,19 @@ class CashRegisterSessionForm
                         ));
                     }),
                 TextInput::make('discrepancy')
-                    ->label(__('expenses.fields.discrepancy'))
+                    ->label(__('cash-register-sessions.fields.discrepancy'))
                     ->disabled()
                     ->dehydrated()
                     ->mask(RawJs::make('$money($input, \',\', \'.\', 0)'))
                     ->formatStateUsing(fn ($state) => self::formatMoney($state))
                     ->dehydrateStateUsing(fn ($state) => self::dehydrateMoney($state)),
                 Select::make('status')
-                    ->label(__('expenses.fields.status'))
+                    ->label(__('cash-register-sessions.fields.status'))
                     ->options(CashRegisterStatus::class)
                     ->default(CashRegisterStatus::Open)
                     ->required(),
                 Select::make('admin_id')
-                    ->label(__('expenses.fields.admin'))
+                    ->label(__('cash-register-sessions.fields.admin'))
                     ->relationship('admin', 'name')
                     ->required(),
             ]);

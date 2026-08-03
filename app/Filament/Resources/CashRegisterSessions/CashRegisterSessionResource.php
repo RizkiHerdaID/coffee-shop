@@ -22,17 +22,17 @@ class CashRegisterSessionResource extends Resource
 
     public static function getModelLabel(): string
     {
-        return __('expenses.cash_register_label');
+        return __('cash-register-sessions.label');
     }
 
     public static function getPluralModelLabel(): string
     {
-        return __('expenses.cash_register_plural_label');
+        return __('cash-register-sessions.plural_label');
     }
 
     public static function getNavigationLabel(): string
     {
-        return __('expenses.cash_register_plural_label');
+        return __('cash-register-sessions.plural_label');
     }
 
     public static function form(Schema $schema): Schema
