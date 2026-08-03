@@ -1,9 +1,40 @@
 # Roadmap — Coffee Shop
 
-The full backlog captured 2026-08-02 has been **completed in one marathon auto-mode run**
-(9 parallel waves, 2 worktrees max at a time, herdr opencode fleets). Main HEAD: `0bbd92a`,
-suite **428/428 green** (1900 assertions). Live board: https://vikunja.example,
-project "Coffee Shop" (id 6) — all cards in Done (bucket 19).
+The full backlog captured 2026-08-02 was **completed in one marathon auto-mode run**
+(9 parallel waves, 2 worktrees max at a time, herdr opencode fleets), then hardened
+by the 2026-08-03 bug-fix marathon below. Main HEAD: `1086a9d`,
+suite **575/575 green** (2452 assertions). Live board: https://vikunja.example,
+project "Coffee Shop" (id 6) — all cards in Done (bucket 19); card 130
+(AGENTS.md drift / missing factories / docs sync) closed by the fix-docs-cleanup branch.
+
+## 2026-08-03 bug-fix marathon (all on `main`)
+
+Shipped in one day after the pre-merge audit + i18n/ops/messaging waves; every item
+is a fix on top of the 2026-08-02 features — see `AGENTS.md` git history for the
+full chain and `docs/pos.md` / `docs/owner-tools.md` / `docs/website.md` for behavior.
+
+- `22bacfa` **POS cash bugs** — `payments` now stores the APPLIED amount + a new
+  `change` column (surplus never counted as intake), all revenue reports unified on
+  NET (`net_total`), concurrency guards around capture/close.
+- `d6761c3` **Order audit freeze** — order deletes blocked, refunds only on
+  open/unattached shifts (closed Z-reports stay stable), loyalty stamps credited
+  exactly once (`orders.loyalty_credited_at`), honest `markPaid`, atomic capture,
+  `order_counters` daily sequence.
+- `1728a9c` **Ops/infra** — dedicated `schedule` compose service, `storage:link`
+  in the entrypoint, `/robots.txt` via `RobotsController` (static file deleted),
+  report indexes migration, `AWS_ENDPOINT_URL` for S3.
+- `8134983` + `924492a` **Stock/wastage forms** — wastage rows linked to
+  `stock_items`, atomic/idempotent PO receiving, Indonesian numeric masks,
+  UNIQUE constraints on seeded tables (`menu_items.name`/`stock_items.name`,
+  `promos.title`).
+- `2b9b22f` **Review role + workflow docs** — fleet boot gains a reviewer pane,
+  `docs/workflow.md` synced.
+- `76d76e6` **Public-site i18n fixes** — raw JSON-LD price escaped, `SetLocale`
+  precedence, lang-switch query-string strip, reservation throttling/honeypot/
+  past-time validation, empty states, loyalty threshold config.
+- `1086a9d` **Services/messaging hardening** — Fonnte retries + JSON-response
+  validation + empty-phone guard, `App\Support\Phone` normalization, AiCopy
+  retries + array-content join.
 
 ## What shipped this session (2026-08-02, all on `main`)
 
@@ -36,8 +67,9 @@ project "Coffee Shop" (id 6) — all cards in Done (bucket 19).
 
 ### Wave 5 — payments + loyalty (merged `12fa63f`, `58c880c`)
 - **Split payments** — partial QRIS/e-wallet amounts with pay-rest button, overpay rejected.
-- **Loyalty stamps** — phone-keyed `loyalty_cards`, `OrderObserver` (wasChanged guard) credits on
-  paid orders, 10th drink free, `/cek-poin` public page (`LoyaltyTest`).
+- **Loyalty stamps** — phone-keyed `loyalty_cards`, `OrderObserver::saved()` credits on
+  paid orders exactly once (`lockForUpdate` re-read + `loyalty_credited_at` stamp,
+  hardened 2026-08-03 in `d6761c3`), 10th drink free, `/cek-poin` public page (`LoyaltyTest`).
 
 ### Wave 6 — discounts + suppliers (merged `f6a108d`, `e635c55`)
 - **POS discounts** — `discount_type` fixed/percent on orders, `Shift::salesTotal()` now NET,

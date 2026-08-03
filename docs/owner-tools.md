@@ -73,7 +73,7 @@ PO fields: `supplier_id`, `ordered_at`, `expected_at`, `status`, `total` (intege
 
 - Expense: `category`, `description`, `amount`, `spent_at`, `note`.
 - Cash register session: `opened_at`, `closed_at`, `opening_float`, `expected_amount`, `counted_amount`, `discrepancy`, `status` (`open`/`closed`, enum `app/Enums/CashRegisterStatus.php`), `admin_id`.
-- Math on the model (`app/Models/CashRegisterSession.php:41-59`): `revenue()` = `SUM(orders.total)` for orders with `created_at` within `[opened_at, closed_at ?? now]`; `expectedAmount()` = `opening_float + revenue()`. The form (`Schemas/CashRegisterSessionForm.php`) recomputes `expected_amount` and `discrepancy` live (mirror of the model formula) and stores them — this is the research's "open/close float + discrepancy report" feature.
+- Math on the model (`app/Models/CashRegisterSession.php:41-59`): `revenue()` = Σ **NET** totals (`net_total` = gross − discount) of paid/served orders with `created_at` within `[opened_at, closed_at ?? now]` (pending/refunded/cancelled excluded — same definition as `Shift::salesTotal()` so the session report reconciles with shift reports); `expectedAmount()` = `opening_float + revenue()`. The form (`Schemas/CashRegisterSessionForm.php`) recomputes `expected_amount` and `discrepancy` live (mirror of the model formula) and stores them — this is the research's "open/close float + discrepancy report" feature.
 
 ### Recipes (menu_item ↔ stock_item) and COGS
 
@@ -93,7 +93,7 @@ PO fields: `supplier_id`, `ordered_at`, `expected_at`, `status`, `total` (intege
 | Lang | `lang/{id,en}/pnl.php` |
 
 - Period picker (from/to, default = current month, inclusive `whereDate` bounds on `orders.created_at` / `expenses.spent_at`); "Dari" after "Sampai" shows a localized error instead of figures.
-- Revenue = `SUM(orders.total)` for paid orders (status NOT IN pending/refunded/cancelled — mirrors `Shift::paidOrders()`); COGS = Σ `order_items.qty × MenuItem::cogs()` (lines with a deleted `menu_item_id` contribute 0); expenses grouped by `ExpenseCategory` (all 8 cases 0-filled).
+- Revenue = Σ **NET** order totals (`net_total` = gross − discount) for paid orders (status NOT IN pending/refunded/cancelled — mirrors `Shift::salesTotal()`); COGS = Σ `order_items.qty × MenuItem::cogs()` (lines with a deleted `menu_item_id` contribute 0); expenses grouped by `ExpenseCategory` (all 8 cases 0-filled).
 - Statement shows revenue − COGS = gross margin − expenses = net margin, plus gross/net margin percentages and a period-independent inventory valuation (Σ `stock_items.cost × quantity`).
 
 ### Demand forecasting widget (day-of-week + seasonal)
