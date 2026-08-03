@@ -10,7 +10,12 @@
 # auto-splits and no opencode launch races at worktree creation.
 #
 # Usage:
-#   scripts/herdr-fleet-boot.sh <branch> [N]     # N = 2|3|4 (default 4)
+#   scripts/herdr-fleet-boot.sh <branch> [N]                       # N = 1|2|3|4 (default 4), shape defaults for roles
+#   scripts/herdr-fleet-boot.sh <branch> [N] <role> <role> ...     # explicit role list (overrides shape defaults)
+#
+# Role defaults per fleet size (AGENTS.md role split — shape, not habit):
+#   N=1 lead | N=2 lead tester | N=3 lead tester reviewer (backend-only M/L)
+#   N=4 lead backend frontend tester (full-stack M/L)
 #
 # Idempotent: safe to re-run after a partial boot (closes stray panes, only
 # starts agents that are missing, skips existing ones).
@@ -19,16 +24,38 @@
 
 set -euo pipefail
 
-BRANCH="${1:?usage: herdr-fleet-boot.sh <branch> [N]}"
-N="${2:-4}"
+BRANCH="${1:?usage: herdr-fleet-boot.sh <branch> [N] [role role ...]}"
+
+N=""
+ROLES=()
+if [ $# -ge 2 ] && [[ "$2" =~ ^[0-9]+$ ]]; then
+    N="$2"
+    shift 2
+    ROLES=("$@")
+else
+    shift 1
+    ROLES=("$@")
+fi
+
+# Shape defaults (AGENTS.md "Agent role split"): backend-only is the majority
+# shape, so N=3 means lead/tester/reviewer — frontend joins only via N=4 or an
+# explicit role list.
+if [ ${#ROLES[@]} -eq 0 ]; then
+    N="${N:-4}"
+    case "$N" in
+        1) ROLES=(lead) ;;
+        2) ROLES=(lead tester) ;;
+        3) ROLES=(lead tester reviewer) ;;
+        4) ROLES=(lead backend frontend tester) ;;
+    esac
+else
+    N="${#ROLES[@]}"
+fi
 
 case "$N" in
-    2|3|4) ;;
-    *) echo "error: N must be 2, 3 or 4 (got $N)"; exit 2 ;;
+    1|2|3|4) ;;
+    *) echo "error: fleet size must be 1-4 (got $N)"; exit 2 ;;
 esac
-
-ROLES=(lead backend frontend tester)   # trimmed to N below
-ROLES=("${ROLES[@]:0:N}")
 
 py() { python3 -c "$1"; }
 
@@ -121,7 +148,7 @@ build_shape() {
     # Verified recipe (empirically tested 2026-08-03):
     #   N=4: split BASE right 0.5, then each half down 0.5 -> perfect 2x2 grid.
     #   N=3: split BASE right 0.5, then BASE down 0.5 -> three equal columns
-    #        (lead+backend stacked left, frontend full right column).
+    #        (lead+tester stacked left, reviewer full right column).
     #   N=2: split BASE right 0.5 -> 1:1.
     local RIGHT
     RIGHT="$(split_new "$BASE" right)"
@@ -188,8 +215,9 @@ else
 fi
 
 # Role assignment from geometry (reading order), NOT pane-list order:
-# (y,x)-sorted = top-left, bottom-left, top-right, bottom-right = lead,
-# backend, frontend, tester.
+# (y,x)-sorted = top-left, bottom-left, top-right, bottom-right. Default roles
+# per size: N=2 lead/tester, N=3 lead/tester/reviewer (reviewer gets the full
+# right column), N=4 lead/backend/frontend/tester.
 mapfile -t PANES < <(herdr pane layout --pane "$BASE" | py "
 import json, sys
 d = json.load(sys.stdin)['result']['layout']

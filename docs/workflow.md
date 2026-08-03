@@ -13,10 +13,12 @@ flowchart TD
     Contract --> Size{Fleet size<br/>by feature shape}
     Size -->|S effort| LeadOnly[Lead alone<br/>close spare panes ~700MB each]
     Size -->|M single-layer| LeadTester[Lead + tester]
-    Size -->|M/L multi-layer| LeadBack[Lead + backend + frontend + tester]
+    Size -->|M/L backend-only<br/>money/POS| LeadTestRev[Lead + tester + reviewer<br/>reviewer: contract-validation at dispatch<br/>+ phase-2 re-check of committed diff]
+    Size -->|M/L multi-layer<br/>public UI + backend| LeadBack[Lead + backend + frontend + tester]
 
     LeadOnly --> Dispatch
     LeadTester --> Dispatch
+    LeadTestRev --> Dispatch
     LeadBack --> Dispatch
     LeadOnly -.->|docs-only / research| MainCheckout[Main-checkout fleet<br/>no worktree, no Sail]
 
@@ -62,6 +64,7 @@ flowchart TD
 | Node | Meaning |
 | --- | --- |
 | Contract first | `contract.md` kills redundant research — every agent starts from the same context |
+| Shape decides the fleet | S → lead alone; M single-layer → lead+tester; M/L backend-only (money/POS) → lead+tester+reviewer (frontend would idle — only Filament blades, backend-owned); M/L full-stack → lead+backend+frontend+tester |
 | WRITE files only | Agents never touch git; concurrent `git add` on a shared index races and can corrupt it — the lead stages everything |
 | Report files | `/tmp/opencode/<batch>-<role>-report.md` — fixed naming so "all reports exist" is a mechanical check; pane output scrolls out of reach |
 | Only lead notifies | Prevents message storms when several agents finish at once |
