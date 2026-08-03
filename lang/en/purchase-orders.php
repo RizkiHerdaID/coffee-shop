@@ -43,6 +43,8 @@ return [
     'notifications' => [
         'received_success' => 'Purchase order received — :count item(s) added to stock.',
         'receive_note' => 'PO #:id received',
+        'zero_total' => 'Order total is 0 — cannot receive this order.',
+        'already_received' => 'This order was already received.',
     ],
 
     'restock' => [

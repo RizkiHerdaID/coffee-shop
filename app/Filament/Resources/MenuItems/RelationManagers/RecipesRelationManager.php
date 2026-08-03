@@ -8,6 +8,7 @@ use Filament\Actions\DetachAction;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Resources\RelationManagers\RelationManager;
+use Filament\Support\RawJs;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Model;
@@ -56,7 +57,25 @@ class RecipesRelationManager extends RelationManager
                         TextInput::make('quantity')
                             ->label(__('recipes.fields.quantity'))
                             ->helperText(__('recipes.fields.quantity_help'))
-                            ->numeric()
+                            ->mask(RawJs::make('$money($input, \',\', \'.\', 0)'))
+                            ->rule('regex:/^(\d{1,3}(\.\d{3})*|\d+)$/')
+                            ->formatStateUsing(function ($state) {
+                                if (blank($state)) {
+                                    return $state;
+                                }
+
+                                if (str_contains((string) $state, '.')) {
+                                    return $state;
+                                }
+
+                                return number_format((int) $state, 0, ',', '.');
+                            })
+                            ->dehydrateStateUsing(function ($state) {
+                                $cleaned = str_replace('.', '', (string) $state);
+
+                                return $cleaned === '' ? null : (int) $cleaned;
+                            })
+                            ->minValue(1)
                             ->required()
                             ->default(1),
                     ]),

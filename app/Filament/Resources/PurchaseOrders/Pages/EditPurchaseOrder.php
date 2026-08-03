@@ -25,13 +25,25 @@ class EditPurchaseOrder extends EditRecord
                 ->requiresConfirmation()
                 ->visible(fn (): bool => $this->record->status === PurchaseOrderStatus::Pending)
                 ->action(function (): void {
-                    $this->record->recalculateTotal();
+                    if ($this->record->fresh()->received_at !== null) {
+                        Notification::make()
+                            ->title(__('purchase-orders.notifications.already_received'))
+                            ->warning()
+                            ->send();
 
-                    $stocked = $this->record->receiveStock(__('purchase-orders.notifications.receive_note', ['id' => $this->record->id]));
+                        return;
+                    }
 
-                    $this->record->status = PurchaseOrderStatus::Received;
-                    $this->record->received_at = now();
-                    $this->record->save();
+                    $stocked = $this->record->receive(__('purchase-orders.notifications.receive_note', ['id' => $this->record->id]));
+
+                    if ($stocked === 0) {
+                        Notification::make()
+                            ->title(__('purchase-orders.notifications.zero_total'))
+                            ->danger()
+                            ->send();
+
+                        return;
+                    }
 
                     Notification::make()
                         ->title(__('purchase-orders.notifications.received_success', ['count' => $stocked]))

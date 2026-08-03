@@ -70,4 +70,47 @@ class PurchaseOrder extends Model
 
         return $stocked;
     }
+
+    /**
+     * Atomically receive the order: the row is locked, the received state is
+     * re-checked under the lock (so a concurrent receive can never stock twice),
+     * and an order whose line items sum to zero is refused. Returns how many
+     * lines were stocked, or 0 when nothing happened (already received,
+     * cancelled, or zero-total order — in which case status is left untouched).
+     */
+    public function receive(?string $note = null): int
+    {
+        return DB::transaction(function () use ($note): int {
+            $locked = static::query()->lockForUpdate()->find($this->getKey());
+
+            if ($locked === null || $locked->status !== PurchaseOrderStatus::Pending || $locked->received_at !== null) {
+                return 0;
+            }
+
+            $total = (int) $locked->items()->sum(DB::raw('quantity * unit_price'));
+
+            if ($total < 1) {
+                return 0;
+            }
+
+            $stocked = 0;
+
+            foreach ($locked->items as $item) {
+                $stockItem = $item->stockItem;
+
+                if ($stockItem === null || ! $stockItem->stockIn($item->quantity, $note)) {
+                    continue;
+                }
+
+                $stocked++;
+            }
+
+            $locked->total = $total;
+            $locked->status = PurchaseOrderStatus::Received;
+            $locked->received_at = now();
+            $locked->save();
+
+            return $stocked;
+        });
+    }
 }

@@ -43,6 +43,8 @@ return [
     'notifications' => [
         'received_success' => 'Pesanan diterima — :count item ditambahkan ke stok.',
         'receive_note' => 'Penerimaan PO #:id',
+        'zero_total' => 'Total pesanan 0 — tidak bisa menerima pesanan ini.',
+        'already_received' => 'Pesanan ini sudah diterima sebelumnya.',
     ],
 
     'restock' => [

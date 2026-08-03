@@ -46,7 +46,25 @@ class PurchaseOrderItemsRelationManager extends RelationManager
                     ->required(),
                 TextInput::make('quantity')
                     ->label(__('purchase-orders.fields.quantity'))
-                    ->numeric()
+                    ->mask(RawJs::make('$money($input, \',\', \'.\', 0)'))
+                    ->rule('regex:/^(\d{1,3}(\.\d{3})*|\d+)$/')
+                    ->formatStateUsing(function ($state) {
+                        if (blank($state)) {
+                            return $state;
+                        }
+
+                        if (str_contains((string) $state, '.')) {
+                            return $state;
+                        }
+
+                        return number_format((int) $state, 0, ',', '.');
+                    })
+                    ->dehydrateStateUsing(function ($state) {
+                        $cleaned = str_replace('.', '', (string) $state);
+
+                        return $cleaned === '' ? null : (int) $cleaned;
+                    })
+                    ->minValue(1)
                     ->required()
                     ->default(1),
                 TextInput::make('unit_price')

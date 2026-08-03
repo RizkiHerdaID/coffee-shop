@@ -4,12 +4,14 @@ namespace Tests\Feature;
 
 use App\Enums\OrderStatus;
 use App\Enums\PaymentMethod;
+use App\Filament\Resources\LoyaltyCards\Pages\ListLoyaltyCards;
 use App\Models\Admin;
 use App\Models\LoyaltyCard;
 use App\Models\Order;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
+use Livewire\Livewire;
 use Tests\TestCase;
 
 /**
@@ -367,5 +369,43 @@ class LoyaltyTest extends TestCase
         $card = LoyaltyCard::where('phone', '081234567890')->firstOrFail();
         $this->assertSame(0, $card->stamps);
         $this->assertSame(1, $card->redeemed);
+    }
+
+    // ---------------------------------------------------------------------
+    // Numeric input masks (Vikunja 128): the grant/adjust stamp forms accept
+    // Indonesian-formatted quantities and persist the raw integer.
+    // ---------------------------------------------------------------------
+
+    public function test_grant_stamps_action_accepts_formatted_quantity_and_stores_raw_integer(): void
+    {
+        $admin = Admin::factory()->create();
+
+        Livewire::actingAs($admin, 'admin')
+            ->test(ListLoyaltyCards::class)
+            ->callAction('grantStamps', data: [
+                'phone' => '081234567890',
+                'qty' => '25.000',
+            ])
+            ->assertHasNoActionErrors();
+
+        $card = LoyaltyCard::where('phone', '081234567890')->firstOrFail();
+        $this->assertSame(25000, $card->stamps);
+    }
+
+    public function test_adjust_stamps_action_accepts_formatted_quantity_and_stores_raw_integer(): void
+    {
+        $admin = Admin::factory()->create();
+        LoyaltyCard::credit('081234567890', 5);
+
+        $card = LoyaltyCard::where('phone', '081234567890')->firstOrFail();
+
+        Livewire::actingAs($admin, 'admin')
+            ->test(ListLoyaltyCards::class)
+            ->callTableAction('adjustStamps', $card, data: [
+                'qty' => '1.500',
+            ])
+            ->assertHasNoTableActionErrors();
+
+        $this->assertSame(1505, $card->fresh()->stamps);
     }
 }
