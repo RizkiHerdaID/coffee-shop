@@ -20,6 +20,7 @@ use Filament\Actions\Exports\Models\Export;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\URL;
+use Illuminate\Support\Str;
 use Livewire\Livewire;
 use Tests\TestCase;
 
@@ -29,6 +30,8 @@ class ExportsTest extends TestCase
 
     protected Admin $admin;
 
+    protected string $exportDisk;
+
     private int $orderSeq = 0;
 
     protected function setUp(): void
@@ -37,7 +40,14 @@ class ExportsTest extends TestCase
 
         $this->admin = Admin::factory()->create();
 
-        Storage::fake('local');
+        // Filament writes export files to config('filament.default_filesystem_disk')
+        // under filament_exports/{export_id}/. A per-test unique disk keeps every
+        // test's files isolated so parallel paratest workers never share paths.
+        $this->exportDisk = 'local_export_'.Str::uuid();
+
+        config()->set('filament.default_filesystem_disk', $this->exportDisk);
+
+        Storage::fake($this->exportDisk);
     }
 
     public function test_stock_item_exporter_columns_are_localized(): void
@@ -260,14 +270,14 @@ class ExportsTest extends TestCase
 
     private function assertExportedFilesContain(Export $export, string $needle): void
     {
-        $files = Storage::disk('local')->allFiles("filament_exports/{$export->getKey()}");
+        $files = Storage::disk($this->exportDisk)->allFiles("filament_exports/{$export->getKey()}");
 
         $this->assertNotEmpty($files);
         $this->assertNotEmpty(collect($files)->filter(fn (string $file): bool => str_ends_with($file, '.csv')));
         $this->assertNotEmpty(collect($files)->filter(fn (string $file): bool => str_ends_with($file, '.xlsx')));
 
         $contents = collect($files)
-            ->map(fn (string $file): string => (string) Storage::disk('local')->get($file))
+            ->map(fn (string $file): string => (string) Storage::disk($this->exportDisk)->get($file))
             ->implode("\n");
 
         $this->assertStringContainsString($needle, $contents);

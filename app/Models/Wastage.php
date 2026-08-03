@@ -24,6 +24,13 @@ class Wastage extends Model
         ];
     }
 
+    protected static function booted(): void
+    {
+        static::deleting(static function (Wastage $wastage): void {
+            $wastage->restoreStock();
+        });
+    }
+
     public function stockItem(): BelongsTo
     {
         return $this->belongsTo(StockItem::class);
@@ -32,5 +39,21 @@ class Wastage extends Model
     public function admin(): BelongsTo
     {
         return $this->belongsTo(Admin::class);
+    }
+
+    /**
+     * Restore the stock quantity deducted when this wastage was recorded.
+     * Skips gracefully when the stock item was itself deleted (nullOnDelete).
+     */
+    public function restoreStock(): bool
+    {
+        if ($this->stock_item_id === null || $this->stockItem === null) {
+            return false;
+        }
+
+        return $this->stockItem->stockIn(
+            $this->quantity,
+            __('wastage.notifications.movement_restore_note', ['id' => $this->getKey()]),
+        );
     }
 }

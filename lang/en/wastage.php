@@ -34,6 +34,8 @@ return [
     'notifications' => [
         'created' => 'Wastage recorded.',
         'movement_note' => 'Stock wastage #:id',
+        'movement_edit_note' => 'Stock wastage adjustment #:id',
+        'movement_restore_note' => 'Stock restore from wastage #:id',
     ],
 
     'empty' => [

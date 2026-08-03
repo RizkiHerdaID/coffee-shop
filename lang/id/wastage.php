@@ -34,6 +34,8 @@ return [
     'notifications' => [
         'created' => 'Pembuangan dicatat.',
         'movement_note' => 'Pembuangan stok #:id',
+        'movement_edit_note' => 'Penyesuaian pembuangan stok #:id',
+        'movement_restore_note' => 'Pengembalian stok dari pembuangan #:id',
     ],
 
     'empty' => [
