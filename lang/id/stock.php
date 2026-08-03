@@ -62,4 +62,8 @@ return [
         'none' => 'Tidak ada item stok menipis yang perlu diberitahukan.',
         'no_phone' => 'Nomor WhatsApp untuk peringatan stok belum dikonfigurasi (atur WHATSAPP_LOW_STOCK_PHONE).',
     ],
+
+    'command' => [
+        'description' => 'Kirim peringatan WhatsApp untuk item stok menipis',
+    ],
 ];

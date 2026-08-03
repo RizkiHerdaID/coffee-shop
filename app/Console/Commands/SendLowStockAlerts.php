@@ -11,15 +11,15 @@ class SendLowStockAlerts extends Command
 {
     protected $signature = 'stock:alert-low';
 
-    protected $description = 'Send WhatsApp alerts for low-stock items';
+    public function __construct()
+    {
+        parent::__construct();
+
+        $this->description = __('stock.command.description');
+    }
 
     public function handle(FonnteWhatsApp $whatsapp): int
     {
-        StockItem::query()
-            ->whereColumn('quantity', '>', 'min_threshold')
-            ->whereNotNull('low_stock_notified_at')
-            ->update(['low_stock_notified_at' => null]);
-
         $phone = config('whatsapp.low_stock.phone');
 
         if (blank($phone)) {
@@ -30,9 +30,16 @@ class SendLowStockAlerts extends Command
             return self::SUCCESS;
         }
 
+        // An item is alertable when it was never notified or its last
+        // alert is older than 24 hours, so items that stay low are
+        // re-alerted daily while oscillating items can never re-alert
+        // more than once per day.
         $items = StockItem::query()
             ->lowStock()
-            ->whereNull('low_stock_notified_at')
+            ->where(function ($query) {
+                $query->whereNull('low_stock_notified_at')
+                    ->orWhere('low_stock_notified_at', '<', now()->subDay());
+            })
             ->get();
 
         if ($items->isEmpty()) {

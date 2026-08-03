@@ -62,4 +62,8 @@ return [
         'none' => 'No low-stock items to alert.',
         'no_phone' => 'Low-stock WhatsApp number not configured (set WHATSAPP_LOW_STOCK_PHONE).',
     ],
+
+    'command' => [
+        'description' => 'Send WhatsApp alerts for low-stock items',
+    ],
 ];

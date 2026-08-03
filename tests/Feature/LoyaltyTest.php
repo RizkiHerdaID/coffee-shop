@@ -8,6 +8,7 @@ use App\Filament\Resources\LoyaltyCards\Pages\ListLoyaltyCards;
 use App\Models\Admin;
 use App\Models\LoyaltyCard;
 use App\Models\Order;
+use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
@@ -26,10 +27,20 @@ use Tests\TestCase;
  * (PageController::points(), GET /cek-poin) shows the stamps and free
  * drinks available for a queried phone. Orders without a customer_phone
  * never credit a stamp.
+ *
+ * Since Vikunja 111, the phone is normalized to the canonical 62-prefixed
+ * form before every lookup or mutation, so the `loyalty_cards.phone`
+ * column stores e.g. "6281234567890" regardless of the input format, and
+ * the first-create race for a brand-new phone degrades to a single row
+ * (insert-or-ignore + fetch-and-increment under the unique index).
  */
 class LoyaltyTest extends TestCase
 {
     use RefreshDatabase;
+
+    private const PHONE = '6281234567890';
+
+    private const OTHER_PHONE = '6281298765432';
 
     protected function setUp(): void
     {
@@ -69,7 +80,7 @@ class LoyaltyTest extends TestCase
     {
         $this->createPaidOrder('081234567890');
 
-        $card = LoyaltyCard::where('phone', '081234567890')->first();
+        $card = LoyaltyCard::findByPhone('081234567890');
 
         $this->assertNotNull($card);
         $this->assertSame(1, $card->stamps);
@@ -82,8 +93,8 @@ class LoyaltyTest extends TestCase
         $this->createPaidOrder('081234567890');
         $this->createPaidOrder('081298765432');
 
-        $this->assertSame(1, LoyaltyCard::where('phone', '081234567890')->firstOrFail()->stamps);
-        $this->assertSame(1, LoyaltyCard::where('phone', '081298765432')->firstOrFail()->stamps);
+        $this->assertSame(1, LoyaltyCard::where('phone', self::PHONE)->firstOrFail()->stamps);
+        $this->assertSame(1, LoyaltyCard::where('phone', self::OTHER_PHONE)->firstOrFail()->stamps);
         $this->assertSame(2, LoyaltyCard::count());
     }
 
@@ -93,7 +104,7 @@ class LoyaltyTest extends TestCase
             $this->createPaidOrder('081234567890');
         }
 
-        $card = LoyaltyCard::where('phone', '081234567890')->firstOrFail();
+        $card = LoyaltyCard::where('phone', self::PHONE)->firstOrFail();
 
         $this->assertSame(3, $card->stamps);
         $this->assertSame(0, $card->redeemed);
@@ -106,7 +117,7 @@ class LoyaltyTest extends TestCase
             $this->createPaidOrder('081234567890');
         }
 
-        $card = LoyaltyCard::where('phone', '081234567890')->firstOrFail();
+        $card = LoyaltyCard::where('phone', self::PHONE)->firstOrFail();
 
         $this->assertSame(9, $card->stamps);
         $this->assertSame(0, $card->freeDrinksAvailable());
@@ -119,7 +130,7 @@ class LoyaltyTest extends TestCase
             $this->createPaidOrder('081234567890');
         }
 
-        $card = LoyaltyCard::where('phone', '081234567890')->firstOrFail();
+        $card = LoyaltyCard::where('phone', self::PHONE)->firstOrFail();
 
         $this->assertSame(10, $card->stamps);
         $this->assertSame(0, $card->redeemed);
@@ -133,7 +144,7 @@ class LoyaltyTest extends TestCase
             $this->createPaidOrder('081234567890');
         }
 
-        $card = LoyaltyCard::where('phone', '081234567890')->firstOrFail();
+        $card = LoyaltyCard::where('phone', self::PHONE)->firstOrFail();
 
         $this->assertSame(12, $card->stamps);
         $this->assertSame(1, $card->freeDrinksAvailable());
@@ -146,7 +157,7 @@ class LoyaltyTest extends TestCase
 
         $this->assertFalse(LoyaltyCard::redeem('081234567890'));
 
-        $card = LoyaltyCard::where('phone', '081234567890')->firstOrFail();
+        $card = LoyaltyCard::where('phone', self::PHONE)->firstOrFail();
         $this->assertSame(9, $card->stamps);
         $this->assertSame(0, $card->redeemed);
     }
@@ -157,7 +168,7 @@ class LoyaltyTest extends TestCase
 
         $this->assertTrue(LoyaltyCard::redeem('081234567890'));
 
-        $card = LoyaltyCard::where('phone', '081234567890')->firstOrFail();
+        $card = LoyaltyCard::where('phone', self::PHONE)->firstOrFail();
         $this->assertSame(0, $card->stamps);
         $this->assertSame(1, $card->redeemed);
         $this->assertSame(0, $card->freeDrinksAvailable());
@@ -172,7 +183,7 @@ class LoyaltyTest extends TestCase
         $this->assertTrue(LoyaltyCard::redeem('081234567890'));
         $this->assertFalse(LoyaltyCard::redeem('081234567890'));
 
-        $card = LoyaltyCard::where('phone', '081234567890')->firstOrFail();
+        $card = LoyaltyCard::where('phone', self::PHONE)->firstOrFail();
         $this->assertSame(0, $card->stamps);
         $this->assertSame(2, $card->redeemed);
         $this->assertSame(0, $card->freeDrinksAvailable());
@@ -185,8 +196,8 @@ class LoyaltyTest extends TestCase
         LoyaltyCard::credit('081298765432');
 
         $this->assertSame(2, LoyaltyCard::count());
-        $this->assertSame(2, LoyaltyCard::where('phone', '081234567890')->firstOrFail()->stamps);
-        $this->assertSame(1, LoyaltyCard::where('phone', '081298765432')->firstOrFail()->stamps);
+        $this->assertSame(2, LoyaltyCard::where('phone', self::PHONE)->firstOrFail()->stamps);
+        $this->assertSame(1, LoyaltyCard::where('phone', self::OTHER_PHONE)->firstOrFail()->stamps);
     }
 
     public function test_adjust_stamps_applies_delta_and_clamps_at_zero(): void
@@ -194,13 +205,13 @@ class LoyaltyTest extends TestCase
         LoyaltyCard::credit('081234567890', 4);
 
         LoyaltyCard::adjustStamps('081234567890', 2);
-        $this->assertSame(6, LoyaltyCard::where('phone', '081234567890')->firstOrFail()->stamps);
+        $this->assertSame(6, LoyaltyCard::where('phone', self::PHONE)->firstOrFail()->stamps);
 
         LoyaltyCard::adjustStamps('081234567890', -6);
-        $this->assertSame(0, LoyaltyCard::where('phone', '081234567890')->firstOrFail()->stamps);
+        $this->assertSame(0, LoyaltyCard::where('phone', self::PHONE)->firstOrFail()->stamps);
 
         LoyaltyCard::adjustStamps('081298765432', 3);
-        $this->assertSame(3, LoyaltyCard::where('phone', '081298765432')->firstOrFail()->stamps);
+        $this->assertSame(3, LoyaltyCard::where('phone', self::OTHER_PHONE)->firstOrFail()->stamps);
     }
 
     public function test_order_without_customer_phone_gets_no_stamp(): void
@@ -231,9 +242,141 @@ class LoyaltyTest extends TestCase
         $order = Order::where('customer_phone', '081234567890')->firstOrFail();
         $order->update(['notes' => 'edit after payment']);
 
-        $card = LoyaltyCard::where('phone', '081234567890')->firstOrFail();
+        $card = LoyaltyCard::where('phone', self::PHONE)->firstOrFail();
         $this->assertSame(1, $card->stamps);
     }
+
+    // ---------------------------------------------------------------------
+    // Phone normalization (Vikunja 111): any Indonesian format converges
+    // to the same canonical key, so POS, admin and public lookups always
+    // land on the same card.
+    // ---------------------------------------------------------------------
+
+    public function test_credit_converges_all_phone_formats_to_a_single_card(): void
+    {
+        LoyaltyCard::credit('0812-3456-7890');
+        LoyaltyCard::credit('+6281234567890');
+        LoyaltyCard::credit('08 1234 5678 90');
+
+        $this->assertSame(1, LoyaltyCard::count());
+        $this->assertSame(3, LoyaltyCard::where('phone', self::PHONE)->firstOrFail()->stamps);
+    }
+
+    public function test_find_by_phone_matches_any_phone_format(): void
+    {
+        LoyaltyCard::credit('0812-3456-7890', 3);
+
+        $this->assertSame(3, LoyaltyCard::findByPhone('+6281234567890')?->stamps);
+        $this->assertSame(3, LoyaltyCard::findByPhone('081234567890')?->stamps);
+        $this->assertNull(LoyaltyCard::findByPhone('081200000000'));
+    }
+
+    public function test_redeem_with_a_formatted_phone_uses_the_same_card(): void
+    {
+        LoyaltyCard::credit('081234567890', 10);
+
+        $this->assertTrue(LoyaltyCard::redeem('+62 812-3456-7890'));
+
+        $card = LoyaltyCard::where('phone', self::PHONE)->firstOrFail();
+        $this->assertSame(0, $card->stamps);
+        $this->assertSame(1, $card->redeemed);
+    }
+
+    // ---------------------------------------------------------------------
+    // First-create race (Vikunja 115, part): two concurrent first credits
+    // for a brand-new phone must collapse into a single card. The unique
+    // index on phone + insert-or-ignore makes the loser of the race
+    // degrade to fetch-and-increment.
+    // ---------------------------------------------------------------------
+
+    public function test_credit_after_a_concurrent_first_create_lands_on_the_existing_card(): void
+    {
+        // Simulate the loser of the race: a concurrent first-credit has
+        // already inserted the row, so this credit's insert-or-ignore is a
+        // no-op and it must fetch-and-increment instead of duplicating.
+        LoyaltyCard::create(['phone' => self::PHONE, 'stamps' => 0, 'redeemed' => 0]);
+
+        $card = LoyaltyCard::credit('0812-3456-7890');
+
+        $this->assertSame(1, LoyaltyCard::count());
+        $this->assertSame(1, $card->stamps);
+        $this->assertSame(self::PHONE, $card->phone);
+    }
+
+    public function test_unique_phone_index_rejects_duplicate_rows(): void
+    {
+        LoyaltyCard::credit('081234567890');
+
+        $this->expectException(QueryException::class);
+
+        LoyaltyCard::create(['phone' => self::PHONE, 'stamps' => 1, 'redeemed' => 0]);
+    }
+
+    // ---------------------------------------------------------------------
+    // Configurable reward threshold (worktree-4 parity): the stamps needed
+    // per free drink come from config('loyalty.stamps_per_reward') (env
+    // LOYALTY_STAMPS_PER_REWARD, default 10), so the threshold can change
+    // without code edits. Default-value tests above keep asserting 10.
+    // ---------------------------------------------------------------------
+
+    public function test_free_drinks_remaining_and_redeem_honor_configured_threshold(): void
+    {
+        $original = config('loyalty.stamps_per_reward');
+
+        try {
+            config()->set('loyalty.stamps_per_reward', 8);
+
+            LoyaltyCard::credit('081234567890', 7);
+            $card = LoyaltyCard::where('phone', self::PHONE)->firstOrFail();
+            $this->assertSame(0, $card->freeDrinksAvailable());
+            $this->assertSame(1, $card->remainingToNextFreeDrink());
+
+            LoyaltyCard::credit('081234567890', 1);
+            $card = LoyaltyCard::where('phone', self::PHONE)->firstOrFail();
+            $this->assertSame(1, $card->freeDrinksAvailable());
+            $this->assertSame(8, $card->remainingToNextFreeDrink());
+
+            $this->assertTrue(LoyaltyCard::redeem('081234567890'));
+
+            $card = LoyaltyCard::where('phone', self::PHONE)->firstOrFail();
+            $this->assertSame(0, $card->stamps);
+            $this->assertSame(1, $card->redeemed);
+            $this->assertSame(0, $card->freeDrinksAvailable());
+            $this->assertSame(8, $card->remainingToNextFreeDrink());
+
+            LoyaltyCard::credit('081234567890', 16);
+            $card = LoyaltyCard::where('phone', self::PHONE)->firstOrFail();
+            $this->assertSame(2, $card->freeDrinksAvailable());
+            $this->assertSame(8, $card->remainingToNextFreeDrink());
+
+            $this->assertTrue(LoyaltyCard::redeem('081234567890'));
+
+            $card = LoyaltyCard::where('phone', self::PHONE)->firstOrFail();
+            $this->assertSame(8, $card->stamps);
+            $this->assertSame(2, $card->redeemed);
+            $this->assertSame(1, $card->freeDrinksAvailable());
+
+            $this->assertTrue(LoyaltyCard::redeem('081234567890'));
+
+            $card = LoyaltyCard::where('phone', self::PHONE)->firstOrFail();
+            $this->assertSame(0, $card->stamps);
+            $this->assertSame(3, $card->redeemed);
+            $this->assertSame(0, $card->freeDrinksAvailable());
+
+            $this->assertFalse(LoyaltyCard::redeem('081234567890'));
+        } finally {
+            config()->set('loyalty.stamps_per_reward', $original);
+        }
+    }
+
+    public function test_default_threshold_is_ten_stamps(): void
+    {
+        $this->assertSame(10, (int) config('loyalty.stamps_per_reward'));
+    }
+
+    // ---------------------------------------------------------------------
+    // Public "Cek Poin" page.
+    // ---------------------------------------------------------------------
 
     public function test_points_page_renders_successfully(): void
     {
@@ -252,10 +395,12 @@ class LoyaltyTest extends TestCase
     {
         LoyaltyCard::credit('081234567890', 4);
 
-        $card = LoyaltyCard::where('phone', '081234567890')->firstOrFail();
+        $card = LoyaltyCard::where('phone', self::PHONE)->firstOrFail();
         $this->assertSame(4, $card->stamps);
         $this->assertSame(0, $card->freeDrinksAvailable());
 
+        // The raw format is queried on purpose: the controller normalizes
+        // via LoyaltyCard::findByPhone(), so any format finds the card.
         $this->get(url('/cek-poin').'?phone=081234567890')
             ->assertOk()
             ->assertSee(__('points.stamps_label'))
@@ -291,7 +436,7 @@ class LoyaltyTest extends TestCase
         $this->actingAs($admin, 'admin');
 
         $order = $this->createPaidOrder('081234567890', 20000, $admin);
-        $this->assertSame(1, LoyaltyCard::where('phone', '081234567890')->firstOrFail()->stamps);
+        $this->assertSame(1, LoyaltyCard::where('phone', self::PHONE)->firstOrFail()->stamps);
 
         $order->refund($order->paid_total);
         $this->assertSame(OrderStatus::Refunded, $order->fresh()->status);
@@ -299,7 +444,7 @@ class LoyaltyTest extends TestCase
         // Admin corrects the refund back to paid: must NOT re-credit.
         $order->update(['status' => OrderStatus::Paid]);
 
-        $card = LoyaltyCard::where('phone', '081234567890')->firstOrFail();
+        $card = LoyaltyCard::where('phone', self::PHONE)->firstOrFail();
         $this->assertSame(1, $card->stamps);
         $this->assertSame(0, $card->redeemed);
     }
@@ -309,13 +454,13 @@ class LoyaltyTest extends TestCase
         $admin = Admin::factory()->create();
 
         $order = $this->createPaidOrder('081234567890', 20000, $admin);
-        $this->assertSame(1, LoyaltyCard::where('phone', '081234567890')->firstOrFail()->stamps);
+        $this->assertSame(1, LoyaltyCard::where('phone', self::PHONE)->firstOrFail()->stamps);
 
         $order->update(['status' => OrderStatus::Served]);
         $order->update(['status' => OrderStatus::Pending]);
         $order->update(['status' => OrderStatus::Paid]);
 
-        $this->assertSame(1, LoyaltyCard::where('phone', '081234567890')->firstOrFail()->stamps);
+        $this->assertSame(1, LoyaltyCard::where('phone', self::PHONE)->firstOrFail()->stamps);
     }
 
     public function test_direct_status_edit_to_paid_credits_a_stamp_exactly_once(): void
@@ -333,10 +478,10 @@ class LoyaltyTest extends TestCase
         $this->assertDatabaseCount('loyalty_cards', 0);
 
         $order->update(['status' => OrderStatus::Paid]);
-        $this->assertSame(1, LoyaltyCard::where('phone', '081234567890')->firstOrFail()->stamps);
+        $this->assertSame(1, LoyaltyCard::where('phone', self::PHONE)->firstOrFail()->stamps);
 
         $order->update(['notes' => 're-save after payment']);
-        $this->assertSame(1, LoyaltyCard::where('phone', '081234567890')->firstOrFail()->stamps);
+        $this->assertSame(1, LoyaltyCard::where('phone', self::PHONE)->firstOrFail()->stamps);
     }
 
     // ---------------------------------------------------------------------
@@ -352,11 +497,11 @@ class LoyaltyTest extends TestCase
         LoyaltyCard::credit('081234567890', 5);
         LoyaltyCard::credit('081234567890', 5);
 
-        $this->assertSame(10, LoyaltyCard::where('phone', '081234567890')->firstOrFail()->stamps);
+        $this->assertSame(10, LoyaltyCard::where('phone', self::PHONE)->firstOrFail()->stamps);
 
         DB::commit();
 
-        $this->assertSame(10, LoyaltyCard::where('phone', '081234567890')->firstOrFail()->stamps);
+        $this->assertSame(10, LoyaltyCard::where('phone', self::PHONE)->firstOrFail()->stamps);
     }
 
     public function test_double_redeem_on_exactly_ten_stamps_allows_only_one(): void
@@ -366,7 +511,7 @@ class LoyaltyTest extends TestCase
         $this->assertTrue(LoyaltyCard::redeem('081234567890'));
         $this->assertFalse(LoyaltyCard::redeem('081234567890'));
 
-        $card = LoyaltyCard::where('phone', '081234567890')->firstOrFail();
+        $card = LoyaltyCard::where('phone', self::PHONE)->firstOrFail();
         $this->assertSame(0, $card->stamps);
         $this->assertSame(1, $card->redeemed);
     }
@@ -388,7 +533,7 @@ class LoyaltyTest extends TestCase
             ])
             ->assertHasNoActionErrors();
 
-        $card = LoyaltyCard::where('phone', '081234567890')->firstOrFail();
+        $card = LoyaltyCard::where('phone', self::PHONE)->firstOrFail();
         $this->assertSame(25000, $card->stamps);
     }
 
@@ -397,7 +542,7 @@ class LoyaltyTest extends TestCase
         $admin = Admin::factory()->create();
         LoyaltyCard::credit('081234567890', 5);
 
-        $card = LoyaltyCard::where('phone', '081234567890')->firstOrFail();
+        $card = LoyaltyCard::where('phone', self::PHONE)->firstOrFail();
 
         Livewire::actingAs($admin, 'admin')
             ->test(ListLoyaltyCards::class)

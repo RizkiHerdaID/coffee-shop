@@ -2,7 +2,6 @@
 
 namespace App\Console\Commands;
 
-use App\Exceptions\MissingAiKeyException;
 use App\Models\MenuItem;
 use App\Services\AiCopyService;
 use Illuminate\Console\Command;
@@ -45,9 +44,6 @@ class GenerateMenuCopy extends Command
                 $note = $aiCopy->generateDescription($item->name, $item->price);
                 $item->update(['note' => $note]);
                 $this->info(__('ai-copy.command.ok', ['name' => $item->name]));
-            } catch (MissingAiKeyException) {
-                $this->error(__('ai-copy.command.skipped_no_key', ['name' => $item->name]));
-                $failed++;
             } catch (RuntimeException $exception) {
                 $this->error(__('ai-copy.command.failed', [
                     'name' => $item->name,

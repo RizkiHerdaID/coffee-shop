@@ -15,26 +15,36 @@ class SendOrderConfirmation implements ShouldQueue
 
     public function handle(FonnteWhatsApp $whatsapp): void
     {
-        if (! config('whatsapp.enabled') || ! filled($this->order->customer_phone)) {
+        if (! config('whatsapp.enabled')) {
             return;
         }
 
-        $whatsapp->send($this->order->customer_phone, $this->message());
+        // Re-read the order from the database: the serialized model may be
+        // stale, and with a sync queue the order may not have been
+        // committed at dispatch time. If the order no longer exists, skip
+        // silently.
+        $order = $this->order->fresh();
+
+        if ($order === null || blank($order->customer_phone)) {
+            return;
+        }
+
+        $whatsapp->send($order->customer_phone, $this->message($order));
     }
 
-    protected function message(): string
+    protected function message(Order $order): string
     {
-        $items = $this->order->items()
+        $items = $order->items()
             ->orderBy('id')
             ->limit(3)
             ->pluck('name')
             ->implode(', ');
 
         return __($items === '' ? 'whatsapp.confirmation' : 'whatsapp.confirmation_with_items', [
-            'order_number' => $this->order->order_number,
+            'order_number' => $order->order_number,
             'shop' => config('shop.name'),
             'items' => $items,
-            'total' => 'Rp '.number_format($this->order->net_total, 0, ',', '.'),
+            'total' => 'Rp '.number_format($order->net_total, 0, ',', '.'),
             'phone' => config('shop.phone'),
         ]);
     }

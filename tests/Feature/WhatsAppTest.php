@@ -9,8 +9,10 @@ use App\Models\Order;
 use App\Services\FonnteWhatsApp;
 use Database\Seeders\MenuSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
 
@@ -82,7 +84,9 @@ class WhatsAppTest extends TestCase
     public function test_sends_confirmation_payload_when_enabled(): void
     {
         config(['whatsapp.enabled' => true, 'whatsapp.fonnte.token' => 'test-token']);
-        Http::fake();
+        Http::fake([
+            config('whatsapp.fonnte.url') => Http::response(['status' => true], 200),
+        ]);
         $order = $this->makeOrder(['order_number' => 'ORD-001']);
 
         SendOrderConfirmation::dispatchSync($order);
@@ -90,7 +94,7 @@ class WhatsAppTest extends TestCase
         Http::assertSent(function (Request $request): bool {
             return $request->url() === config('whatsapp.fonnte.url')
                 && $request->hasHeader('Authorization', 'test-token')
-                && $request['target'] === '081234567890'
+                && $request['target'] === '6281234567890'
                 && str_contains($request['message'], 'ORD-001')
                 && str_contains($request['message'], config('shop.name'))
                 && ! str_contains($request['message'], ':shop')
@@ -105,7 +109,9 @@ class WhatsAppTest extends TestCase
     public function test_message_includes_only_first_three_items(): void
     {
         config(['whatsapp.enabled' => true, 'whatsapp.fonnte.token' => 'test-token']);
-        Http::fake();
+        Http::fake([
+            config('whatsapp.fonnte.url') => Http::response(['status' => true], 200),
+        ]);
         $order = $this->makeOrder();
         $order->items()->create(['menu_item_id' => 3, 'name' => 'Flat White', 'price' => 20000, 'qty' => 1, 'subtotal' => 20000]);
         $order->items()->create(['menu_item_id' => 4, 'name' => 'Cold Brew', 'price' => 25000, 'qty' => 1, 'subtotal' => 25000]);
@@ -123,7 +129,9 @@ class WhatsAppTest extends TestCase
     public function test_message_omits_items_when_order_has_none(): void
     {
         config(['whatsapp.enabled' => true, 'whatsapp.fonnte.token' => 'test-token']);
-        Http::fake();
+        Http::fake([
+            config('whatsapp.fonnte.url') => Http::response(['status' => true], 200),
+        ]);
         $order = $this->makeOrder();
         $order->items()->delete();
 
@@ -136,17 +144,115 @@ class WhatsAppTest extends TestCase
         });
     }
 
+    // ---------------------------------------------------------------------
+    // Service-level HTTP behavior (Vikunja 110): success requires a JSON
+    // body with a truthy status; non-JSON bodies, HTTP errors and network
+    // exceptions are retried with backoff and then fail with a warning.
+    // Delays are injected as [0] / maxAttempts 1 to keep the suite fast.
+    // ---------------------------------------------------------------------
+
+    public function test_service_treats_non_json_success_response_as_failure(): void
+    {
+        config(['whatsapp.enabled' => true, 'whatsapp.fonnte.token' => 'test-token']);
+        Log::spy();
+        Http::fake([
+            config('whatsapp.fonnte.url') => Http::response('OK', 200),
+        ]);
+
+        $result = $this->makeService(maxAttempts: 1)->send('081234567890', 'pesan');
+
+        $this->assertFalse($result);
+        Log::shouldHaveReceived('warning')->once();
+    }
+
     public function test_service_treats_fonnte_logical_failure_as_failure(): void
     {
         config(['whatsapp.enabled' => true, 'whatsapp.fonnte.token' => 'test-token']);
         Http::fake([
             'api.fonnte.com/*' => Http::response(['status' => false, 'reason' => 'request invalid on disconnected device'], 200),
         ]);
-        $order = $this->makeOrder();
 
-        $result = app(FonnteWhatsApp::class)->send($order->customer_phone, 'pesan');
+        $result = $this->makeService(maxAttempts: 1)->send('081234567890', 'pesan');
 
         $this->assertFalse($result);
+    }
+
+    public function test_service_retries_transient_json_failure_then_succeeds(): void
+    {
+        config(['whatsapp.enabled' => true, 'whatsapp.fonnte.token' => 'test-token']);
+        $attempts = 0;
+        Http::fake([
+            config('whatsapp.fonnte.url') => function () use (&$attempts) {
+                $attempts++;
+
+                return $attempts === 1
+                    ? Http::response(['status' => false, 'reason' => 'temporary error'], 200)
+                    : Http::response(['status' => true], 200);
+            },
+        ]);
+
+        $result = $this->makeService(retryDelays: [0, 0])->send('081234567890', 'pesan');
+
+        $this->assertTrue($result);
+        $this->assertSame(2, $attempts);
+    }
+
+    public function test_service_retries_network_error_then_succeeds(): void
+    {
+        config(['whatsapp.enabled' => true, 'whatsapp.fonnte.token' => 'test-token']);
+        $attempts = 0;
+        Http::fake([
+            config('whatsapp.fonnte.url') => function () use (&$attempts) {
+                $attempts++;
+
+                if ($attempts === 1) {
+                    throw new ConnectionException('Connection timed out');
+                }
+
+                return Http::response(['status' => true], 200);
+            },
+        ]);
+
+        $result = $this->makeService(retryDelays: [0, 0])->send('081234567890', 'pesan');
+
+        $this->assertTrue($result);
+        $this->assertSame(2, $attempts);
+    }
+
+    public function test_service_normalizes_phone_before_sending(): void
+    {
+        config(['whatsapp.enabled' => true, 'whatsapp.fonnte.token' => 'test-token']);
+        Http::fake([
+            config('whatsapp.fonnte.url') => Http::response(['status' => true], 200),
+        ]);
+
+        $result = $this->makeService(maxAttempts: 1)->send('0812-3456-7890', 'pesan');
+
+        $this->assertTrue($result);
+        Http::assertSent(fn (Request $request): bool => $request['target'] === '6281234567890');
+    }
+
+    public function test_service_returns_false_for_an_empty_phone_without_http(): void
+    {
+        config(['whatsapp.enabled' => true, 'whatsapp.fonnte.token' => 'test-token']);
+        Log::spy();
+        Http::fake();
+
+        $result = $this->makeService(maxAttempts: 1)->send('', 'pesan');
+
+        $this->assertFalse($result);
+        Log::shouldHaveReceived('warning')->once();
+        Http::assertNothingSent();
+    }
+
+    protected function makeService(int $maxAttempts = 3, array $retryDelays = [1, 3]): FonnteWhatsApp
+    {
+        return new FonnteWhatsApp(
+            token: 'test-token',
+            baseUrl: config('whatsapp.fonnte.url'),
+            maxAttempts: $maxAttempts,
+            retryDelays: $retryDelays,
+        );
     }
 
     protected function makeOrder(array $attributes = []): Order

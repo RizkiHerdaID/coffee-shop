@@ -32,7 +32,7 @@ class SendReservationConfirmationTest extends TestCase
     public function test_job_sends_confirmation_with_localized_date_for_indonesian_locale(): void
     {
         config(['whatsapp.enabled' => true, 'whatsapp.fonnte.token' => 'test-token']);
-        Http::fake();
+        Http::fake([config('whatsapp.fonnte.url') => Http::response(['status' => true], 200)]);
         app()->setLocale('id');
 
         $reservation = $this->makeReservation();
@@ -42,7 +42,7 @@ class SendReservationConfirmationTest extends TestCase
         Http::assertSent(function (Request $request) use ($reservation): bool {
             return $request->url() === config('whatsapp.fonnte.url')
                 && $request->hasHeader('Authorization', 'test-token')
-                && $request['target'] === $reservation->phone
+                && $request['target'] === '6281234567890'
                 && str_contains($request['message'], $reservation->name)
                 && str_contains($request['message'], '19:30')
                 && str_contains($request['message'], config('shop.name'))
@@ -54,7 +54,7 @@ class SendReservationConfirmationTest extends TestCase
     public function test_job_uses_english_month_when_app_locale_is_english(): void
     {
         config(['whatsapp.enabled' => true, 'whatsapp.fonnte.token' => 'test-token']);
-        Http::fake();
+        Http::fake([config('whatsapp.fonnte.url') => Http::response(['status' => true], 200)]);
         app()->setLocale('en');
 
         SendReservationConfirmation::dispatchSync($this->makeReservation());

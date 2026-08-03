@@ -94,7 +94,7 @@ final class PageController extends Controller
         $phone = filled($request->query('phone')) ? trim((string) $request->query('phone')) : null;
 
         return view('points', [
-            'card' => $phone ? LoyaltyCard::where('phone', $phone)->first() : null,
+            'card' => $phone ? LoyaltyCard::findByPhone($phone) : null,
             'phone' => $phone,
         ]);
     }

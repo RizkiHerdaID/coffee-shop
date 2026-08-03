@@ -21,7 +21,7 @@ class PointsPageTest extends TestCase
 
     public function test_points_page_shows_card_balance_for_known_phone(): void
     {
-        LoyaltyCard::create(['phone' => '081234567890', 'stamps' => 13, 'redeemed' => 2]);
+        LoyaltyCard::create(['phone' => '6281234567890', 'stamps' => 13, 'redeemed' => 2]);
 
         $response = $this->get(route('points', ['phone' => '081234567890']));
 
@@ -45,7 +45,7 @@ class PointsPageTest extends TestCase
     {
         config()->set('loyalty.stamps_per_reward', 8);
 
-        LoyaltyCard::create(['phone' => '081234567890', 'stamps' => 12, 'redeemed' => 0]);
+        LoyaltyCard::create(['phone' => '6281234567890', 'stamps' => 12, 'redeemed' => 0]);
 
         $response = $this->get(route('points', ['phone' => '081234567890']));
 

@@ -49,7 +49,7 @@ class LowStockAlertTest extends TestCase
 
         Http::assertSent(function (Request $request): bool {
             return $request->url() === config('whatsapp.fonnte.url')
-                && $request['target'] === '081234567890'
+                && $request['target'] === '6281234567890'
                 && str_contains($request['message'], 'Susu')
                 && str_contains($request['message'], '2 liter')
                 && str_contains($request['message'], '5');
@@ -71,17 +71,65 @@ class LowStockAlertTest extends TestCase
         Http::assertSentCount(1);
     }
 
-    public function test_restocked_item_becomes_eligible_for_alert_again(): void
+    public function test_still_low_item_is_not_realerted_within_24_hours(): void
     {
         $this->fakeFonnte();
         $item = $this->makeItem(['name' => 'Susu']);
-        $item->forceFill(['low_stock_notified_at' => now()])->save();
-        $item->update(['quantity' => 10]);
+        $item->forceFill(['low_stock_notified_at' => now()->subHours(23)])->save();
+        $notifiedAt = (string) $item->fresh()->low_stock_notified_at;
 
         $this->artisan('stock:alert-low')->assertSuccessful();
 
         Http::assertNothingSent();
-        $this->assertNull($item->fresh()->low_stock_notified_at);
+        $this->assertSame($notifiedAt, (string) $item->fresh()->low_stock_notified_at);
+    }
+
+    public function test_still_low_item_is_realerted_after_24_hours(): void
+    {
+        $this->fakeFonnte();
+        $item = $this->makeItem(['name' => 'Susu']);
+        $item->forceFill(['low_stock_notified_at' => now()->subDay()->subHour()])->save();
+        $notifiedAt = (string) $item->fresh()->low_stock_notified_at;
+
+        $this->artisan('stock:alert-low')->assertSuccessful();
+
+        Http::assertSentCount(1);
+        $this->assertNotSame($notifiedAt, (string) $item->fresh()->low_stock_notified_at);
+    }
+
+    public function test_restocked_item_is_not_realerted_when_it_dips_again_within_24_hours(): void
+    {
+        $this->fakeFonnte();
+        $item = $this->makeItem(['name' => 'Susu']);
+        $item->forceFill(['low_stock_notified_at' => now()->subHours(23)])->save();
+
+        // Recovers above the threshold: no reset of the notified timestamp.
+        $item->update(['quantity' => 10]);
+        $this->artisan('stock:alert-low')->assertSuccessful();
+        Http::assertNothingSent();
+
+        // Dips low again, still inside the 24h pace window: no re-alert.
+        $item->update(['quantity' => 2]);
+        $this->artisan('stock:alert-low')->assertSuccessful();
+
+        Http::assertNothingSent();
+        $this->assertNotNull($item->fresh()->low_stock_notified_at);
+    }
+
+    public function test_restocked_item_is_realerted_when_it_dips_again_after_24_hours(): void
+    {
+        $this->fakeFonnte();
+        $item = $this->makeItem(['name' => 'Susu']);
+        $item->forceFill(['low_stock_notified_at' => now()->subDay()->subHour()])->save();
+
+        $item->update(['quantity' => 10]);
+        $this->artisan('stock:alert-low')->assertSuccessful();
+        Http::assertNothingSent();
+
+        $item->update(['quantity' => 2]);
+        $this->artisan('stock:alert-low')->assertSuccessful();
+
+        Http::assertSentCount(1);
     }
 
     public function test_blank_phone_logs_warning_and_succeeds_without_sending(): void
