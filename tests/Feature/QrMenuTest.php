@@ -51,6 +51,15 @@ class QrMenuTest extends TestCase
         $response->assertNotFound();
     }
 
+    public function test_qr_menu_page_aborts_for_leading_zero_table(): void
+    {
+        $this->seed(MenuSeeder::class);
+
+        $response = $this->get('/qr/01');
+
+        $response->assertNotFound();
+    }
+
     public function test_qr_menu_page_shows_localized_empty_state_when_no_items(): void
     {
         $response = $this->get('/qr/1');

@@ -35,7 +35,14 @@
         ];
 
         $openingHours = collect(config('shop.hours'))->flatMap(function ($hours, $label) use ($days) {
-            [$opens, $closes] = array_map('trim', explode('—', $hours));
+            $parts = preg_split('/\s*[—-]\s*/u', (string) $hours);
+
+            if (count($parts) === 2) {
+                [$opens, $closes] = array_map('trim', $parts);
+            } else {
+                $opens = trim($hours);
+                $closes = null;
+            }
 
             return array_map(fn ($day) => [
                 '@type' => 'OpeningHoursSpecification',
@@ -77,7 +84,7 @@
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 
     @php
-        $fontsManifest = json_decode((string) file_get_contents(public_path('build/fonts-manifest.json')), true);
+        $fontsManifest = json_decode((string) @file_get_contents(public_path('build/fonts-manifest.json')), true);
         $heroFontVariant = collect($fontsManifest['families']['instrument-sans']['variants'] ?? [])->get('600:normal');
         $heroFont = collect($heroFontVariant['files'] ?? [])->firstWhere('format', 'woff2');
     @endphp

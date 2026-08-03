@@ -38,6 +38,7 @@ return [
 
     'flash' => [
         'success' => 'Terima kasih! Reservasi Anda telah kami terima dan akan kami konfirmasi melalui WhatsApp.',
+        'success_no_wa' => 'Pesanan diterima. Konfirmasi menyusul.',
     ],
 
     'form' => [
@@ -54,11 +55,10 @@ return [
         'notes' => 'Catatan (opsional)',
         'notes_placeholder' => 'Permintaan khusus, mis. tempat outdoor',
         'submit' => 'Kirim Reservasi',
-        'submitting' => 'Mengirim…',
-        'success' => 'Reservasi Anda berhasil dikirim. Kami akan mengonfirmasi melalui WhatsApp.',
         'invalid_phone' => 'Format nomor WhatsApp tidak valid.',
-        'party_size_min' => 'Jumlah tamu minimal 1.',
         'past_time' => 'Waktu reservasi harus di masa depan. Pilih jam yang belum lewat untuk hari ini.',
+        'closed' => 'Jam tersebut di luar jam operasional kami. Silakan pilih jam lain saat kami buka.',
+        'too_far' => 'Reservasi hanya dapat dibuat maksimal 90 hari ke depan. Silakan pilih tanggal yang lebih dekat.',
     ],
 
     'empty' => [

@@ -68,4 +68,46 @@ class PointsPageTest extends TestCase
         $en->assertOk();
         $en->assertSee(__('points.heading'));
     }
+
+    public function test_points_page_is_throttled_after_thirty_requests_per_minute(): void
+    {
+        for ($i = 0; $i < 30; $i++) {
+            $this->get(route('points'))->assertOk();
+        }
+
+        $this->get(route('points'))->assertStatus(429);
+    }
+
+    public function test_points_page_found_and_not_found_shapes_still_render_under_throttle(): void
+    {
+        LoyaltyCard::create(['phone' => '6281234567890', 'stamps' => 13, 'redeemed' => 2]);
+
+        $found = $this->get(route('points', ['phone' => '081234567890']));
+
+        $found->assertOk();
+        $found->assertSee(__('points.stamps_label'));
+        $found->assertSee('13');
+
+        $missing = $this->get(route('points', ['phone' => '081200000000']));
+
+        $missing->assertOk();
+        $missing->assertSee(__('points.not_found'));
+    }
+
+    public function test_points_page_ignores_array_phone_query_parameter(): void
+    {
+        $response = $this->get(route('points').'?phone[]=081234567890');
+
+        $response->assertOk();
+        $response->assertDontSee(__('points.not_found'));
+        $response->assertDontSee(__('points.stamps_label'));
+    }
+
+    public function test_points_form_keeps_locale_with_hidden_lang_input(): void
+    {
+        $response = $this->get(route('points').'?lang=en');
+
+        $response->assertOk();
+        $response->assertSee('<input type="hidden" name="lang" value="en">', false);
+    }
 }

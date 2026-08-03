@@ -38,6 +38,7 @@ return [
 
     'flash' => [
         'success' => 'Thank you! Your reservation has been received and we will confirm it via WhatsApp.',
+        'success_no_wa' => 'Booking received. Confirmation to follow.',
     ],
 
     'form' => [
@@ -54,11 +55,10 @@ return [
         'notes' => 'Notes (optional)',
         'notes_placeholder' => 'Special requests, e.g. outdoor seating',
         'submit' => 'Send Reservation',
-        'submitting' => 'Sending…',
-        'success' => 'Your reservation has been sent. We will confirm via WhatsApp.',
         'invalid_phone' => 'Invalid WhatsApp number format.',
-        'party_size_min' => 'Party size must be at least 1.',
         'past_time' => 'Reservation time must be in the future. Pick a time that has not passed today.',
+        'closed' => 'That time is outside our opening hours. Please pick a time when we are open.',
+        'too_far' => 'Reservations can only be made up to 90 days ahead. Please pick a closer date.',
     ],
 
     'empty' => [

@@ -114,7 +114,7 @@ class SendReservationConfirmationTest extends TestCase
             'phone' => '081234567890',
             'party_size' => 2,
             'date' => now()->addDay()->format('Y-m-d'),
-            'time' => '19:30',
+            'time' => '12:00',
         ])->assertRedirect(url('/reservasi'));
 
         Queue::assertPushed(

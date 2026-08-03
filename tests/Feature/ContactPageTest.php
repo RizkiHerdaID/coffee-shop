@@ -48,6 +48,15 @@ class ContactPageTest extends TestCase
         $response->assertSee('Terima QRIS');
     }
 
+    public function test_contact_page_qris_title_is_translated_in_english(): void
+    {
+        $response = $this->get('/contact?lang=en');
+
+        $response->assertOk();
+        $response->assertSee('Pay with QRIS');
+        $response->assertDontSee('Terima QRIS');
+    }
+
     public function test_contact_page_has_keyless_maps_embed(): void
     {
         $response = $this->get('/contact');

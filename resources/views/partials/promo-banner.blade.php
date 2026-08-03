@@ -15,7 +15,10 @@
         <div class="flex shrink-0 items-center gap-3">
             @php
                 $ctaUrl = (string) ($promo->cta_url ?? '');
-                $ctaUrl = preg_match('#^(https?:)?//#i', $ctaUrl) || str_starts_with($ctaUrl, '/') || str_starts_with($ctaUrl, '#') ? $ctaUrl : '#';
+                $ctaUrl = preg_match('#^(https?:)?//#i', $ctaUrl)
+                    || (str_starts_with($ctaUrl, '/') && ! str_starts_with($ctaUrl, '//') && ! str_contains($ctaUrl, '\\'))
+                    || str_starts_with($ctaUrl, '#')
+                    ? $ctaUrl : '#';
             @endphp
             @if ($promo->cta_text && $ctaUrl !== '#')
             <a href="{{ $ctaUrl }}" class="shrink-0 rounded-full bg-stone-950 px-4 py-1.5 text-xs font-bold text-amber-400 transition hover:bg-stone-800">{{ $promo->cta_text }}</a>
