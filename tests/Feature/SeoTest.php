@@ -2,8 +2,10 @@
 
 namespace Tests\Feature;
 
+use App\Models\MenuItem;
 use Database\Seeders\MenuSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
 use Tests\TestCase;
 
 class SeoTest extends TestCase
@@ -101,5 +103,90 @@ class SeoTest extends TestCase
         $response->assertOk();
         $response->assertSee('property="og:url" content="'.url('/menu').'"', false);
         $response->assertDontSee('property="og:url" content="'.url('/menu').'?lang=en"', false);
+    }
+
+    public function test_menu_page_json_ld_escapes_script_tag_payload_in_item_names(): void
+    {
+        $this->seed(MenuSeeder::class);
+
+        $payload = '</script><script>alert(1)</script>';
+        MenuItem::create([
+            'name' => $payload,
+            'price' => 25000,
+            'category' => 'coffee',
+            'sort_order' => 99,
+            'available' => true,
+        ]);
+
+        $response = $this->get('/menu');
+
+        $response->assertOk();
+        $response->assertDontSee('</script><script>', false);
+
+        preg_match_all('/<script type="application\/ld\+json">(.*?)<\/script>/s', $response->getContent(), $matches);
+
+        $this->assertNotEmpty($matches[1], 'No JSON-LD blocks found');
+
+        $itemListIndex = collect($matches[1])->search(fn (string $json): bool => str_contains($json, '"ItemList"'));
+
+        $this->assertNotFalse($itemListIndex, 'Menu ItemList JSON-LD block not found');
+
+        $itemListJson = $matches[1][$itemListIndex];
+
+        $this->assertStringNotContainsString('</script>', $itemListJson);
+
+        $escapedInJson = str_contains($itemListJson, '\u003C/script\u003E') || str_contains($itemListJson, '\u003C\/script\u003E');
+        $this->assertTrue($escapedInJson, 'ItemList JSON-LD must contain the HEX-escaped script tag form');
+
+        $itemList = json_decode($itemListJson, true);
+        $this->assertIsArray($itemList, 'ItemList JSON-LD must remain valid JSON');
+
+        $malicious = collect($itemList['itemListElement'])->firstWhere('name', $payload);
+
+        $this->assertNotNull($malicious, 'Payload item missing from ItemList JSON-LD');
+        $this->assertSame($payload, $malicious['name']);
+        $this->assertSame(25000, $malicious['offers']['price']);
+    }
+
+    public function test_menu_page_renders_script_tag_payload_escaped_in_item_card_html(): void
+    {
+        $this->seed(MenuSeeder::class);
+
+        $payload = '</script><script>alert(1)</script>';
+        MenuItem::create([
+            'name' => $payload,
+            'price' => 25000,
+            'category' => 'coffee',
+            'sort_order' => 99,
+            'available' => true,
+        ]);
+
+        $response = $this->get('/menu');
+
+        $response->assertOk();
+        $response->assertSee('&lt;/script&gt;&lt;script&gt;alert(1)&lt;/script&gt;', false);
+        $response->assertDontSee($payload, false);
+    }
+
+    public function test_home_page_does_not_break_out_of_script_blocks_for_malicious_item_name(): void
+    {
+        $this->seed(MenuSeeder::class);
+
+        $payload = '</script><script>alert(1)</script>';
+        MenuItem::create([
+            'name' => $payload,
+            'price' => 25000,
+            'category' => 'coffee',
+            'sort_order' => 1,
+            'available' => true,
+        ]);
+
+        Cache::flush();
+
+        $response = $this->get('/');
+
+        $response->assertOk();
+        $response->assertDontSee('</script><script>', false);
+        $response->assertSee('&lt;/script&gt;&lt;script&gt;alert(1)&lt;/script&gt;', false);
     }
 }
