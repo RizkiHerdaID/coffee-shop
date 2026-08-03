@@ -46,7 +46,7 @@ services:
         entrypoint:
             - './docker-entrypoint.sh'
             - '/usr/local/bin/start-container'
-        command: 'php artisan queue:work --sleep=3 --tries=3'
+        command: 'php artisan queue:work --sleep=3 --tries=3 --timeout=120'
         environment:
             WWWUSER: '${WWWUSER:-1000}'
             LARAVEL_SAIL: 1

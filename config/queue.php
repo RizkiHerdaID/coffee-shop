@@ -40,7 +40,11 @@ return [
             'connection' => env('DB_QUEUE_CONNECTION'),
             'table' => env('DB_QUEUE_TABLE', 'jobs'),
             'queue' => env('DB_QUEUE', 'default'),
-            'retry_after' => (int) env('DB_QUEUE_RETRY_AFTER', 90),
+            // Must stay above the queue worker's --timeout (compose.yaml
+            // queue service runs --timeout=120) so a slow worker child is
+            // never killed and its job re-run mid-attempt (which would
+            // duplicate customer-facing WhatsApp sends).
+            'retry_after' => (int) env('DB_QUEUE_RETRY_AFTER', 150),
             'after_commit' => false,
         ],
 

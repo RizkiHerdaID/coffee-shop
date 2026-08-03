@@ -127,7 +127,7 @@ final class PageController extends Controller
 
             $reservation = Reservation::create($validated);
 
-            SendReservationConfirmation::dispatch($reservation);
+            SendReservationConfirmation::dispatch($reservation, app()->getLocale());
 
             return redirect()->route('reservation')->with('success', __('reservation.flash.success'));
         }

@@ -14,6 +14,15 @@ class FonnteWhatsApp
 
     public const DEFAULT_RETRY_DELAYS = [1, 3];
 
+    /**
+     * Substrings that mark a Fonnte failure reason as transient (worth a
+     * retry). A status:false reason with none of these is treated as
+     * permanent (e.g. invalid token/target, quota) and fails fast.
+     *
+     * @var string[]
+     */
+    public const TRANSIENT_REASON_MARKERS = ['temporar', 'timeout', 'busy', 'rate'];
+
     public function __construct(
         protected ?string $token = null,
         protected ?string $baseUrl = null,
@@ -49,9 +58,16 @@ class FonnteWhatsApp
             }
 
             try {
+                // Explicit timeouts keep a single attempt's worst case at
+                // ~25s (15s response + 10s connect), well under the queue
+                // worker's --timeout (120s in compose.yaml), so a slow
+                // gateway can never get the worker killed mid-attempt and
+                // the job re-run (duplicate customer-facing sends).
                 $response = Http::acceptJson()
                     ->asForm()
                     ->withHeaders(['Authorization' => $this->token])
+                    ->timeout(15)
+                    ->connectTimeout(10)
                     ->post($this->baseUrl, [
                         'target' => $phone,
                         'message' => $message,
@@ -64,6 +80,12 @@ class FonnteWhatsApp
 
             if ($response !== null && $this->isSuccess($response)) {
                 return true;
+            }
+
+            // Permanent failures (e.g. token/target invalid, quota) can
+            // never succeed by retrying, so skip the remaining attempts.
+            if ($response !== null && $this->isPermanentFailure($response)) {
+                break;
             }
 
             // Non-successful response (HTTP error, non-JSON body, or a
@@ -118,5 +140,35 @@ class FonnteWhatsApp
         $body = $response->json();
 
         return is_array($body) && (bool) ($body['status'] ?? false);
+    }
+
+    /**
+     * A JSON body with status:false and a non-empty reason that shows no
+     * sign of being transient (per TRANSIENT_REASON_MARKERS) will not
+     * succeed on retry, so it is not worth further attempts. HTTP errors,
+     * non-JSON bodies, connection exceptions and status:false bodies
+     * without a reason key stay retryable.
+     */
+    protected function isPermanentFailure(Response $response): bool
+    {
+        $body = $response->json();
+
+        if (! is_array($body) || (bool) ($body['status'] ?? true)) {
+            return false;
+        }
+
+        $reason = strtolower((string) ($body['reason'] ?? ''));
+
+        if ($reason === '') {
+            return false;
+        }
+
+        foreach (self::TRANSIENT_REASON_MARKERS as $marker) {
+            if (str_contains($reason, $marker)) {
+                return false;
+            }
+        }
+
+        return true;
     }
 }

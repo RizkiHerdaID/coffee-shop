@@ -47,22 +47,24 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $schedule->command('summary:send --period=daily')
             ->dailyAt(config('summary.daily.time'))
-            ->withoutOverlapping()
+            // Bounded mutex expiry: the Laravel default (1440 min) would
+            // let one crashed run suppress a full day of pings/alerts.
+            ->withoutOverlapping(120)
             ->pingOnSuccessIf(filled($heartbeatUrl), $heartbeatUrl);
 
         $schedule->command('summary:send --period=weekly')
-            ->weeklyOn(1, config('summary.weekly.time'))
-            ->withoutOverlapping()
+            ->weeklyOn(config('summary.weekly.day'), config('summary.weekly.time'))
+            ->withoutOverlapping(120)
             ->pingOnSuccessIf(filled($heartbeatUrl), $heartbeatUrl);
 
         $schedule->command('stock:alert-low')
             ->hourly()
-            ->withoutOverlapping()
+            ->withoutOverlapping(60)
             ->pingOnSuccessIf(filled($heartbeatUrl), $heartbeatUrl);
 
         $schedule->command('pulse:check')
             ->everyMinute()
-            ->withoutOverlapping()
+            ->withoutOverlapping(60)
             ->pingOnSuccessIf(filled($heartbeatUrl), $heartbeatUrl);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

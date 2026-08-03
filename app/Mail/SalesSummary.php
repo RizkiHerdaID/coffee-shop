@@ -21,7 +21,14 @@ class SalesSummary extends Mailable implements ShouldQueue
     public function __construct(
         public string $period,
         public array $stats,
-    ) {}
+        public string $mailLocale = '',
+    ) {
+        // The locale is captured at construction (dispatch time): the
+        // mailable is rendered on the queue worker, where app()->getLocale()
+        // would be the config default. Named $mailLocale: Mailable already
+        // declares an untyped $locale.
+        $this->mailLocale = $this->mailLocale !== '' ? $this->mailLocale : app()->getLocale();
+    }
 
     public function envelope(): Envelope
     {
@@ -35,13 +42,13 @@ class SalesSummary extends Mailable implements ShouldQueue
 
     private function summarySubject(): string
     {
-        Carbon::setLocale(app()->getLocale());
+        Carbon::setLocale($this->mailLocale);
 
         $start = $this->stats['start']->translatedFormat('d F Y');
         $end = $this->stats['end']->translatedFormat('d F Y');
 
         return $this->period === 'weekly'
-            ? __('summary.subject.weekly', ['start' => $start, 'end' => $end])
-            : __('summary.subject.daily', ['date' => $end]);
+            ? __('summary.subject.weekly', ['start' => $start, 'end' => $end], $this->mailLocale)
+            : __('summary.subject.daily', ['date' => $end], $this->mailLocale);
     }
 }
