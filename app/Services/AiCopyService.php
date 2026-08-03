@@ -37,9 +37,10 @@ class AiCopyService
         }
 
         try {
-            // Timeout per attempt; retry connection failures and server
-            // errors (5xx) twice with 1s backoff. Client errors (4xx) fail
-            // fast, and once the retries are exhausted the request throws.
+            // Timeout per attempt; retry(2, ...) is 2 TOTAL attempts (1
+            // retry) for connection failures and server errors (5xx) with
+            // 1s backoff. Client errors (4xx) fail fast, and once the
+            // retries are exhausted the request throws.
             $response = Http::withToken($apiKey)
                 ->acceptJson()
                 ->timeout(30)

@@ -22,7 +22,7 @@ class Order extends Model
             if (config('whatsapp.enabled') && filled($order->customer_phone)) {
                 // Dispatch after commit so a sync queue never sends a
                 // confirmation before the order row is visible.
-                DB::afterCommit(fn () => SendOrderConfirmation::dispatch($order));
+                DB::afterCommit(fn () => SendOrderConfirmation::dispatch($order, app()->getLocale()));
             }
         });
 

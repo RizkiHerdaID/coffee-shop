@@ -55,6 +55,38 @@ class WhatsAppTest extends TestCase
         Queue::assertPushed(SendOrderConfirmation::class, fn (SendOrderConfirmation $job) => $job->order->is($second));
     }
 
+    public function test_job_dispatch_captures_current_locale(): void
+    {
+        // The dispatch site (Order::created observer) must capture the
+        // request locale so the worker renders the message in the
+        // visitor's language instead of the config default.
+        Queue::fake();
+        config(['whatsapp.enabled' => true, 'whatsapp.fonnte.token' => 'test-token']);
+        $admin = Admin::factory()->create();
+
+        app()->setLocale('en');
+        Order::create([
+            'order_number' => 'ORD-LOC',
+            'customer_phone' => '081234567890',
+            'status' => OrderStatus::Pending,
+            'total' => 25000,
+            'created_by' => $admin->id,
+        ]);
+
+        Queue::assertPushed(
+            SendOrderConfirmation::class,
+            fn (SendOrderConfirmation $job): bool => $job->locale === 'en',
+        );
+    }
+
+    public function test_env_example_documents_fonnte_and_loyalty_keys(): void
+    {
+        $env = file_get_contents(base_path('.env.example'));
+
+        $this->assertStringContainsString('FONNTE_URL=', $env);
+        $this->assertStringContainsString('LOYALTY_STAMPS_PER_REWARD=', $env);
+    }
+
     public function test_no_http_request_is_made_when_disabled(): void
     {
         config(['whatsapp.enabled' => false]);
@@ -76,7 +108,7 @@ class WhatsAppTest extends TestCase
         config(['whatsapp.enabled' => true, 'whatsapp.fonnte.token' => null]);
         $order = $this->makeOrder();
 
-        SendOrderConfirmation::dispatchSync($order);
+        SendOrderConfirmation::dispatchSync($order, app()->getLocale());
 
         Http::assertNothingSent();
     }
@@ -89,7 +121,7 @@ class WhatsAppTest extends TestCase
         ]);
         $order = $this->makeOrder(['order_number' => 'ORD-001']);
 
-        SendOrderConfirmation::dispatchSync($order);
+        SendOrderConfirmation::dispatchSync($order, app()->getLocale());
 
         Http::assertSent(function (Request $request): bool {
             return $request->url() === config('whatsapp.fonnte.url')
@@ -116,7 +148,7 @@ class WhatsAppTest extends TestCase
         $order->items()->create(['menu_item_id' => 3, 'name' => 'Flat White', 'price' => 20000, 'qty' => 1, 'subtotal' => 20000]);
         $order->items()->create(['menu_item_id' => 4, 'name' => 'Cold Brew', 'price' => 25000, 'qty' => 1, 'subtotal' => 25000]);
 
-        SendOrderConfirmation::dispatchSync($order);
+        SendOrderConfirmation::dispatchSync($order, app()->getLocale());
 
         Http::assertSent(function (Request $request): bool {
             return str_contains($request['message'], 'Espresso')
@@ -135,7 +167,7 @@ class WhatsAppTest extends TestCase
         $order = $this->makeOrder();
         $order->items()->delete();
 
-        SendOrderConfirmation::dispatchSync($order);
+        SendOrderConfirmation::dispatchSync($order, app()->getLocale());
 
         Http::assertSent(function (Request $request): bool {
             return ! str_contains($request['message'], 'Item:')
@@ -217,6 +249,81 @@ class WhatsAppTest extends TestCase
 
         $this->assertTrue($result);
         $this->assertSame(2, $attempts);
+    }
+
+    public function test_service_fails_fast_on_permanent_fonnte_reason(): void
+    {
+        config(['whatsapp.enabled' => true, 'whatsapp.fonnte.token' => 'test-token']);
+        $attempts = 0;
+        Http::fake([
+            config('whatsapp.fonnte.url') => function () use (&$attempts) {
+                $attempts++;
+
+                return Http::response(['status' => false, 'reason' => 'token invalid'], 200);
+            },
+        ]);
+
+        $result = $this->makeService(retryDelays: [0, 0])->send('081234567890', 'pesan');
+
+        $this->assertFalse($result);
+        $this->assertSame(1, $attempts, 'A permanent reason must not burn the remaining retries.');
+    }
+
+    public function test_service_fails_fast_on_unrecognized_fonnte_reason(): void
+    {
+        // Conservative default per the contract: a status:false reason that
+        // carries no transient marker (temporar/timeout/busy/rate) is
+        // treated as permanent — retrying it would only burn attempts.
+        config(['whatsapp.enabled' => true, 'whatsapp.fonnte.token' => 'test-token']);
+        $attempts = 0;
+        Http::fake([
+            config('whatsapp.fonnte.url') => function () use (&$attempts) {
+                $attempts++;
+
+                return Http::response(['status' => false, 'reason' => 'message contains banned word'], 200);
+            },
+        ]);
+
+        $result = $this->makeService(retryDelays: [0, 0])->send('081234567890', 'pesan');
+
+        $this->assertFalse($result);
+        $this->assertSame(1, $attempts, 'An unrecognized reason must fail fast, not retry.');
+    }
+
+    public function test_fonnte_request_configures_explicit_timeouts(): void
+    {
+        $source = file_get_contents(app_path('Services/FonnteWhatsApp.php'));
+
+        $this->assertStringContainsString(
+            '->timeout(15)',
+            $source,
+            'Fonnte HTTP requests must bound each attempt to 15s.',
+        );
+        $this->assertStringContainsString(
+            '->connectTimeout(10)',
+            $source,
+            'Fonnte HTTP requests must bound the connect phase to 10s.',
+        );
+    }
+
+    public function test_queue_retry_after_and_worker_timeout_exceed_fonnte_worst_case(): void
+    {
+        // 3 attempts x ~25s + 4s sleeps ≈ 79s < worker --timeout (120s)
+        // < retry_after (150s): a slow gateway can never get the worker
+        // killed mid-job, which would re-run the job and duplicate sends.
+        $this->assertGreaterThanOrEqual(
+            120,
+            config('queue.connections.database.retry_after'),
+            'DB_QUEUE_RETRY_AFTER must stay above the queue worker --timeout.',
+        );
+
+        $compose = file_get_contents(base_path('compose.yaml'));
+
+        $this->assertStringContainsString(
+            'queue:work --sleep=3 --tries=3 --timeout=120',
+            $compose,
+            'The queue worker must run with --timeout=120.',
+        );
     }
 
     public function test_service_normalizes_phone_before_sending(): void

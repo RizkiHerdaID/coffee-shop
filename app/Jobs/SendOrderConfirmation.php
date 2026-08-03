@@ -11,7 +11,7 @@ class SendOrderConfirmation implements ShouldQueue
 {
     use Queueable;
 
-    public function __construct(public Order $order) {}
+    public function __construct(public Order $order, public string $locale) {}
 
     public function handle(FonnteWhatsApp $whatsapp): void
     {
@@ -40,12 +40,15 @@ class SendOrderConfirmation implements ShouldQueue
             ->pluck('name')
             ->implode(', ');
 
+        // The locale is captured at dispatch time: a queued job runs on
+        // the queue worker, where app()->getLocale() is the config default
+        // and would ignore the visitor's language.
         return __($items === '' ? 'whatsapp.confirmation' : 'whatsapp.confirmation_with_items', [
             'order_number' => $order->order_number,
             'shop' => config('shop.name'),
             'items' => $items,
             'total' => 'Rp '.number_format($order->net_total, 0, ',', '.'),
             'phone' => config('shop.phone'),
-        ]);
+        ], $this->locale);
     }
 }

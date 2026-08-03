@@ -12,28 +12,40 @@ class SendReservationConfirmation implements ShouldQueue
 {
     use Queueable;
 
-    public function __construct(public Reservation $reservation) {}
+    public function __construct(public Reservation $reservation, public string $locale) {}
 
     public function handle(FonnteWhatsApp $whatsapp): void
     {
-        if (! config('whatsapp.enabled') || ! filled($this->reservation->phone)) {
+        if (! config('whatsapp.enabled')) {
             return;
         }
 
-        $whatsapp->send($this->reservation->phone, $this->message());
+        // Re-read the reservation from the database: with a database queue
+        // a reservation deleted before the job runs is restored as null by
+        // SerializesModels, so guard like SendOrderConfirmation does.
+        $reservation = $this->reservation->fresh();
+
+        if ($reservation === null || blank($reservation->phone)) {
+            return;
+        }
+
+        $whatsapp->send($reservation->phone, $this->message($reservation));
     }
 
-    protected function message(): string
+    protected function message(Reservation $reservation): string
     {
+        // The locale is captured at dispatch time: a queued job runs on
+        // the queue worker, where app()->getLocale() is the config default
+        // and would ignore the visitor's language.
         return __('whatsapp.reservation', [
-            'name' => $this->reservation->name,
+            'name' => $reservation->name,
             'shop' => config('shop.name'),
-            'date' => Carbon::parse($this->reservation->date)
-                ->locale(app()->getLocale())
+            'date' => Carbon::parse($reservation->date)
+                ->locale($this->locale)
                 ->translatedFormat('d M Y'),
-            'time' => Carbon::parse($this->reservation->time)->format('H:i'),
-            'party_size' => $this->reservation->party_size,
+            'time' => Carbon::parse($reservation->time)->format('H:i'),
+            'party_size' => $reservation->party_size,
             'phone' => config('shop.phone'),
-        ]);
+        ], $this->locale);
     }
 }

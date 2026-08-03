@@ -25,6 +25,7 @@ class SalesSummaryEmailTest extends TestCase
     protected function tearDown(): void
     {
         Carbon::setTestNow();
+        Carbon::setLocale('id');
 
         parent::tearDown();
     }
@@ -202,6 +203,31 @@ class SalesSummaryEmailTest extends TestCase
             return $mail->stats['revenue'] === 75000
                 && $mail->stats['orders_count'] === 2;
         });
+    }
+
+    public function test_mailable_subject_uses_locale_captured_at_construction(): void
+    {
+        // The mailable is rendered on the queue worker, where the app
+        // locale is the config default: the locale passed at construction
+        // (dispatch) must win, both for the translated subject and the
+        // localized month names.
+        app()->setLocale('id');
+
+        $mailable = new SalesSummary('weekly', [
+            'period' => 'weekly',
+            'start' => Carbon::parse('2026-08-01'),
+            'end' => Carbon::parse('2026-08-02'),
+            'revenue' => 0,
+            'orders_count' => 0,
+            'avg_order' => 0,
+            'top_items' => [],
+        ], 'en');
+
+        $subject = $mailable->envelope()->subject;
+
+        $this->assertStringContainsString('Sales Summary', $subject);
+        $this->assertStringContainsString('August', $subject);
+        $this->assertStringNotContainsString('Agustus', $subject);
     }
 
     public function test_top_items_come_from_paid_orders_only(): void

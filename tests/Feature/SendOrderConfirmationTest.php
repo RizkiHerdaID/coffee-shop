@@ -69,7 +69,7 @@ class SendOrderConfirmationTest extends TestCase
         $this->fakeFonnte();
         $order = $this->makeOrder(['order_number' => 'ORD-001']);
 
-        SendOrderConfirmation::dispatchSync($order);
+        SendOrderConfirmation::dispatchSync($order, app()->getLocale());
 
         Http::assertSent(function (Request $request): bool {
             return $request->url() === config('whatsapp.fonnte.url')
@@ -90,7 +90,7 @@ class SendOrderConfirmationTest extends TestCase
         $order = $this->makeOrder();
         $order->items()->delete();
 
-        SendOrderConfirmation::dispatchSync($order);
+        SendOrderConfirmation::dispatchSync($order, app()->getLocale());
 
         Http::assertSent(function (Request $request): bool {
             return ! str_contains($request['message'], 'Item:')
@@ -108,7 +108,7 @@ class SendOrderConfirmationTest extends TestCase
         DB::table('order_items')->where('order_id', $order->id)->delete();
         DB::table('orders')->where('id', $order->id)->delete();
 
-        (new SendOrderConfirmation($order))->handle(app(FonnteWhatsApp::class));
+        (new SendOrderConfirmation($order, app()->getLocale()))->handle(app(FonnteWhatsApp::class));
 
         Http::assertNothingSent();
     }
@@ -118,9 +118,27 @@ class SendOrderConfirmationTest extends TestCase
         $this->fakeFonnte();
         $order = $this->makeOrder(['customer_phone' => '+62 812-3456-7890']);
 
-        SendOrderConfirmation::dispatchSync($order);
+        SendOrderConfirmation::dispatchSync($order, app()->getLocale());
 
         Http::assertSent(fn (Request $request): bool => $request['target'] === '6281234567890');
         Http::assertSentCount(1);
+    }
+
+    public function test_job_renders_message_in_locale_captured_at_dispatch(): void
+    {
+        // The locale is captured when the job is constructed (dispatch
+        // time); the queue worker's default locale must not leak in.
+        $this->fakeFonnte();
+        app()->setLocale('en');
+        $order = $this->makeOrder(['order_number' => 'ORD-LOC']);
+        $job = new SendOrderConfirmation($order, 'en');
+
+        app()->setLocale('id');
+        $job->handle(app(FonnteWhatsApp::class));
+
+        Http::assertSent(function (Request $request): bool {
+            return str_contains($request['message'], 'Hello! We received your order ORD-LOC')
+                && ! str_contains($request['message'], 'Halo!');
+        });
     }
 }
