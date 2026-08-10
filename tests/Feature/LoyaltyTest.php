@@ -340,6 +340,59 @@ class LoyaltyTest extends TestCase
     }
 
     // ---------------------------------------------------------------------
+    // Full-refund loyalty reversal (Vikunja 166): a full refund zeroes out
+    // the paid_total AND reverses the loyalty stamp that was credited on
+    // payment, clearing loyalty_credited_at so a subsequent re-payment
+    // re-credits. Partial refunds leave the stamp intact.
+    // ---------------------------------------------------------------------
+
+    public function test_full_refund_reverses_loyalty_stamp_and_clears_credited_flag(): void
+    {
+        $admin = Admin::factory()->create();
+        $this->actingAs($admin, 'admin');
+
+        $order = $this->createPaidOrder('081234567890', 20000, $admin);
+
+        $card = LoyaltyCard::where('phone', '081234567890')->firstOrFail();
+        $this->assertSame(1, $card->stamps);
+        $this->assertNotNull($order->fresh()->loyalty_credited_at);
+
+        $order->refresh()->refund($order->paid_total);
+
+        $order->refresh();
+        $this->assertSame(OrderStatus::Refunded, $order->status);
+        $this->assertSame(0, $order->paid_total);
+
+        $card = LoyaltyCard::where('phone', '081234567890')->firstOrFail();
+        $this->assertSame(0, $card->stamps);
+        $this->assertNull($order->loyalty_credited_at);
+    }
+
+    public function test_partial_refund_does_not_reverse_loyalty_stamp(): void
+    {
+        $admin = Admin::factory()->create();
+        $this->actingAs($admin, 'admin');
+
+        $order = $this->createPaidOrder('081234567890', 50000, $admin);
+
+        $card = LoyaltyCard::where('phone', '081234567890')->firstOrFail();
+        $this->assertSame(1, $card->stamps);
+
+        $creditedAt = $order->fresh()->loyalty_credited_at;
+        $this->assertNotNull($creditedAt);
+
+        $order->refresh()->refund(20000);
+
+        $order->refresh();
+        $this->assertSame(OrderStatus::Paid, $order->status);
+        $this->assertSame(30000, $order->paid_total);
+
+        $card = LoyaltyCard::where('phone', '081234567890')->firstOrFail();
+        $this->assertSame(1, $card->stamps);
+        $this->assertNotNull($order->loyalty_credited_at);
+    }
+
+    // ---------------------------------------------------------------------
     // Atomic balance mutations (Vikunja 115, part): read-modify-write is
     // serialized, so sequential/nested operations never lose stamps and a
     // redeem can never drive the balance negative.

@@ -190,6 +190,11 @@ class Order extends Model
 
         if ($this->paid_total <= 0) {
             $this->update(['status' => OrderStatus::Refunded]);
+
+            if ($this->customer_phone !== null && $this->loyalty_credited_at !== null) {
+                LoyaltyCard::adjustStamps($this->customer_phone, -1);
+                $this->forceFill(['loyalty_credited_at' => null])->saveQuietly();
+            }
         }
 
         return true;
