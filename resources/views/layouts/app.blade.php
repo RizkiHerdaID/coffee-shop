@@ -50,9 +50,11 @@
             'openingHoursSpecification' => $openingHours,
         ];
 
-        $visibleTestimonials = \Illuminate\Support\Facades\Schema::hasTable('testimonials')
-            ? \App\Models\Testimonial::query()->visible()->get(['rating'])
-            : collect();
+        $visibleTestimonials = Cache::remember('layout:testimonials:ratings', now()->addHours(1), function (): Collection {
+            return \Illuminate\Support\Facades\Schema::hasTable('testimonials')
+                ? \App\Models\Testimonial::query()->visible()->get(['rating'])
+                : collect();
+        });
 
         if ($visibleTestimonials->count() >= 3) {
             $localBusiness['aggregateRating'] = [

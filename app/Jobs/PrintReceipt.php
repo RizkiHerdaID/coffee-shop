@@ -40,21 +40,21 @@ class PrintReceipt implements ShouldQueue
                 'x'.$item->qty,
                 $width,
             );
-            $lines[] = $this->formatLine('', 'Rp '.number_format($item->subtotal, 0, ',', '.'), $width);
+            $lines[] = $this->formatLine('', $this->rupiah($item->subtotal), $width);
         }
 
         $lines[] = $this->rule('-', $width);
 
         if ($order->discount_value > 0) {
-            $lines[] = $this->formatLine(__('dashboard.discount'), '-Rp '.number_format($order->discount_value, 0, ',', '.'), $width);
+            $lines[] = $this->formatLine(__('dashboard.discount'), '-'.$this->rupiah($order->discount_value), $width);
         }
 
-        $lines[] = $this->formatLine(__('pos.receipt.total'), 'Rp '.number_format($order->net_total, 0, ',', '.'), $width);
+        $lines[] = $this->formatLine(__('pos.receipt.total'), $this->rupiah($order->net_total), $width);
 
         foreach ($order->payments as $payment) {
             $lines[] = $this->formatLine(
                 mb_strtoupper(($payment->method ?? PaymentMethod::Cash)->getLabel()),
-                'Rp '.number_format($payment->amount, 0, ',', '.'),
+                $this->rupiah($payment->amount),
                 $width,
             );
         }
@@ -68,7 +68,7 @@ class PrintReceipt implements ShouldQueue
         if ($change > 0) {
             $lines[] = $this->formatLine(
                 __('pos.receipt.change'),
-                'Rp '.number_format($change, 0, ',', '.'),
+                $this->rupiah($change),
                 $width,
             );
         }

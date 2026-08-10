@@ -8,6 +8,7 @@ use App\Models\MenuItem;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\Shift;
+use App\Support\Money;
 use BackedEnum;
 use Closure;
 use Filament\Notifications\Notification;
@@ -339,11 +340,11 @@ class Cashier extends Page
         }
 
         if ($this->discountType === 'fixed') {
-            if (! preg_match('/^(\d{1,3}(\.\d{3})*|\d+)$/', $this->discountAmount)) {
+            if (! Money::isValidRupiah($this->discountAmount)) {
                 throw ValidationException::withMessages(['discountAmount' => __('dashboard.discount_invalid')]);
             }
 
-            $amount = (int) str_replace('.', '', $this->discountAmount);
+            $amount = Money::parseRupiah($this->discountAmount);
 
             if ($amount < 1 || $amount > $gross) {
                 throw ValidationException::withMessages(['discountAmount' => __('dashboard.discount_exceeds_total')]);
@@ -448,7 +449,7 @@ class Cashier extends Page
             throw ValidationException::withMessages(['paymentAmount' => __('pos.payment.amount_required')]);
         }
 
-        if (filled($this->paymentAmount) && (int) str_replace('.', '', (string) $this->paymentAmount) < 1) {
+        if (filled($this->paymentAmount) && Money::parseRupiah($this->paymentAmount) < 1) {
             throw ValidationException::withMessages(['paymentAmount' => __('pos.payment.amount_min')]);
         }
 
@@ -513,7 +514,7 @@ class Cashier extends Page
     protected function resolveAppliedAmount(Order $order, PaymentMethod $method): array
     {
         if ($method === PaymentMethod::Cash) {
-            $tendered = (int) str_replace('.', '', (string) $this->paymentAmount);
+            $tendered = Money::parseRupiah($this->paymentAmount);
 
             return [
                 min($tendered, $order->remaining),
@@ -527,7 +528,7 @@ class Cashier extends Page
             return [$order->remaining, 0];
         }
 
-        $applied = (int) str_replace('.', '', (string) $this->paymentAmount);
+        $applied = Money::parseRupiah($this->paymentAmount);
 
         if ($applied > $order->remaining) {
             throw ValidationException::withMessages(['paymentAmount' => __('dashboard.amount_exceeds_remaining')]);
@@ -639,7 +640,7 @@ class Cashier extends Page
         $gross = $this->cartTotal;
 
         if ($this->discountType === 'fixed') {
-            $amount = (int) str_replace('.', '', (string) $this->discountAmount);
+            $amount = Money::parseRupiah($this->discountAmount);
 
             return $amount < 1 ? 0 : min($amount, $gross);
         }

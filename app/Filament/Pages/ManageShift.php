@@ -7,6 +7,7 @@ use App\Models\Order;
 use App\Models\Payment;
 use App\Models\Shift;
 use App\Models\ShiftCashMovement;
+use App\Support\Money;
 use BackedEnum;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
@@ -140,8 +141,8 @@ class ManageShift extends Page
                 ],
                 'deposits' => $deposits,
                 'petty_out' => $pettyOut,
-                'expected_cash' => $shift->opening_cash + $cashPaid + $cashRefunds + $deposits - $pettyOut,
-                'discrepancy' => $shift->closing_cash - ($shift->opening_cash + $cashPaid + $cashRefunds + $deposits - $pettyOut),
+                'expected_cash' => $shift->expectedCash(),
+                'discrepancy' => $shift->discrepancy(),
             ];
         });
     }
@@ -308,16 +309,16 @@ class ManageShift extends Page
 
     protected function isValidAmount(string $value): bool
     {
-        return preg_match('/^(\d{1,3}(\.\d{3})*|\d+)$/', $value) === 1;
+        return Money::isValidRupiah($value);
     }
 
     protected function parseAmount(string $value): int
     {
-        return (int) str_replace('.', '', $value);
+        return Money::parseRupiah($value);
     }
 
     protected function formatIdr(int $amount): string
     {
-        return 'Rp '.number_format($amount, 0, ',', '.');
+        return Money::formatRupiah($amount);
     }
 }

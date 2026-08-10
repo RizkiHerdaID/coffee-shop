@@ -6,6 +6,7 @@ use App\Enums\OrderStatus;
 use App\Enums\PaymentMethod;
 use App\Filament\Exports\OrderExporter;
 use App\Models\Order;
+use App\Support\Money;
 use Closure;
 use Filament\Actions\Action;
 use Filament\Actions\EditAction;
@@ -15,7 +16,6 @@ use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
 use Filament\Support\Icons\Heroicon;
-use Filament\Support\RawJs;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
@@ -115,14 +115,14 @@ class OrdersTable
                             ->label(__('pos.refund.amount'))
                             ->required()
                             ->prefix('Rp')
-                            ->mask(RawJs::make('$money($input, \',\', \'.\', 0)'))
-                            ->rule('regex:/^(\d{1,3}(\.\d{3})*|\d+)$/')
-                            ->formatStateUsing(fn ($state) => $state === null || $state === '' ? $state : (is_string($state) && str_contains($state, '.') ? $state : number_format((int) $state, 0, ',', '.')))
-                            ->dehydrateStateUsing(fn ($state) => (int) str_replace('.', '', (string) $state))
+                            ->mask(Money::filamentMask())
+                            ->rule(...Money::filamentRule())
+                            ->formatStateUsing(Money::filamentFormat(...))
+                            ->dehydrateStateUsing(fn ($state) => Money::parseRupiah($state))
                             ->rule(function (TextInput $component): Closure {
                                 return function (string $attribute, mixed $value, Closure $fail) use ($component): void {
                                     $record = $component->getRecord();
-                                    $amount = (int) str_replace('.', '', (string) $value);
+                                    $amount = Money::parseRupiah($value);
 
                                     if ($record instanceof Order && $amount > $record->paid_total) {
                                         $fail(__('pos.refund.exceeds_paid'));

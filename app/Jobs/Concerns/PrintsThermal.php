@@ -71,6 +71,14 @@ trait PrintsThermal
     }
 
     /**
+     * Format an integer-IDR amount for the thermal receipt.
+     */
+    protected function rupiah(int $amount): string
+    {
+        return 'Rp '.number_format($amount, 0, ',', '.');
+    }
+
+    /**
      * Two-column line: left label, right value, padded to the full width.
      *
      * Both columns are truncated so the rendered line NEVER exceeds the

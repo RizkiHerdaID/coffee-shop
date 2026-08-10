@@ -4,10 +4,10 @@ namespace App\Filament\Resources\Orders\Schemas;
 
 use App\Enums\OrderStatus;
 use App\Models\Order;
+use App\Support\Money;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Schemas\Schema;
-use Filament\Support\RawJs;
 use Illuminate\Database\Eloquent\Builder;
 
 class OrderForm
@@ -31,10 +31,10 @@ class OrderForm
                     ->label(__('orders.total'))
                     ->required()
                     ->prefix('Rp')
-                    ->mask(RawJs::make('$money($input, \',\', \'.\', 0)'))
-                    ->formatStateUsing(fn ($state) => self::formatTotal($state))
-                    ->dehydrateStateUsing(fn (?string $state): ?int => $state === null ? null : (int) str_replace('.', '', $state))
-                    ->rule('regex:/^(\d{1,3}(\.\d{3})*|\d+)$/'),
+                    ->mask(Money::filamentMask())
+                    ->formatStateUsing(Money::filamentFormat(...))
+                    ->dehydrateStateUsing(fn (?string $state): ?int => $state === null ? null : Money::parseRupiah($state))
+                    ->rule(...Money::filamentRule()),
                 Select::make('shift_id')
                     ->relationship('shift', 'id', function (Select $component, Builder $query): Builder {
                         $query->open();
@@ -63,14 +63,6 @@ class OrderForm
      */
     public static function formatTotal(mixed $state): mixed
     {
-        if ($state === null || $state === '') {
-            return $state;
-        }
-
-        if (str_contains((string) $state, '.')) {
-            return $state;
-        }
-
-        return number_format((int) $state, 0, ',', '.');
+        return Money::filamentFormat($state);
     }
 }
